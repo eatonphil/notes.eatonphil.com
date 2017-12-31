@@ -1,0 +1,259 @@
+# Walking through a basic Racket web service
+## December 29, 2016
+
+Racket is an impressive language and ecosystem. Compared to Python,
+Racket (an evolution of Scheme [R5RS][1] is three years younger. It is
+as concise and expressive as Python but with much more reasonable
+syntax and semantics. Racket is also faster in many cases due in part
+to:
+
+* [JIT compilation][2] on x86 platforms
+* support for both
+[concurrency][3] and [parallelism][4]
+* support for [optimizing][5] statically-typed code
+
+Furthermore, the built-in web server libraries **and** database
+drivers for MySQL and PostgreSQL are fully asynchronous. This last bit
+drove me here from [Play / Akka][6].  (But strong reservations about
+the complexity of Scala and the ugliness of Play in Java helped too.)
+
+With this motivation in mind, I'm going to break down the simple web
+service [example][7] provided in the Racket manuals. If you don't see
+the following code in the linked page immediately, scroll down a bit.
+
+```scheme
+#lang web-server
+
+(require web-server/http)
+
+(provide interface-version stuffer start)
+
+(define interface-version 'stateless)
+
+(define stuffer
+  (stuffer-chain
+   serialize-stuffer
+   (md5-stuffer (build-path (find-system-path 'home-dir) ".urls"))))
+
+(define (start req)
+  (response/xexpr
+   `(html (body (h2 "Look ma, no state!")))))
+```
+
+First we notice the #lang declaration. Racket libraries love to make
+new "languages". These languages can include some entirely new syntax
+(like the [Algol language implementation][8]) or can simply include a
+summary collection of libraries and alternative program entrypoints
+(such as this web-server language provides). So the first thing we'll
+do to really understand this code is to throw out the custom
+language. And while we're at it, we'll throw out all typical imports
+provided by the [default racket language][9] and use the racket/base
+language instead. This will help us get a better understanding of the
+Racket libraries and the functions we're using from these libraries.
+
+While we're throwing the language away, we notice the paragraphs just
+below that [original example][10] in the manual. It mentions that the
+web-server language also imports a bunch of modules. We can discover
+which of these modules we actually need by searching in the Racket
+manual for functions we've used.  For instance, [searching][11] for
+"response/xexpr" tells us it's in the [web-server/http/xexpr][12]
+module. We'll import the modules we need using the "prefix-in" form to
+make function-module connections explicit.
+
+```scheme
+#lang racket/base
+
+(require (prefix-in xexpr: web-server/http/xexpr)
+         (prefix-in hash: web-server/stuffers/hash)
+         (prefix-in stuffer: web-server/stuffers/stuffer)
+         (prefix-in serialize: web-server/stuffers/serialize))
+
+(provide interface-version stuffer start)
+
+(define interface-version 'stateless)
+
+(define stuffer
+  (stuffer:stuffer-chain
+   serialize:serialize-stuffer
+   (hash:md5-stuffer (build-path (find-system-path 'home-dir) ".urls"))))
+
+(define (start req)
+  (xexpr:response/xexpr
+   `(html (body (h2 "Look ma, no state!")))))
+```
+
+Now we've got something that is a little less magical. We can run this
+file by calling it: "racket server.rkt". But nothing happens. This is
+because the web-server language would start the service itself using
+the exported variables we provided. So we're going to have to figure
+out what underlying function calls "start" and call it
+ourselves. Unfortunately searching for "start" in the manual search
+field yields nothing relevant. So we Google "racket web server
+start". Down the page on the second [search result][13] we notice an
+[example][14] using the serve/servlet function to register the start
+function.  This is our in.
+
+```scheme
+#lang racket/base
+
+(require (prefix-in xexpr: web-server/http/xexpr)
+         (prefix-in hash: web-server/stuffers/hash)
+         (prefix-in stuffer: web-server/stuffers/stuffer)
+         (prefix-in serialize: web-server/stuffers/serialize)
+         (prefix-in servlet-env: web-server/servlet-env))
+
+(provide interface-version stuffer start)
+
+(define interface-version 'stateless)
+
+(define stuffer
+  (stuffer:stuffer-chain
+   serialize:serialize-stuffer
+   (hash:md5-stuffer (build-path (find-system-path 'home-dir) ".urls"))))
+
+(define (start req)
+  (xexpr:response/xexpr
+   `(html (body (h2 "Look ma, no state!")))))
+
+(servlet-env:serve/servlet start)
+```
+
+Run this version and it works! We are directed to a browser with our
+HTML.  But we should clean this code up a bit. We no longer need to
+export anything so we'll drop the provide line. We aren't even using
+the interface-version and stuffer code. Things seem to be fine without
+them, so we'll drop those too.  Also, looking at the serve/servlet
+[documentation][15] we notice some other nice arguments we can tack
+on.
+
+```scheme
+#lang racket/base
+
+(require (prefix-in xexpr: web-server/http/xexpr)
+         (prefix-in servlet-env: web-server/servlet-env))
+
+(define (start req)
+  (xexpr:response/xexpr
+   `(html (body (h2 "Look ma, no state!")))))
+
+(servlet-env:serve/servlet
+ start
+ #:servlet-path "/"
+ #:servlet-regexp rx""
+ #:stateless? #t)
+```
+
+Ah, that's much cleaner. When you run this code, you will no longer be
+directed to the /servlets/standalone.rkt path but to the site root --
+set by the #:servlet-path optional variable. Also, every other path
+you try to reach such as /foobar will successfully map to the start
+function -- set by the #:servlet-regexp optional variable. Finally, we
+also found the configuration to set the servlet stateless -- set by
+the optional variable \#:stateless?.
+
+But this is missing two things we could really use out of a simple web
+service. The first is routing. We do that by looking up the
+documentation for the [web-server/dispatch][16] module. We'll use this
+module to define some routes -- adding a 404 route to demonstrate the
+usage.
+
+```scheme
+#lang racket/base
+
+(require (prefix-in dispatch: web-server/dispatch)
+         (prefix-in xexpr: web-server/http/xexpr)
+         (prefix-in servlet: web-server/servlet-env))
+
+(define (not-found-route request)
+  (xexpr:response/xexpr
+   `(html (body (h2 "Uh-oh! Page not found.")))))
+
+(define (home-route request)
+  (xexpr:response/xexpr
+   `(html (body (h2 "Look ma, no state!!!!!!!!!")))))
+
+(define-values (route-dispatch route-url)
+  (dispatch:dispatch-rules
+   [("") home-route]
+   [else not-found-route]))
+
+(servlet:serve/servlet
+ route-dispatch
+ #:servlet-path "/"
+ #:servlet-regexp #rx""
+ #:stateless? #t)
+```
+
+Run this version and check out the server root. Then try any other
+path. Looks good.  The final missing piece to this simple web service
+is logging. Thankfully, the [web-server/dispatch-log][17] module has
+us covered with some request formatting functions. So we'll wrap the
+route-dispatch function and we'll print out the formatted request.
+
+```scheme
+#lang racket/base
+
+(require (prefix-in dispatch: web-server/dispatch)
+         (prefix-in dispatch-log: web-server/dispatchers/dispatch-log)
+         (prefix-in xexpr: web-server/http/xexpr)
+         (prefix-in servlet: web-server/servlet-env))
+
+(define (not-found-route request)
+  (xexpr:response/xexpr
+   `(html (body (h2 "Uh-oh! Page not found.")))))
+
+(define (home-route request)
+  (xexpr:response/xexpr
+   `(html (body (h2 "Look ma, no state!!!!!!!!!")))))
+
+(define-values (route-dispatch route-url)
+  (dispatch:dispatch-rules
+   [("") home-route]
+   [else not-found-route]))
+
+(define (route-dispatch/log-middleware req)
+  (display (dispatch-log:apache-default-format req))
+  (flush-output)
+  (route-dispatch req))
+
+(servlet:serve/servlet
+ route-dispatch/log-middleware
+ #:servlet-path "/"
+ #:servlet-regexp #rx""
+ #:stateless? #t)
+```
+
+Run this version and notice the logs displayed for each request. Now
+you've got a simple web service with routing and logging!  I hope this
+gives you a taste for how easy it is to build simple web services in
+Racket without downloading any third-party libraries. Database drivers
+and HTML template libraries are also included and similarly
+well-documented. In the future I hope to add an example of a slightly
+more advanced web service.
+
+<p style="font-size: 12px">
+  Aside: I have had huge difficulty discovering the source of Racket
+  libraries.  These library sources are nearly impossible to Google
+  and search on Github is insane.  Best scenario, the official
+  racket.org docs would link directly to the source of a function when
+  the function is documented. Of course I could just download the
+  Racket source and start grepping... but I'm only so interested.
+</p>
+
+[1]: https://en.wikipedia.org/wiki/Scheme_(programming_language)
+[2]: https://docs.racket-lang.org/guide/performance.html#%28part._.J.I.T%29
+[3]: https://docs.racket-lang.org/reference/threads.html
+[4]: https://docs.racket-lang.org/reference/places.html
+[5]: https://docs.racket-lang.org/ts-guide/optimization.html
+[6]: https://www.playframework.com/documentation/2.6.x/ThreadPools#Knowing-when-you-are-blocking
+[7]: https://docs.racket-lang.org/web-server/stateless.html#%28part._stateless-example%29
+[8]: http://docs.racket-lang.org/algol60/
+[9]: http://docs.racket-lang.org/reference/
+[10]: https://docs.racket-lang.org/web-server/stateless.html#%28part._stateless-example%29
+[11]: https://docs.racket-lang.org/search/index.html?q=response%2Fxexpr
+[12]: https://docs.racket-lang.org/web-server/http.html#%28part._xexpr%29
+[13]: https://docs.racket-lang.org/web-server/run.html
+[14]: https://docs.racket-lang.org/web-server/run.html#%28part._.Examples%29
+[15]: https://docs.racket-lang.org/web-server/run.html#%28def._%28%28lib._web-server%2Fservlet-env..rkt%29._serve%2Fservlet%29%29
+[16]: https://docs.racket-lang.org/web-server/dispatch.html
+[17]: https://docs.racket-lang.org/web-server-internal/dispatch-log.html

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+rsync dist eatonphil.com:/var/www/html

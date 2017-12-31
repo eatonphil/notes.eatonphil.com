@@ -1,0 +1,124 @@
+body {
+    margin: 0 auto;
+    padding: 0;
+    color: #333;
+}
+
+h1 {
+    font-family: "Segoe UI", Frutiger, "Frutiger Linotype", "Dejavu Sans", "Helvetica Neue", Arial, sans-serif;
+    font-size: 1.7rem;
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 500;
+    line-height: 1.9rem;
+    margin: 0 0 5px 0;
+}
+
+h2 {
+    font-family: "Segoe UI", Frutiger, "Frutiger Linotype", "Dejavu Sans", "Helvetica Neue", Arial, sans-serif;
+    font-size: 1rem;
+    font-style: normal;
+    font-variant: normal;
+    font-weight: normal;
+    line-height: 1.1rem;
+    color: #555;
+}
+
+p, li {
+    font-family: "Segoe UI", Frutiger, "Frutiger Linotype", "Dejavu Sans", "Helvetica Neue", Arial, sans-serif;
+    font-size: 1rem;
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1.9rem;
+}
+
+a {
+    color: rgb(66, 133, 244);
+    font-family: "Segoe UI", Frutiger, "Frutiger Linotype", "Dejavu Sans", "Helvetica Neue", Arial, sans-serif;
+    font-size: .9rem;
+    text-decoration: none;
+}
+
+pre {
+    width: 800px;
+    margin-left: -75px;
+}
+
+@media (max-width: 800px) {
+    pre {
+        width: 100%;
+        margin-left: 0;
+    }
+}
+
+hr {
+    padding: 0;
+    margin: 0;
+}
+
+footer .container {
+    padding-top: 0;
+    margin-bottom: 15px;
+}
+
+footer p {
+    padding: 0;
+    margin: 0;
+    font-size: .9rem;
+}
+
+.container {
+    width: 650px;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 10px 15px;
+}
+
+header .container {
+    border-left: 15px solid #ff2d2d;
+    margin: 15px auto;
+}
+
+.hljs {
+    padding: 30px;
+    background: white;
+    border: 1px solid #ccc;
+}
+
+.title {
+    color: #333;
+    margin: 0;
+    padding: 0;
+    line-height: initial;
+    font-size: .9rem;
+}
+
+.subtitle {
+    color: #333;
+    text-decoration: none;
+    font-size: 1.15rem;
+    font-variant: small-caps;
+    font-weight: 900;
+}
+
+.summary {
+    border: 1px solid #ccc;
+    padding: 15px;
+    display: block;
+}
+
+.summary:not(:last-of-type) {
+    margin-bottom: 15px;
+}
+
+.summary h1 {
+    font-size: 1.05rem;
+}
+
+.summary h2 {
+    font-size: .9rem;
+    line-height: initial;
+    margin: 0;
+    padding: 0;
+}

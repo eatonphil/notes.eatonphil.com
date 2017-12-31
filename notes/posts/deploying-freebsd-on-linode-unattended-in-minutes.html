@@ -1,0 +1,93 @@
+# Deploying FreeBSD on Linode unattended in minutes
+## March 11, 2017
+
+I became a FreeBSD user over 2 years ago when I wanted to see what all
+the fuss was about. I swapped my y410p dual-booting Windows / Ubuntu
+with FreeBSD running Gnome 3. I learned a lot during the transition
+and came to appreciate FreeBSD as a user. I soon began running FreeBSD
+as my OS of choice on cloud servers I managed. So naturally, when I
+started working at Linode a year ago I wanted to run FreeBSD servers
+on Linode too.
+
+Linode is a great platform for running random unofficial images
+because you have much control over the configuration. I followed
+[existing][1] [guides][2] closely and was soon able to get a number of
+operating systems running on Linodes by installing them manually:
+FreeBSD, OpenBSD, NetBSD, Minix3, and SmartOS to date.
+
+Unofficial images come at a cost though. In particular, I became
+frustrated having to reinstall using the installer every time I
+managed to trash the disk. So over the past year, I spent time trying
+to understand the automated installation processes across different
+operating systems and Linux distributions.
+
+Unattended installations are tough. The methods for doing them differ
+wildly. On RedHat, Fedora, and CentOS there is [Kickstart][3]. On
+Debian and Ubuntu there is [preseeding][4]. Gentoo, Arch, and FreeBSD
+don't particularly have a framework for unattended installs, but the
+entire installation process is well-documented and inherently
+scriptable (if you put in the effort). OpenBSD has
+[autoinstall][5]. Trying to understand each and every one of these
+potential installation methods was pretty defeating for getting
+started on a side-project.
+
+A few weeks ago, I finally had the silly revelation that I didn't need
+to script the installation process -- at least initially. I only had
+to have working images available somewhere that could be copied to new
+Linodes. Some OSs / distributions may provide these images, but there
+is no guarantee that they exist or work. If I tested and hosted them
+for Linodes, anyone could easily run their own copy.
+
+I began by running the installation process as normal for
+FreeBSD. After the disk had FreeBSD installed on it, I rebooted into
+[Finnix][6], [made a compressed disk image][7], and transferred it to
+an "image host" (another Linode in Fremont running an FTP
+server). Then I tested the reversal process manually to make sure a
+new Linode could grab the image, dd it to a disk, reboot and have a
+working filesystem and networking. (This transfer occurs over private
+networking to reduce bandwidth costs and thus limits Linode creation
+to the datacenter of the image host, Fremont.)
+
+Then it was time to script the process. I looked into the existing
+Linode API client wrappers and noticed none of them were
+documented. So I took a day to write and document a good part of a
+[new Linode Python client][8].
+
+I got to work and out came the [linode-deploy-experimental][9]
+script. To run this script, you'll need an [API token][10]. This
+script will allow you to deploy from the hosted images (which now
+include FreeBSD 11.0 and OpenBSD 6.0). Follow the example line in the
+git repo and you'll have a Linode running OpenBSD or FreeBSD in
+minutes.
+
+Clearly there's a lot of work to do on both this script and on the
+images:
+
+* Fremont datacenter has the only image host.
+* The script does not change the default password: "password123".
+You'll want to change this immediately.
+* The script does not automatically grow the file system after
+install.
+* The TTY config for these images currently requires you to use
+Glish instead of Weblish.
+* And [more][11].
+
+Even if many of these issues do get sorted out (I assume they will),
+keep in mind that these are unofficial, unsupported images. Some
+things will probably never work: backups, password reset, etc. If you
+need help, you are probably limited to community support. You can also
+find me with any questions (peaton on OFTC). But for me this is at
+least a slight improvement on having to run through the install
+process every time I need a new FreeBSD Linode.
+
+[1]: https://www.linode.com/docs/tools-reference/custom-kernels-distros/install-freebsd-on-linode/
+[2]: https://forum.linode.com/viewtopic.php?f=20&t=12080
+[3]: https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/5/html/installation_guide/ch-kickstart2
+[4]: https://wiki.debian.org/DebianInstaller/Preseed
+[5]: http://man.openbsd.org/OpenBSD-6.0/man8/autoinstall.8
+[6]: https://www.linode.com/docs/troubleshooting/rescue-and-rebuild/
+[7]: https://wiki.archlinux.org/index.php/disk_cloning#Create_disk_image
+[8]: https://github.com/eatonphil/python3-linode_api3
+[9]: https://github.com/eatonphil/linode_deploy_experimental
+[10]: https://www.linode.com/docs/platform/api/api-key/
+[11]: https://github.com/eatonphil/linode_deploy_experimental/issues
