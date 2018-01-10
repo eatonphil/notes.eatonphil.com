@@ -6,6 +6,7 @@ body {
     margin: 0 auto;
     padding: 0;
     color: #333;
+    background: #fdfdff;
 }
 
 h1 {
@@ -25,7 +26,8 @@ h2 {
     font-variant: normal;
     font-weight: normal;
     line-height: 1.1rem;
-    color: #555;
+    color: #666;
+    padding-bottom: 5px;
 }
 
 p, li {
@@ -59,6 +61,10 @@ pre {
 hr {
     padding: 0;
     margin: 0;
+    display: block;
+    height: 1px;
+    border: 0;
+    border-top: 1px solid #ccc;
 }
 
 footer .container {
@@ -80,8 +86,10 @@ footer p {
 }
 
 header .container {
-    border-left: 15px solid #ff2d2d;
+    border-left: 15px solid #496fb5;
     margin: 15px auto;
+    position: relative;
+    left: 15px;
 }
 
 .hljs {
@@ -110,6 +118,7 @@ header .container {
     border: 1px solid #ccc;
     padding: 15px;
     display: block;
+    background: white;
 }
 
 .summary:not(:last-of-type) {
@@ -118,6 +127,7 @@ header .container {
 
 .summary h1 {
     font-size: 1.05rem;
+    font-weight: normal;
 }
 
 .summary h2 {
@@ -125,4 +135,5 @@ header .container {
     line-height: initial;
     margin: 0;
     padding: 0;
+    font-weight: normal;
 }

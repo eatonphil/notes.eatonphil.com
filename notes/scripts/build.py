@@ -1,4 +1,5 @@
 import glob
+from datetime import datetime
 
 import mistune
 
@@ -45,6 +46,7 @@ def main():
     for post in get_posts():
         out_file = post[len('posts/'):]
         output, title = get_post_data(post)
+        header, date = title[1], title[2]
 
         post_data.append((out_file, title[1], title[2]))
 
@@ -52,6 +54,8 @@ def main():
         with open('dist/' + out_file, 'w') as f:
             f.write(TEMPLATE.format(post=output + "<hr />", title=title, tag=(TAG or title)))
 
+    post_data.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
+    post_data.reverse()
     post = "\n".join([POST_SUMMARY.format(*args) for args in post_data])
     with open('dist/index.html', 'w') as f:
         f.write(TEMPLATE.format(post=post, title=TAG, tag=TAG))
