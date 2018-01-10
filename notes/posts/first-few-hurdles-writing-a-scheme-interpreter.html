@@ -1,0 +1,105 @@
+# First few hurdles writing a Scheme interpreter
+## January 10, 2018
+
+I started working on [BSDScheme][0] last October, inspired to get back
+into language implementation after my coworker built [bshift][1], a
+compiler for a C-like language. BSDScheme is an interpreter for a
+(currently small subset of) Scheme written in D. It implements a few
+substantial primitive [functions][2] (in under 1000 LoC!). It uses the
+same test framework bshift uses, [btest][12]. I'm going to expand here
+on some notes I wrote in a [post][11] on Reddit on some issues I faced
+during these first few months developing BSDSCheme.
+
+Before I get too far, here is a simple exponent function running in
+BSDScheme. It demonstates a few of the basic builtin primitives and
+also integers being upgraded to D's [std.bigint][10] when an integer
+operation produces an integer unable to fit in 64 bits. (See the
+[times][14] and [plus][15] guards for details; see the [examples][13]
+directory for other examples.)
+
+```shell
+$ cat examples/recursion.scm
+(define (exp base pow)
+  (if (= pow 0)
+      1
+      (* base (exp base (- pow 1)))))
+
+(display (exp 2 64))
+(newline)
+$ ./bin/bsdscheme examples/exp.scm
+18446744073709551616
+```
+
+The first big correction I made was to the way values are represented
+in memory. I originally implemented BSDScheme's value representation
+as a [struct][3] with a pointer to each possible value type. This
+design was simple to begin with but space-inefficient. I modelled a
+[redesign][6] after the [Chicken Scheme][4] data representation. It
+uses a struct with [two fields][5], header and data. Both fields are
+word-size integers (currently hard-coded as 64 bits). The header
+stores type and length information and the data stores data.
+
+In this representation, simple types (integers &lt; 2^63, booleans,
+characters, etc.) take up only 128 bits. The integers, booleans, etc.
+are placed directly into the 64 bit data field. Other types (larger
+integers, strings, functions, etc) use the data field to store a
+pointer to memory allocated in the heap. Getting the conversion of
+these complex types right was the trickiest part of this data
+representation effort... lots of void-pointer conversions.
+
+The next big fix I made was to simplify the way generic functions
+dealt with their arguments. Originally I passed each function its
+arguments unevaluated and left it up to each function to evaluate its
+arguments before operating on them. While there was nothing
+intrinsically wrong with this method, it was overly complicated and
+bug-prone. I refactored the builtin functions into two groups:
+[normal][2] functions and [special][7] functions. Normal function
+arguments are [evaluated][8] before sending the arguments S-expression
+to the function. Special functions receive the arguments S-expression
+verbatim so they can decide what / when to evaluate.
+
+The last issue I'll talk about in this post was dealing with the AST
+representation. When I started out, the easiest way to get things
+working was to have an AST representation completely separate from the
+representation of BSDScheme values. This won't get you far in
+Scheme. In order to (eventually) support macros (and in the meantime
+support eval), the AST representation would have to make use of the
+value representation. This was the most complicated and confusing
+issue so far in BSDScheme. With the switch to recursive data
+structures, it was hard to know if an error occurred because I parsed
+incorrectly, or recursed over what I parsed incorrectly, or even if I
+was printing out what I parsed incorrectly. After some embarrassing
+pain, I got all the [pieces in place][9] after a month and it set me
+up to easily support converting my original interpret function into a
+generic eval function that I could expose to the language like any
+other special function.
+
+One frustrating side-effect of this AST conversion is that since the
+parsing stage builds out trees using the internal value
+representation, the parsing stage is tied to the interpreter. From
+what I can tell, this basically means I have to revert back to some
+intermediate AST representation or throw away the parser to support a
+compiler backend.
+
+Next steps in BSDScheme include converting all the examples into
+tests, combining the needlessly split out lexing and parsing stage
+into a single read function that can be exposed into the language,
+fleshing out R7RS library support, and looking more into LLVM as a
+backend.
+
+[0]: https://github.com/eatonphil/bsdscheme
+[1]: https://github.com/briansteffens/bshift
+[2]: https://github.com/eatonphil/bsdscheme/blob/c49bb14182f04682a5cda4dd224b853b4fc92e92/src/runtime.d#L422
+[3]: https://github.com/eatonphil/bsdscheme/pull/3/files#diff-653d5ccdaa287f13a3b2d964da52ab4aL284
+[4]: https://wiki.call-cc.org/man/4/Data%20representation
+[5]: https://github.com/eatonphil/bsdscheme/pull/3/files#diff-c586618fe7ea7c64340046e89fd82621R14
+[6]: https://github.com/eatonphil/bsdscheme/pull/3
+[7]: https://github.com/eatonphil/bsdscheme/blob/c3286df73a32da657e780db8f33e845c9f806a9d/src/runtime.d#L435
+[8]: https://github.com/eatonphil/bsdscheme/blob/c3286df73a32da657e780db8f33e845c9f806a9d/src/runtime.d#L399
+[9]: https://github.com/eatonphil/bsdscheme/pull/5
+[10]: https://dlang.org/phobos/std_bigint.html
+[11]: https://www.reddit.com/r/scheme/comments/7nvd1y/my_small_scheme_implementation_in_d/
+[12]: https://github.com/briansteffens/btest
+[13]: https://github.com/eatonphil/bsdscheme/tree/master/examples
+[14]: https://github.com/eatonphil/bsdscheme/blob/b202e8b5a24fe4281a06e39241f2be3cd51720fc/src/runtime.d#L99
+[15]: https://github.com/eatonphil/bsdscheme/blob/b202e8b5a24fe4281a06e39241f2be3cd51720fc/src/runtime.d#L63
