@@ -30,6 +30,14 @@ h2 {
     padding-bottom: 5px;
 }
 
+h3 {
+    color: #333;
+}
+
+h4 {
+    color: #666;
+}
+
 p, li {
     font-family: sans-serif;
     font-size: 1rem;
