@@ -77,7 +77,7 @@ This uses a portable library, "uiop", that ASDF exposes by default (we
 won't need to explicitly import this anywhere because the package is
 managed by ASDF). It will run the command "docker ps" in a subprocess
 and return the output as a string. Then we use the regex split
-function from the cl-ppcre library to split the output first into
+function from the "cl-ppcre" library to split the output first into
 lines, take all but the first line, and split the lines up based one
 two or more whitespace characters.
 
@@ -93,8 +93,8 @@ Next let's define the package (think module in Python) by editing
 
 Here we state the package's name, say that we want to import all
 Common Lisp base symbols into the package, say we want to import the
-"split" symbol from the "cl-ppcre" package, and say we want to export
-only our "ps" function.
+"split" symbol from the "cl-ppcre" package, and say we only want to
+export our "ps" function.
 
 At this point we must also declare within the "cl-docker/docker.lisp"
 file that it is a part of this package:
@@ -121,16 +121,19 @@ in "cl-docker/cl-docker.asd":
 This defines all the pieces of the system for ASDF: the system name,
 the package definition and the component of the package
 ("cl-docker/docker.lisp"), and tells ASDF to make the "cl-ppcre"
-system on disk available to us. However, we don't have the "cl-ppcre"
-system on disk, so we tell Quicklisp to load this system and it will
-fetch any missing dependencies from its repository. But one last step
-before then, unless you put this directory in "~/common-lisp", you'll
-need to register the directory containing the directory of your
-system definitions so ASDF (and Quicklisp) no where to look if you
+system on disk available to us. However in preparation for times when
+we don't have the "cl-ppcre" system (or any other dependencies) on
+disk, we always load the system indirectly through Quicklisp (rather
+than directly via ASDF) so Quicklisp can fetch any missing
+dependencies from its repository of systems.
+
+But before then -- unless you put this directory in "~/common-lisp" --
+you'll need to register the directory containing the directory of your
+system definitions so ASDF (and Quicklisp) know where to look if you
 ask to load this system.
 
-To do this, add a ".conf" file to "~/.config/common-lisp/source-registry.conf.d/"
-and add the following:
+To do this, add a ".conf" file to
+"~/.config/common-lisp/source-registry.conf.d/" and add the following:
 
 ```lisp
 (:tree "~/path/to/dir/containing/system/dir")
@@ -167,6 +170,8 @@ To load "cl-docker":
 * (cl-docker:ps)
 ```
 
+And that's it!
+
 For the complete source of this example package, check out this
 [Gist](https://gist.github.com/eatonphil/59cdfeb4826c7a12a07d7055f6817a56).
 
@@ -181,20 +186,19 @@ tedious, you can also use Zach Beane's (creator of Quicklisp)
 [quickproject](http://xach.livejournal.com/278047.html) tool to build
 out the structure for you.
 
-### Common Lisp resources
+### Resources for Common Lisp
 
 You must read [Practical Common
 Lisp](http://www.gigamonkeys.com/book/). It is freely available
-online. It is one of the best resources I keep referring back to
+online. It is one of the best resources I keep referring to in
 dealing with simple issues (as a new Lisper, I stumble on a lot of
 simple issues).
 
 Paul Graham's [On Lisp](http://www.paulgraham.com/onlisp.html) is also
 a must-read when you want to get a better understanding of macros in
-Lisp. It will help you out with macros in Scheme just as well. This
-book is actually out of print physically, but I sent
-[Lulu](https://www.lulu.com/) the PDF and I received a physical copy
-for under $20 (including shipping).
+Lisp. It will also help you out with macros in Scheme. This book is
+out of print physically, but I sent [Lulu](https://www.lulu.com/) the
+PDF and I received my physical copy for under $20 (including shipping).
 
 I'm currently making my way through [Common Lisp the Language 2nd
 Edition](http://www.cs.cmu.edu/Groups/AI/html/cltl/cltl2.html) which I
