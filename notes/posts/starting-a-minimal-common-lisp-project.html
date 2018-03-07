@@ -23,24 +23,25 @@ there are lighter interpreters out there that are easier to embed
 (e.g. in nginx). Chicken Scheme's "niche" is being a generally
 high-quality implementation with a great [collection of 3rd-party
 libraries](http://wiki.call-cc.org/chicken-projects/egg-index-4.html),
-but it is not the
+but it is also not the
 [fastest](https://ecraven.github.io/r7rs-benchmarks/) Scheme you could
 choose.
 
-I worked on a larger web prototype -- a Github issue reporting app --
-in [Racket](https://racket-lang.org/), a derivative of Scheme
-R6RS. I've blogged favorably about Racket
-[before](http://notes.eatonphil.com/walking-through-a-basic-racket-web-service.html).
-It is an interpreter with a JIT compiler, has thread support, and is
-also well known for its collection of [3rd-party
+I've worked on a larger web prototype -- a Github issue reporting app
+-- in [Racket](https://racket-lang.org/), a derivative of Scheme
+R6RS. And I've blogged
+[favorably](http://notes.eatonphil.com/walking-through-a-basic-racket-web-service.html)
+about Racket. It is a
+[high-performance](https://ecraven.github.io/r7rs-benchmarks/)
+interpreter with a JIT compiler, has thread support, and is also well
+known for its collection of [3rd-party
 libaries](https://pkgs.racket-lang.org/). However the Racket ecosystem
 [suffers](https://fare.livejournal.com/188429.html) from the same
 issues Haskell's does: libraries and bindings are primarily
-proof-of-concept only; missing documentation, tests and
-use. Additionally, trying to render "templatized" HTML (like Jinja
-allows for in Flask) without using S-exp-based syntax was a nightmare.
-(Read: there's space for someone to write a good string templating
-library.)
+proof-of-concept only; missing documentation, tests and use. Trying to
+render "templatized" HTML (like Jinja allows for in Flask) without
+using S-exp-based syntax was a nightmare.  (Read: there's space for
+someone to write a good string templating library.)
 
 #### Sorry, Racket
 
@@ -72,12 +73,13 @@ ASDF does not manage non-local dependencies. For that we use
 [Quicklisp](https://www.quicklisp.org/beta/), the defacto package
 manager. ASDF should come bundled with your Common Lisp installation,
 which I'll assume is SBCL (not that it matters). Quicklisp does not
-come built in.
+come bundled.
 
 ### Getting Quicklisp
 
-You can follow the notes on the Quicklisp site for installation, but
-the basic gist is:
+You can follow the notes on the Quicklisp
+[site](https://www.quicklisp.org/beta/) for installation, but the
+basic gist is:
 
 ```shell
 $ curl -O https://beta.quicklisp.org/quicklisp.lisp
@@ -113,13 +115,18 @@ not matter) and add the following:
 
 ```lisp
 (defun ps ()
-  (uiop:run-program '("docker" "ps") :output :string))
+  (let ((output (uiop:run-program '("docker" "ps") :output :string)))
+    (loop for line in (rest (cl-ppcre:split "(\\n+)" output))
+      collect (cl-ppcre:split "(\\s\\s+)" line))))
 ```
 
 This uses a portable library, "uiop", that ASDF exposes by default (we
 won't need to explicitly import this anywhere because the package is
 managed by ASDF). It will run the command "docker ps" and return the
-output as a string.
+output as a string. Then we use the regex split function from the
+cl-ppcre library to split the output first into lines, take all but
+the first line, and split the lines up based one two or more
+whitespace characters.
 
 Next let's define the package (think module in Python) by editing
 "cl-docker/package.lisp" (this name also does not matter):
@@ -127,12 +134,14 @@ Next let's define the package (think module in Python) by editing
 ```lisp
 (defpackage cl-docker
   (:use cl)
+  (:import-from :cl-ppcre :split)
   (:export :ps))
 ```
 
-Here we state the packages name, say that we want to import all Common
-Lisp base symbols into the package and we want to export only our "ps"
-function.
+Here we state the package's name, say that we want to import all
+Common Lisp base symbols into the package, say we want to import the
+"split" symbol from the "cl-ppcre" package, and say we want to export
+only our "ps" function.
 
 At this point we must also declare within the "cl-docker/docker.lisp"
 file that it is a part of this package:
@@ -141,7 +150,9 @@ file that it is a part of this package:
 (in-package :cl-docker)
 
 (defun ps ()
-  (uiop:run-program '("docker" "ps") :output :string))
+  (let ((output (uiop:run-program '("docker" "ps") :output :string)))
+    (loop for line in (rest (cl-ppcre:split "(\\n+)" output))
+      collect (cl-ppcre:split "(\\s\\s+)" line))))
 ```
 
 Next let's define the system (ASDF-level, similar to a package in Python)
@@ -149,6 +160,98 @@ in "cl-docker/cl-docker.asd":
 
 ```lisp
 (defsystem :cl-docker
+    :depends-on (:cl-ppcre)
     :components ((:file "package")
                  (:file "docker")))
 ```
+
+This defines all the pieces of the system for ASDF: the system name,
+the package definition and the component of the package
+("cl-docker/docker.lisp"), and tells ASDF to make the "cl-ppcre"
+system on disk available to us. However, we don't have the "cl-ppcre"
+system on disk, so we tell Quicklisp to load this system and it will
+fetch any missing dependencies from its repository. But one last step
+before then, unless you put this directory in "~/common-lisp", you'll
+need to register the directory containing the directory of your
+system definitions so ASDF (and Quicklisp) no where to look if you
+ask to load this system.
+
+To do this, add a ".conf" file to "~/.config/common-lisp/source-registry.conf.d/"
+and add the following:
+
+```lisp
+(:tree "~/path/to/dir/containing/system/dir")
+```
+
+So if you had a repo called "cl-docker" in your "~/projects" directory
+that contained the "cl-docker" directory we previously created (that,
+in turn, contains the "cl-docker.asd", "package.lisp", and
+"docker.lisp" files) then you might create
+"~/.config/common-lisp/source-registry.conf.d/1-cl-docker.conf" and
+add:
+
+```lisp
+(:tree "~/projects/cl-docker")
+```
+
+#### Using the system
+
+Now you can use the library from anywhere on your computer. Enter a
+Common Lisp REPL and tell Quicklisp to load the system (and download
+any non-local dependencies):
+
+```shell
+$ sbcl
+...
+* (ql:quickload "cl-docker")
+To load "cl-docker":
+  Load 1 ASDF system:
+    cl-docker
+; Loading "cl-docker"
+..................................................
+[package cl-docker]
+("cl-docker")
+* (cl-docker:ps)
+```
+
+For the complete source of this example package, check out this
+[Gist](https://gist.github.com/eatonphil/59cdfeb4826c7a12a07d7055f6817a56).
+
+### In conclusion
+
+Common Lisp is easy to work with, the packages are many and mature.
+Configuring an ASDF package is even simpler than configuring a Python
+"setup.py". I didn't demonstrate pinning versions of dependencies in
+ASDF, but [of course](https://stackoverflow.com/a/21663603/1507139)
+you can do that too. If any of this -- as simple as it is -- seems
+tedious, you can also use Zach Beane's (creator of Quicklisp)
+[quickproject](http://xach.livejournal.com/278047.html) tool to build
+out the structure for you.
+
+### Common Lisp resources
+
+You must read [Practical Common
+Lisp](http://www.gigamonkeys.com/book/). It is freely available
+online. It is one of the best resources I keep referring back to
+dealing with simple issues (as a new Lisper, I stumble on a lot of
+simple issues).
+
+Paul Graham's [On Lisp](http://www.paulgraham.com/onlisp.html) is also
+a must-read when you want to get a better understanding of macros in
+Lisp. It will help you out with macros in Scheme just as well. This
+book is actually out of print physically, but I sent
+[Lulu](https://www.lulu.com/) the PDF and I received a physical copy
+for under $20 (including shipping).
+
+I'm currently making my way through [Common Lisp the Language 2nd
+Edition](http://www.cs.cmu.edu/Groups/AI/html/cltl/cltl2.html) which I
+believe is also freely available online. However I don't really
+recommend this unless your are interested in implementing Common Lisp
+or are dying to learn the standard library (not a bad idea).
+
+Finally, Peter Norvig's [Paradigms of Artificial Intelligence
+Programming](https://github.com/norvig/paip-lisp) just recently became
+freely available online. I haven't yet read it but I'm queuing it
+up. Don't let the title scare you, apparantly it is primarily
+considered a practical guide to Common Lisp around
+old-school/classical AI that isn't supposed to encumber.
