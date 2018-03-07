@@ -17,7 +17,11 @@ class Renderer(mistune.Renderer):
 
     def header(self, text, level, *args, **kwargs):
         self.title[level] = text
-        return super().header(text, level, *args, **kwargs)
+        return "<h{level} id=\"{id}\">{text}</h{level}>".format(**{
+            "id": text.lower().replace(' ', '-'),
+            "text": text,
+            "level": level,
+        })
 
     def block_code(self, code, lang=""):
         code = code.rstrip('\n')
