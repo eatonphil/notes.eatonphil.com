@@ -38,7 +38,7 @@ basic gist is:
 $ curl -O https://beta.quicklisp.org/quicklisp.lisp
 $ sbcl --load quicklisp.lisp
 ...
-* (quicklisp-quickstart:lisp)
+* (quicklisp-quickstart:install)
 ...
 * ^D
 $ sbcl --load "~/quicklisp/setup.lisp"
@@ -114,6 +114,7 @@ in "cl-docker/cl-docker.asd":
 ```lisp
 (defsystem :cl-docker
     :depends-on (:cl-ppcre)
+    :serial t
     :components ((:file "package")
                  (:file "docker")))
 ```
@@ -121,11 +122,14 @@ in "cl-docker/cl-docker.asd":
 This defines all the pieces of the system for ASDF: the system name,
 the package definition and the component of the package
 ("cl-docker/docker.lisp"), and tells ASDF to make the "cl-ppcre"
-system on disk available to us. However in preparation for times when
-we don't have the "cl-ppcre" system (or any other dependencies) on
-disk, we always load the system indirectly through Quicklisp (rather
-than directly via ASDF) so Quicklisp can fetch any missing
-dependencies from its repository of systems.
+system on disk available to us. We also tell ASDF to process the
+components in the order we specified (otherwise it will pick an order
+that may not be what we want).
+
+In preparation for times when we don't have the "cl-ppcre" system (or
+any other dependencies) on disk, we always load the system indirectly
+through Quicklisp (rather than directly via ASDF) so Quicklisp can
+fetch any missing dependencies from its repository of systems.
 
 But before then -- unless you put this directory in "~/common-lisp" --
 you'll need to register the directory containing the directory of your
