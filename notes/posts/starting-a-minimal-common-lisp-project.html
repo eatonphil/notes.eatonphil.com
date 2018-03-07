@@ -11,53 +11,6 @@ Furthermore, [SBCL](http://sbcl.org/) -- a popular implementation --
 is a highly optimized compiler that is competitive with
 [Java](https://benchmarksgame.alioth.debian.org/u64q/lisp.html).
 
-To skip past my Scheme digression, click [here](#building-blocks).
-
-### On Scheme
-
-I've done one or two unremarkable web prototypes in [Chicken
-Scheme](https://www.call-cc.org/), an R5RS/R7RS Scheme implementation.
-I don't think Chicken Scheme is the best bet for the web (I'm mostly
-biased to this topic) because it has no native-thread support and
-there are lighter interpreters out there that are easier to embed
-(e.g. in nginx). Chicken Scheme's "niche" is being a generally
-high-quality implementation with a great [collection of 3rd-party
-libraries](http://wiki.call-cc.org/chicken-projects/egg-index-4.html),
-but it is also not the
-[fastest](https://ecraven.github.io/r7rs-benchmarks/) Scheme you could
-choose.
-
-I've worked on a larger web prototype -- a Github issue reporting app
--- in [Racket](https://racket-lang.org/), a derivative of Scheme
-R6RS. And I've blogged
-[favorably](http://notes.eatonphil.com/walking-through-a-basic-racket-web-service.html)
-about Racket. It is a
-[high-performance](https://ecraven.github.io/r7rs-benchmarks/)
-interpreter with a JIT compiler, has thread support, and is also well
-known for its collection of [3rd-party
-libaries](https://pkgs.racket-lang.org/). However the Racket ecosystem
-[suffers](https://fare.livejournal.com/188429.html) from the same
-issues Haskell's does: libraries and bindings are primarily
-proof-of-concept only; missing documentation, tests and use. Trying to
-render "templatized" HTML (like Jinja allows for in Flask) without
-using S-exp-based syntax was a nightmare.  (Read: there's space for
-someone to write a good string templating library.)
-
-#### Sorry, Racket
-
-Last point on Racket (because it really is worth looking into),
-debugging in that Github issue project was not fun. The backtraces
-were mostly useless. Naively I assume this may have to do with the way
-Racket optimizes and rewrites functions. I was often left with zero
-context to see find and correct my errors. But it could very well be I
-was making poor use of Racket.
-
-#### On the other hand
-
-Common Lisp (its implementations and ecosystem) seems more robust and
-developed. SBCL, with it's great performance and native-thread
-support, is a promising candidate for backend web development.
-
 ### Building blocks
 
 Common Lisp symbols, imagine "first-class" variables/labels, are
@@ -122,11 +75,11 @@ not matter) and add the following:
 
 This uses a portable library, "uiop", that ASDF exposes by default (we
 won't need to explicitly import this anywhere because the package is
-managed by ASDF). It will run the command "docker ps" and return the
-output as a string. Then we use the regex split function from the
-cl-ppcre library to split the output first into lines, take all but
-the first line, and split the lines up based one two or more
-whitespace characters.
+managed by ASDF). It will run the command "docker ps" in a subprocess
+and return the output as a string. Then we use the regex split
+function from the cl-ppcre library to split the output first into
+lines, take all but the first line, and split the lines up based one
+two or more whitespace characters.
 
 Next let's define the package (think module in Python) by editing
 "cl-docker/package.lisp" (this name also does not matter):
@@ -255,3 +208,48 @@ freely available online. I haven't yet read it but I'm queuing it
 up. Don't let the title scare you, apparantly it is primarily
 considered a practical guide to Common Lisp around
 old-school/classical AI that isn't supposed to encumber.
+
+### On Scheme
+
+I've done one or two unremarkable web prototypes in [Chicken
+Scheme](https://www.call-cc.org/), an R5RS/R7RS Scheme implementation.
+I don't think Chicken Scheme is the best bet for the web (I'm mostly
+biased to this topic) because it has no native-thread support and
+there are lighter interpreters out there that are easier to embed
+(e.g. in nginx). Chicken Scheme's "niche" is being a generally
+high-quality implementation with a great [collection of 3rd-party
+libraries](http://wiki.call-cc.org/chicken-projects/egg-index-4.html),
+but it is also not the
+[fastest](https://ecraven.github.io/r7rs-benchmarks/) Scheme you could
+choose.
+
+I've worked on a larger web prototype -- a Github issue reporting app
+-- in [Racket](https://racket-lang.org/), a derivative of Scheme
+R6RS. And I've blogged
+[favorably](http://notes.eatonphil.com/walking-through-a-basic-racket-web-service.html)
+about Racket. It is a
+[high-performance](https://ecraven.github.io/r7rs-benchmarks/)
+interpreter with a JIT compiler, has thread support, and is also well
+known for its collection of [3rd-party
+libaries](https://pkgs.racket-lang.org/). However the Racket ecosystem
+[suffers](https://fare.livejournal.com/188429.html) from the same
+issues Haskell's does: libraries and bindings are primarily
+proof-of-concept only; missing documentation, tests and use. Trying to
+render "templatized" HTML (like Jinja allows for in Flask) without
+using S-exp-based syntax was a nightmare.  (Read: there's space for
+someone to write a good string templating library.)
+
+#### Sorry, Racket
+
+Last point on Racket (because it really is worth looking into),
+debugging in that Github issue project was not fun. The backtraces
+were mostly useless. Naively I assume this may have to do with the way
+Racket optimizes and rewrites functions. I was often left with zero
+context to see find and correct my errors. But it could very well be I
+was making poor use of Racket.
+
+#### On the other hand
+
+Common Lisp (its implementations and ecosystem) seems more robust and
+developed. SBCL, with it's great performance and native-thread
+support, is a promising candidate for backend web development.
