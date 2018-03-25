@@ -1,0 +1,66 @@
+# Book Review: ANSI Common Lisp
+## March 25, 2018
+
+#### Score: 4.5 / 5
+
+Paul Graham and his editor(s) are excellent. His prose is light and
+easy to follow. The only awkward component of the book's organization
+is that he tends to use a concept one section before explicitly
+introducing and defining that concept. I'm not sure yet if this is a
+good or bad thing.
+
+### As a learning resource
+
+Among books recommended to potential Lispers, *ANSI Common Lisp* is
+typically written off. Graham's style of Lisp is called
+"non-idiomatic". That's fair, both *ANSI Common Lisp* and *On Lisp*
+feature aspects of Common Lisp that lend themselves to functional
+programming. And as those of you who've read *Practical Common Lisp*
+know, Common Lisp (unlike Scheme) was not designed to be a functional
+programming language. Ultimately *ANSI Common Lisp* covers the same
+topics *Practical Common Lisp* does, if not more. But *ANSI Common
+Lisp* is better written, in less space, and with shorter examples.
+
+I'm impressed at Graham's ability to summarize. There is a graphic
+illustrating symbols as a structure composed of a name, a value, a
+function, a package, and a property list. Although other resources
+(books and otherwise) mention symbols as having one or more of these
+components, his graphic was the first representation that clicked for
+me. He also provides clarity about packages being namespaces for
+*names* (symbols) not objects or functions.
+
+And toward the end of the book, there is a discussion on the
+"instance" abstraction (relative to the class definitions themselves)
+being more powerful than plain "objects" that carry around methods
+themselves. This has been the single most useful discussion on the
+implementation of object-oriented constructs I've read yet.
+
+### Digression on Practical Common Lisp
+
+*Practical Common Lisp* is often called the best introduction to
+Common Lisp. After reading both, I'd give *Practical Common Lisp*
+second place or call it a tie. The issue with *Practical Common Lisp*
+is that it takes too long to get anywhere and the practical chapters
+themselves are just as much a slog. And for as big as it is,
+*Practical Common Lisp* still doesn't include some major (potentially
+confusing) aspects of "modern" Common Lisp like ASDF, Quicklisp,
+production deployment strategies, etc.
+
+Even after having read *Practical Common Lisp* I wasn't really clear
+how to pull together all the libraries I needed to get anything real
+done (e.g. scripting against an HTTP API or interacting with a SQL
+database). This is not to say that *Practical Common Lisp* is a bad
+book, it is a good book. But I definitely don't recommend reading it
+without also reading *ANSI Common Lisp*. And regardless, there are
+still a few of those modern concepts neither book covers.
+
+### From the article
+
+* <a target="_blank" href="https://www.amazon.com/gp/product/0133708756/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=0133708756&linkCode=as2&tag=hazpea-20&linkId=5663ce8bae02f30ae64a729b307bfc15">ANSI Common Lisp</a><img src="//ir-na.amazon-adsystem.com/e/ir?t=hazpea-20&l=am2&o=1&a=0133708756" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" /> *Affiliate*
+* On Lisp: Advanced Techniques for Common Lisp
+  * <a target="_blank" href="https://www.amazon.com/gp/product/0130305529/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=0130305529&linkCode=as2&tag=hazpea-20&linkId=8721e89dac65acccf0027dedafa2fa78">Book</a><img src="//ir-na.amazon-adsystem.com/e/ir?t=hazpea-20&l=am2&o=1&a=0130305529" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" /> *Affiliate*
+  * <a href="http://www.lulu.com/us/en/shop/paul-graham/on-lisp/paperback/product-22430842.html">Book</a> *Custom printed, no affiliate, cheaper*
+  * <a href="http://www.paulgraham.com/onlisptext.html">PDF</a> *Free*
+* Practical Common Lisp
+  * <a target="_blank" href="https://www.amazon.com/gp/product/1590592395/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=1590592395&linkCode=as2&tag=hazpea-20&linkId=17d7f441c1414f4ccfce8041ab0a7278">Book</a><img src="//ir-na.amazon-adsystem.com/e/ir?t=hazpea-20&l=am2&o=1&a=1590592395" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" /> *Affiliate*
+  * <a href="http://www.gigamonkeys.com/book/">PDF</a> *Free*
