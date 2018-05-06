@@ -81,7 +81,7 @@ Here is what the lexer should return for an example input:
 
 ```python
 assert_equal(lex('{"foo": [1, 2, {"bar": 2}]}'),
-             ["{", "foo", ":", "[", 1, ",", 2, "{", "bar", ":", 2, "}", "]", "}"])
+             ['{', 'foo', ':', '[', 1, ',', 2, '{', 'bar', ':', 2, '}', ']', '}'])
 ```
 
 Here is what this logic might begin to look like:
@@ -104,7 +104,7 @@ def lex(string):
             tokens.append(string[0])
             string = string[1:]
         else:
-            raise Exception("Unexpected character: {}".format(string[0]))
+            raise Exception('Unexpected character: {}'.format(string[0]))
 
     return tokens
 ```
@@ -166,7 +166,7 @@ def lex(string):
             tokens.append(string[0])
             string = string[1:]
         else:
-            raise Exception("Unexpected character: {}".format(string[0]))
+            raise Exception('Unexpected character: {}'.format(string[0]))
     
     return tokens
 ```
@@ -175,8 +175,8 @@ def lex(string):
 
 For the `lex_string` function, the gist will be to check if the first
 character is a quote. If it is, iterate over the input string until
-you find an ending quote. If you find an initial quote, return None
-and the original list. If you find an initial quote and an ending
+you find an ending quote. If you don't find an initial quote, return
+None and the original list. If you find an initial quote and an ending
 quote, return the string within the quotes and the rest of the
 unchecked input string.
 
@@ -284,9 +284,9 @@ Here is what the parser should return for an example input:
 ```python
 tokens = lex('{"foo": [1, 2, {"bar": 2}]}')
 assert_equal(tokens,
-             ["{", "foo", ":", "[", 1, ",", 2, "{", "bar", ":", 2, "}", "]", "}"])
+             ['{', 'foo', ':', '[', 1, ',', 2, '{', 'bar', ':', 2, '}', ']', '}'])
 assert_equal(parse(tokens),
-             {"foo": [1, 2, {"bar": 2}]})
+             {'foo': [1, 2, {'bar': 2}]})
 ```
 
 Here is what this logic might begin to look like:
