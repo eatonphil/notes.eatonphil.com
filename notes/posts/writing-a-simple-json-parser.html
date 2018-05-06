@@ -74,7 +74,7 @@ whitespace without knowing that it is not part of a string.
 
 The gist of the JSON lexer will be to iterate over the input source
 and try to find patterns of strings, numbers, booleans, nulls, or JSON
-syntax like left parenthesis and left brackets, ultimately returning
+syntax like left round bracket and left brackets, ultimately returning
 each of these elements as a list.
 
 Here is what the lexer should return for an example input:
@@ -112,9 +112,9 @@ def lex(string):
 The goal here is to try to match strings, numbers, booleans, and nulls
 and add them to the list of tokens. If none of these match, check if
 the character is whitespace and throw it away if so. Otherwise store
-it as a token if it is part of JSON syntax (like left
-parenthesis). Finally throw an exception if the character/string
-didn't match any of these patterns.
+it as a token if it is part of JSON syntax (like left round
+bracket). Finally throw an exception if the character/string didn't
+match any of these patterns.
 
 Let's extend the core logic here a little bit to support all the types
 and add the function stubs.
@@ -324,8 +324,8 @@ and concerned with only specific elements.
 #### Parsing arrays
 
 Parsing arrays is a matter of parsing array members and expecting a
-comma token between them or a right parenthesis indicating the end of
-the array.
+comma token between them or a right round bracket indicating the end
+of the array.
 
 ```python
 def parse_array(tokens):
@@ -347,7 +347,7 @@ def parse_array(tokens):
         else:
             tokens = tokens[1:]
 
-    raise Exception('Expected end-of-array parenthesis')
+    raise Exception('Expected end-of-array round bracket')
 ```
 
 #### Parsing objects
