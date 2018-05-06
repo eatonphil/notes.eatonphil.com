@@ -22,7 +22,7 @@ of tokens and tries to find patterns in them to meet the language
 being parsed.
 
 Parsing does not determine semantic viability of an input
-source. Semantic viability of an input source may include whether or
+source. Semantic viability of an input source might include whether or
 not a variable is defined before being used, whether a function is
 called with the correct arguments, or whether a variable can be
 declared a second time in some scope.
@@ -55,8 +55,8 @@ syntactic analysis.
 Assuming a simple lexical analyzer, you might iterate over all the
 characters in an input string (or stream) and break them apart into
 fundemental, **non-recursively** defined language constructs such as
-integers, strings, and boolean literals. In particular, strings *must*
-be part of the lexical analysis because you cannot throw away
+integers, strings, and boolean literals. In particular, strings
+**must** be part of the lexical analysis because you cannot throw away
 whitespace without knowing that it is not part of a string.
 
 <p class="small">
