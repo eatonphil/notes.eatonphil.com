@@ -1,0 +1,427 @@
+# Writing a simple JSON parser
+## May 6, 2018
+
+Writing a JSON parser is one of the easiest ways to get familiar with
+parsing techniques. The format is extremely simple. It's defined
+recursively so you get a slight challenge compared to, say, parsing
+[Brainfuck](https://en.wikipedia.org/wiki/Brainfuck); and you probably
+already use JSON. Aside from that last point, parsing
+[S-expressions](https://en.wikipedia.org/wiki/S-expression) for Scheme
+might be an even simpler task.
+
+If you'd just like to see the code for the library, `pj`, [check it out
+on Github](https://github.com/eatonphil/pj).
+
+### What parsing is and (typically) is not
+
+Parsing is often broken up into two stages: lexical analysis and
+syntactic analysis. Lexical analysis breaks source input into the
+simplest decomposable elements of a language called "tokens".
+Syntactic analysis (often itself called "parsing") receives the list
+of tokens and tries to find patterns in them to meet the language
+being parsed.
+
+Parsing does not determine semantic viability of an input
+source. Semantic viability of an input source may include whether or
+not a variable is defined before being used, whether a function is
+called with the correct arguments, or whether a variable can be
+declared a second time in some scope.
+
+<p class="small">
+  There are, of course, always variations in how people choose to
+  parse and apply semantic rules, but I am assuming a "traditional"
+  approach to explain the core concepts.
+</p>
+
+#### The JSON library's interface
+
+Ultimately, there should be a `from_string` method that accepts a
+JSON-encoded string and returns the equivalent Python dictionary.
+
+For example:
+
+```
+assert_equal(to_string('{"foo": 1}'),
+             {"foo": 1})
+```
+
+### Lexical analysis
+
+Lexical analysis breaks down an input string into tokens. Comments and
+whitespace are often discarded during lexical analysis so you are left
+with a simpler input you can search for grammatical matches during the
+syntactic analysis.
+
+Assuming a simple lexical analyzer, you might iterate over all the
+characters in an input string (or stream) and break them apart into
+fundemental, **non-recursively** defined language constructs such as
+integers, strings, and boolean literals. In particular, strings *must*
+be part of the lexical analysis because you cannot throw away
+whitespace without knowing that it is not part of a string.
+
+<p class="small">
+  In a helpful lexer you keep track of the whitespace and comments
+  you've skipped, the current line number and file you are in so that
+  you can refer back to it at any stage in errors produced by analysis
+  of the source. <a
+  href="https://v8project.blogspot.com/2018/03/v8-release-66.html">The
+  V8 Javascript engine recently became able to do reproduce the exact
+  source code of a function.</a> This, at the very least, would need
+  the help of a lexer to make possible.
+</p>
+
+#### Implementing a JSON lexer
+
+The gist of the JSON lexer will be to iterate over the input source
+and try to find patterns of strings, numbers, booleans, nulls, or JSON
+syntax like left parenthesis and left brackets, ultimately returning
+each of these elements as a list.
+
+Here is what the lexer should return for an example input:
+
+```python
+assert_equal(lex('{"foo": [1, 2, {"bar": 2}]}'),
+             ["{", "foo", ":", "[", 1, ",", 2, "{", "bar", ":", 2, "}", "]", "}"])
+```
+
+Here is what this logic might begin to look like:
+
+```python
+def lex(string):
+    tokens = []
+
+    while len(string):
+        json_string, string = lex_string(string)
+        if json_string is not None:
+            tokens.append(json_string)
+            continue
+
+        # TODO: lex booleans, nulls, numbers
+        
+        if string[0] in JSON_WHITESPACE:
+            string = string[1:]
+        elif string[0] in JSON_SYNTAX:
+            tokens.append(string[0])
+            string = string[1:]
+        else:
+            raise Exception("Unexpected character: {}".format(string[0]))
+
+    return tokens
+```
+
+The goal here is to try to match strings, numbers, booleans, and nulls
+and add them to the list of tokens. If none of these match, check if
+the character is whitespace and throw it away if so. Otherwise store
+it as a token if it is part of JSON syntax (like left
+parenthesis). Finally throw an exception if the character/string
+didn't match any of these patterns.
+
+Let's extend the core logic here a little bit to support all the types
+and add the function stubs.
+
+```python
+def lex_string(string):
+    return None, string
+
+
+def lex_number(string):
+    return None, string
+
+
+def lex_bool(string):
+    return None, string
+
+
+def lex_null(string):
+    return None, string
+
+
+def lex(string):
+    tokens = []
+    
+    while len(string):
+        json_string, string = lex_string(string)
+        if json_string is not None:
+            tokens.append(json_string)
+            continue
+        
+        json_number, string = lex_number(string)
+        if json_number is not None:
+            tokens.append(json_number)
+            continue
+        
+        json_bool, string = lex_bool(string)
+        if json_bool is not None:
+            tokens.append(json_bool)
+            continue
+        
+        json_null, string = lex_null(string)
+        if json_null is not None:
+            tokens.append(json_null)
+            continue
+        
+        if string[0] in JSON_WHITESPACE:
+            string = string[1:]
+        elif string[0] in JSON_SYNTAX:
+            tokens.append(string[0])
+            string = string[1:]
+        else:
+            raise Exception("Unexpected character: {}".format(string[0]))
+    
+    return tokens
+```
+
+#### Lexing strings
+
+For the `lex_string` function, the gist will be to check if the first
+character is a quote. If it is, iterate over the input string until
+you find an ending quote. If you find an initial quote, return None
+and the original list. If you find an initial quote and an ending
+quote, return the string within the quotes and the rest of the
+unchecked input string.
+
+```python
+def lex_string(string):
+    json_string = ''
+    
+    if string[0] == JSON_QUOTE:
+        string = string[1:]
+    else:
+        return None, string
+    
+    for c in string:
+        if c == JSON_QUOTE:
+            return json_string, string[len(json_string)+1:]
+        else:
+            json_string += c
+    
+    raise Exception('Expected end-of-string quote')
+```
+
+#### Lexing numbers
+
+For the `lex_number` function, the gist will be to iterate over the
+input until you find a character that cannot be part of a number.
+(This is, of course, a gross simplification, but being more accurate
+will be left as an exercise to the reader.) After finding a character
+that cannot be part of a number, either return a float or int if the
+characters you've accumulated number more than 0. Otherwise return
+None and the original string input.
+
+```python
+def lex_number(string):
+    json_number = ''
+    
+    number_characters = [str(d) for d in range(0, 10)] + ['-', 'e', '.']
+    
+    for c in string:
+        if c in number_characters:
+            json_number += c
+        else:
+            break
+    
+    rest = string[len(json_number):]
+    
+    if not len(json_number):
+        return None, string
+    
+    if '.' in json_number:
+        return float(json_number), rest
+    
+    return int(json_number), rest
+```
+
+#### Lexing booleans and nulls
+
+Finding boolean and null values is a very simple string match.
+
+```python
+def lex_bool(string):
+    string_len = len(string)
+    
+    if string_len >= TRUE_LEN and \
+       string[:TRUE_LEN] == 'true':
+        return True, string[TRUE_LEN:]
+    elif string_len >= FALSE_LEN and \
+         string[:FALSE_LEN] == 'false':
+        return False, string[FALSE_LEN:]
+    
+    return None, string
+    
+    
+def lex_null(string):
+    string_len = len(string)
+    
+    if string_len >= NULL_LEN and \
+       string[:NULL_LEN] == 'null':
+        return True, string[NULL_LEN]
+    
+    return None, string
+```
+
+And now the lexer code is done! See the
+[pj/lexer.py](https://github.com/eatonphil/pj/blob/master/pj/lexer.py)
+for the code as a whole.
+
+### Syntactic analysis
+
+The syntax analyzer's (basic) job is to iterate over a one-dimensional
+list of tokens and match groups of tokens up to pieces of the language
+according to the definition of the language. If, at any point during
+syntactic analysis, the parser cannot match the current set of tokens up
+to a valid grammar of the language, the parser will fail and possibly
+give you useful information as to what you gave, where, and what it
+expected from you.
+
+#### Implementing a JSON parser
+
+The gist of the JSON parser will be to iterate over the tokens
+received after a call to `lex` and try to match the tokens to objects,
+lists, or plain values.
+
+Here is what the parser should return for an example input:
+
+```python
+tokens = lex('{"foo": [1, 2, {"bar": 2}]}')
+assert_equal(tokens,
+             ["{", "foo", ":", "[", 1, ",", 2, "{", "bar", ":", 2, "}", "]", "}"])
+assert_equal(parse(tokens),
+             {"foo": [1, 2, {"bar": 2}]})
+```
+
+Here is what this logic might begin to look like:
+
+```python
+def parse_array(tokens):
+    return [], tokens
+
+def parse_object(tokens):
+    return {}, tokens
+
+def parse(tokens):
+    t = tokens[0]
+
+    if t == JSON_LEFTPAREN:
+        return parse_array(tokens[1:])
+    elif t == JSON_LEFTBRACKET:
+        return parse_object(tokens[1:])
+    else:
+        return t, tokens[1:]
+```
+
+A key structural difference between this lexer and parser is that the
+lexer returns a one-dimensional array of tokens. Parsers are often
+defined recursively and returns a recursive, tree-like object. Since
+JSON is a data serialization format instead of a language, the parser
+should produce objects in Python rather than a syntax tree on which
+you could perform more analysis (or code generation in the case of a
+compiler).
+
+And, again, the benefit of having the lexical analysis happen
+independent from the parser is that both pieces of code are simpler
+and concerned with only specific elements.
+
+#### Parsing arrays
+
+Parsing arrays is a matter of parsing array members and expecting a
+comma token between them or a right parenthesis indicating the end of
+the array.
+
+```python
+def parse_array(tokens):
+    json_array = []
+    
+    t = tokens[0]
+    if t == JSON_RIGHTPAREN:
+        return json_array, tokens[1:]
+    
+    while True:
+        json, tokens = parse(tokens)
+        json_array.append(json)
+        
+        t = tokens[0]
+        if t == JSON_RIGHTPAREN:
+            return json_array, tokens[1:]
+        elif t != JSON_COMMA:
+            raise Exception('Expected comma after object in array')
+        else:
+            tokens = tokens[1:]
+
+    raise Exception('Expected end-of-array parenthesis')
+```
+
+#### Parsing objects
+
+Parsing objects is a matter of parsing a key-value pair internally
+separated by a colon and externally separated by a comma until you
+reach the end of the object.
+
+```python
+def parse_object(tokens):
+    json_object = {}
+    
+    t = tokens[0]
+    if t == JSON_RIGHTBRACKET:
+        return json_object, tokens[1:]
+    
+    while True:
+        json_key = tokens[0]
+        if type(json_key) is str:
+            tokens = tokens[1:]
+        else:
+            raise Exception('Expected string key, got: {}'.format(json_key))
+        
+        if tokens[0] != JSON_COLON:
+            raise Exception('Expected colon after key in object, got: {}'.format(t))
+        
+        json_value, tokens = parse(tokens[1:])
+        
+        json_object[json_key] = json_value
+        
+        t = tokens[0]
+        if t == JSON_RIGHTBRACKET:
+            return json_object, tokens[1:]
+        elif t != JSON_COMMA:
+            raise Exception('Expected comma after pair in object, got: {}'.format(t))
+        
+        tokens = tokens[1:]
+
+    raise Exception('Expected end-of-object bracket')
+```
+
+And now the parser code is done! See the
+[pj/parser.py](https://github.com/eatonphil/pj/blob/master/pj/parser.py)
+for the code as a whole.
+
+### Unifying the library
+
+To provide the ideal interface, create the `from_string` function
+wrapping the `lex` and `parse` functions.
+
+```python
+def from_string(string):
+    tokens = lex(string)
+    return parse(tokens)[0]
+```
+
+And the library is complete! (ish). Check out the [project on
+Github](https://github.com/eatonphil/pj) for the full implementation
+including basic testing setup.
+
+### Appendix A: Single-step parsing
+
+Some parsers choose to implement lexical and syntactic analysis in one
+stage. For some languages this can simplify the parsing stage
+entirely. Or, in more powerful languages like Common Lisp, it can
+allow you to dynamically extend the lexer and parser in one step with
+[reader macros](https://gist.github.com/chaitanyagupta/9324402).
+
+<p class="small">
+  Aside: I wrote this library in Python to make it more accessible to
+  a larger audience. However, many of the techniques used are more
+  amenable to languages with pattern matching and support for monadic
+  operations -- like Standard ML. If you are curious what this same
+  code would look like in Standard ML, check out the <a
+  href="https://github.com/eatonphil/ponyo/blob/master/src/Encoding/Json.sml">JSON
+  code in Ponyo</a>.
+</p>
