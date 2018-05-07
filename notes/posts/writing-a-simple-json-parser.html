@@ -74,7 +74,7 @@ whitespace without knowing that it is not part of a string.
 
 The gist of the JSON lexer will be to iterate over the input source
 and try to find patterns of strings, numbers, booleans, nulls, or JSON
-syntax like left round bracket and left brackets, ultimately returning
+syntax like left brackets and left braces, ultimately returning
 each of these elements as a list.
 
 Here is what the lexer should return for an example input:
@@ -112,8 +112,8 @@ def lex(string):
 The goal here is to try to match strings, numbers, booleans, and nulls
 and add them to the list of tokens. If none of these match, check if
 the character is whitespace and throw it away if so. Otherwise store
-it as a token if it is part of JSON syntax (like left round
-bracket). Finally throw an exception if the character/string didn't
+it as a token if it is part of JSON syntax (like left
+brackets). Finally throw an exception if the character/string didn't
 match any of these patterns.
 
 Let's extend the core logic here a little bit to support all the types
@@ -301,9 +301,9 @@ def parse_object(tokens):
 def parse(tokens):
     t = tokens[0]
 
-    if t == JSON_LEFTPAREN:
+    if t == JSON_LEFTBRACKET:
         return parse_array(tokens[1:])
-    elif t == JSON_LEFTBRACKET:
+    elif t == JSON_LEFTBRACE:
         return parse_object(tokens[1:])
     else:
         return t, tokens[1:]
@@ -324,7 +324,7 @@ and concerned with only specific elements.
 #### Parsing arrays
 
 Parsing arrays is a matter of parsing array members and expecting a
-comma token between them or a right round bracket indicating the end
+comma token between them or a right bracket indicating the end
 of the array.
 
 ```python
@@ -332,7 +332,7 @@ def parse_array(tokens):
     json_array = []
     
     t = tokens[0]
-    if t == JSON_RIGHTPAREN:
+    if t == JSON_RIGHTBRACKET:
         return json_array, tokens[1:]
     
     while True:
@@ -340,14 +340,14 @@ def parse_array(tokens):
         json_array.append(json)
         
         t = tokens[0]
-        if t == JSON_RIGHTPAREN:
+        if t == JSON_RIGHTBRACKET:
             return json_array, tokens[1:]
         elif t != JSON_COMMA:
             raise Exception('Expected comma after object in array')
         else:
             tokens = tokens[1:]
 
-    raise Exception('Expected end-of-array round bracket')
+    raise Exception('Expected end-of-array bracket')
 ```
 
 #### Parsing objects
@@ -361,7 +361,7 @@ def parse_object(tokens):
     json_object = {}
     
     t = tokens[0]
-    if t == JSON_RIGHTBRACKET:
+    if t == JSON_RIGHTBRACE:
         return json_object, tokens[1:]
     
     while True:
@@ -379,14 +379,14 @@ def parse_object(tokens):
         json_object[json_key] = json_value
         
         t = tokens[0]
-        if t == JSON_RIGHTBRACKET:
+        if t == JSON_RIGHTBRACE:
             return json_object, tokens[1:]
         elif t != JSON_COMMA:
             raise Exception('Expected comma after pair in object, got: {}'.format(t))
         
         tokens = tokens[1:]
 
-    raise Exception('Expected end-of-object bracket')
+    raise Exception('Expected end-of-object brace')
 ```
 
 And now the parser code is done! See the
