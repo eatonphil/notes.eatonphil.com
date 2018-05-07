@@ -145,3 +145,12 @@ header .container {
     padding: 0;
     font-weight: normal;
 }
+
+.small {
+    font-size: .8rem;
+    line-height: 1.4rem;
+}
+
+.small a {
+    font-size: .8rem;
+}

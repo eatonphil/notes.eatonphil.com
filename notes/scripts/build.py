@@ -26,7 +26,7 @@ class Renderer(mistune.Renderer):
     def block_code(self, code, lang=""):
         code = code.rstrip('\n')
         if not lang:
-            code = escape(code, smart_amp=False)
+            code = mistune.escape(code, smart_amp=False)
             return '<pre><code>%s\n</code></pre>\n' % code
         code = mistune.escape(code, quote=True, smart_amp=False)
         return '<pre><code class="hljs %s">%s\n</code></pre>\n' % (lang, code)
