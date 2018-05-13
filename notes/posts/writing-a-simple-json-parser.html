@@ -157,7 +157,7 @@ def lex(string):
         
         json_null, string = lex_null(string)
         if json_null is not None:
-            tokens.append(json_null)
+            tokens.append(None)
             continue
         
         if string[0] in JSON_WHITESPACE:
