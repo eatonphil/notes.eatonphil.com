@@ -16,11 +16,11 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 h1 {
-    font-size: 2rem;
-    letter-spacing: .1rem;
+    font-size: 2.5rem;
+    letter-spacing: .05rem;
     line-height: 3rem;
     margin: 0;
-    font-family: Century Gothic,CenturyGothic,AppleGothic,sans-serif;
+    font-family: Trebuchet MS,Lucida Grande,Lucida Sans Unicode,Lucida Sans,Tahoma,sans-serif; 
 }
 
 h2 {
@@ -37,7 +37,7 @@ h3 {
 }
 
 h4 {
-    color: #666;
+    color: #444;
 }
 
 p, li {
@@ -46,11 +46,11 @@ p, li {
     font-style: normal;
     font-variant: normal;
     font-weight: 400;
-    line-height: 1.9rem;
+    line-height: 1.7rem;
 }
 
 a {
-    color: rgb(66, 133, 244);
+    color: rgb(34, 102, 216);
     font-family: serif;
     text-decoration: none;
 }
@@ -66,23 +66,19 @@ pre {
     }
 }
 
-hr {
-    padding: 0;
-    margin: 0;
-    display: block;
-    height: 1px;
-    border: 0;
-    border-top: 1px solid #ccc;
-}
-
 footer .container {
     margin-bottom: 15px;
 }
 
 footer p {
+    width: 30rem;
+    max-width: 100%;
+    border-top: 1px solid #ccc;
     padding: 0;
     margin: 0;
-    font-size: .9rem;
+    margin-top: 15px;
+    padding-top: 15px;
+    font-size: 1rem;
 }
 
 .container {
@@ -93,7 +89,7 @@ footer p {
 }
 
 header {
-    background: #2d5c84;
+    background: #04928b;
 }
 
 header a {
@@ -106,11 +102,12 @@ header .container {
 }
 
 .col-6 {
-    width: 60%;
+    width: 30rem;
+    max-width: 100%;
 }
 
 .hljs {
-    padding: 30px;
+    padding: 15px;
     background: white;
     border: 1px solid #ccc;
 }
@@ -132,24 +129,16 @@ header .container {
 }
 
 .summary {
-    display: block;
+    margin-top: 15px;
 }
 
-.summary:not(:last-of-type) {
-    margin-bottom: 15px;
+.summary a {
+    font-size: 1.1rem;
 }
 
-.summary h1 {
-    font-size: 1.05rem;
-    font-weight: normal;
-}
-
-.summary h2 {
-    font-size: .9rem;
-    line-height: initial;
-    margin: 0;
-    padding: 0;
-    font-weight: normal;
+.summary-subtitle {
+    font-size: 1.1rem;
+    color: #333;
 }
 
 .small {

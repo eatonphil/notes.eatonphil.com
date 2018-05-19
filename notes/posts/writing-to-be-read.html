@@ -1,43 +1,68 @@
 # Writing to be read
 ## May 18, 2018
 
-There is a constant fight when writing documentation, checklists,
-emails, guides, etc. in the context of work. Each of these provides
-immense value and can be the key to a particular process.  The fight
-is in doing whatever possible to remove barriers for others to better
-understand and ultimately correctly apply what has been written. Aside
-from clarity on the content of writing, there are particular aesthetic
-"heuristics" I use to make notes seem more approachable.
+There is a daily fight in the writing and maintenance of
+documentation, checklists, emails, guides, etc. Each provides immense
+value; a document may be the key to an important process. The goal is
+to remove barriers -- to encourage understanding and correct
+application of what has been noted -- without requiring a change in
+the character of the reader. Ignoring imperfections in the *ideas*
+transcribed into writing, there are particular aesthetic approaches I
+take to (hopefully) make my notes more effective.
+
+These ideas have been influenced by readings on writing, pyschology,
+and user experience. I'd immediately point to [On Writing
+Well](https://amzn.to/2rT0dsE), [Thinking Fast and
+Slow](https://amzn.to/2IttNAl), and [Nielsen
+Norman](https://www.nngroup.com/) research.
 
 ### Language correctness
 
 The low-hanging fruit is spelling and grammatical correctness. It is
-not difficult to provide.
+not difficult to provide. However don't be a grammar stickler
+unreasonably, language is flexible and always changing. Use full
+sentences, capitalize appropriately, and use punctuation. Don't allow
+anyone the opportunity to take your work less seriously by screwing up
+the basics.
 
-### Layout and spacing
+### Structuring sentences and paragraphs
 
-My standards in this category are heavily influence by On Writing Well.
+Keep your sentences short. And avoid run-on sentences; they are always
+difficult to parse. If you use more than two commas in a sentences
+(aside from in lists), the sentence is terrible. Split it up. In some
+cases your sentence may even be perfectly correct without certain
+commas. If you ever have a list containing another list, separate the
+outer list with semi-colons instead of commas to differentiate.
 
-#### On content
+Keep your paragraphs short too. The longer sentences and paragraphs
+go, the more intimidating they look and will discourage readers from
+continuing.
 
-1.  Use full sentences
+#### Visually speaking
 
-2. Don't use more words than you need
+Make your line height
+[120-145%](https://practicaltypography.com/line-spacing.html) the
+height of the font. Increasing the spacing between lines will make the
+paragraph look less dense.
 
-3. Don't use long sentences
+Additionally, a number of studies suggest that limiting the width of
+paragraphs of text increases readability. For best results, limit the
+width such that [50-75
+characters](https://baymard.com/blog/line-length-readability) appear
+per line of text.
 
-It is easy to write run-on sentences. They are difficult to parse.
+#### Don't put checklists in paragraphs
 
-4. Don't use long paragraphs
+If a document describes concrete steps that should be followed and can
+be reasonably summarized, don't mask them within paragraphs of
+text. Instead use an ordered or unordered list to clearly enumerate
+the expectations. You cannot expect a checklist to be followed when it
+is hidden unclearly within the sentences of a paragraph.
 
+### Structuring sections
 
-
-#### On aesthetics
-
-* Don't use gigantic headers
-
-* Make line-spacing 75-100% of the font size.
-
-* Don't use difficult
-
-### (Github) Markdown
+Always provide headers (with an HTML `id` attribute) to give relief
+and to allow a direct link to a particular section in a long page. If
+the page has more than two sections or vertically flows beyond a
+single screen, consider adding a table of contents at the top of the
+page to allow the reader to find the exact section she needs.
