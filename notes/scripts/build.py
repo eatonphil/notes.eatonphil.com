@@ -17,6 +17,8 @@ class Renderer(mistune.Renderer):
 
     def header(self, text, level, *args, **kwargs):
         self.title[level] = text
+        if level <= 2:
+            return ""
         return "<h{level} id=\"{id}\">{text}</h{level}>".format(**{
             "id": text.lower().replace(' ', '-'),
             "text": text,
@@ -56,13 +58,13 @@ def main():
 
         title = title[1]
         with open('dist/' + out_file, 'w') as f:
-            f.write(TEMPLATE.format(post=output + "<hr />", title=title, tag=(TAG or title)))
+            f.write(TEMPLATE.format(post=output + "<hr />", title=title, subtitle=date, tag=(TAG or title)))
 
     post_data.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
     post_data.reverse()
     post = "\n".join([POST_SUMMARY.format(*args) for args in post_data])
     with open('dist/index.html', 'w') as f:
-        f.write(TEMPLATE.format(post=post, title=TAG, tag=TAG))
+        f.write(TEMPLATE.format(post=post, title=TAG, tag=TAG, subtitle=TAG))
 
     with open('dist/style.css', 'w') as fw:
         with open('style.css') as fr:
