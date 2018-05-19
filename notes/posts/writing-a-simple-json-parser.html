@@ -27,7 +27,7 @@ not a variable is defined before being used, whether a function is
 called with the correct arguments, or whether a variable can be
 declared a second time in some scope.
 
-<p class="small">
+<p class="note">
   There are, of course, always variations in how people choose to
   parse and apply semantic rules, but I am assuming a "traditional"
   approach to explain the core concepts.
@@ -59,7 +59,7 @@ integers, strings, and boolean literals. In particular, strings
 **must** be part of the lexical analysis because you cannot throw away
 whitespace without knowing that it is not part of a string.
 
-<p class="small">
+<p class="note">
   In a helpful lexer you keep track of the whitespace and comments
   you've skipped, the current line number and file you are in so that
   you can refer back to it at any stage in errors produced by analysis
@@ -416,7 +416,7 @@ entirely. Or, in more powerful languages like Common Lisp, it can
 allow you to dynamically extend the lexer and parser in one step with
 [reader macros](https://gist.github.com/chaitanyagupta/9324402).
 
-<p class="small">
+<p class="note">
   I wrote this library in Python to make it more accessible to
   a larger audience. However, many of the techniques used are more
   amenable to languages with pattern matching and support for monadic

@@ -34,6 +34,8 @@ h2 {
 
 h3 {
     color: #333;
+    font-size: 1.3rem;
+    line-height: 1.6rem;
 }
 
 h4 {
@@ -47,6 +49,10 @@ p, li {
     font-variant: normal;
     font-weight: 400;
     line-height: 1.7rem;
+}
+
+p:last-child, li:last-child {
+    margin-bottom: 0;
 }
 
 a {
@@ -141,14 +147,22 @@ header .container {
     color: #333;
 }
 
-.small {
-    font-size: .9rem;
+.note {
     line-height: 1.4rem;
     background: #ffffb1;
     border: #e0e0e0 1px solid;
     padding: 15px;
 }
 
-.small a {
+.note, .note p {
+    font-size: .9rem;
+}
+
+.note a {
     font-size: .8rem;
+}
+
+.note-header {
+    background: transparent;
+    font-weight: bold;
 }

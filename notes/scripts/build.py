@@ -58,7 +58,7 @@ def main():
 
         title = title[1]
         with open('dist/' + out_file, 'w') as f:
-            f.write(TEMPLATE.format(post=output, title=title, subtitle=date, tag=(TAG or title)))
+            f.write(TEMPLATE.format(post=output, title=title, subtitle=date, tag=title))
 
     post_data.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
     post_data.reverse()
