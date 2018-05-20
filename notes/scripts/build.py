@@ -4,19 +4,21 @@ from datetime import datetime
 import mistune
 
 POST_SUMMARY = """
-<a href="{}" class="summary">
-  <h1>{}</h1>
-  <h2>{}</h2>
-</a>
+<div class="summary">
+  <a href="{}">{}</a>
+  <div class="summary-subtitle">{}</div>
+</div>
 """
 TEMPLATE = open('template.html').read()
-TAG = "Experiment, study, share"
+TAG = "Notes by a software developer"
 
 class Renderer(mistune.Renderer):
     title = {}
 
     def header(self, text, level, *args, **kwargs):
         self.title[level] = text
+        if level <= 2:
+            return ""
         return "<h{level} id=\"{id}\">{text}</h{level}>".format(**{
             "id": text.lower().replace(' ', '-'),
             "text": text,
@@ -56,13 +58,13 @@ def main():
 
         title = title[1]
         with open('dist/' + out_file, 'w') as f:
-            f.write(TEMPLATE.format(post=output + "<hr />", title=title, tag=(TAG or title)))
+            f.write(TEMPLATE.format(post=output, title=title, subtitle=date, tag=title))
 
     post_data.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
     post_data.reverse()
     post = "\n".join([POST_SUMMARY.format(*args) for args in post_data])
     with open('dist/index.html', 'w') as f:
-        f.write(TEMPLATE.format(post=post, title=TAG, tag=TAG))
+        f.write(TEMPLATE.format(post=post + '<style>header { display: none !important; }</style>', title="", tag=TAG, subtitle=""))
 
     with open('dist/style.css', 'w') as fw:
         with open('style.css') as fr:

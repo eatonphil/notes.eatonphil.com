@@ -3,7 +3,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     
-    <title>{title} | notes.eatonphil.com</title>
+    <title>{tag} | notes.eatonphil.com</title>
     <meta name="description" content="{tag}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -13,14 +13,15 @@
   <body>
     <header>
       <div class="container">
-        <a href="/">
-          <div class="title">notes.eatonphil.com</div>
-          <div class="subtitle">{tag}</div>
-        </a>
+        <a href="/">Notes</a>
+        <h1>{title}</h1>
+        <h2>{subtitle}</h2>
       </div>
     </header>
     <div class="container">
-      {post}
+      <div class="col-6">
+        {post}
+      </div>
     </div>
     <footer>
       <div class="container">
