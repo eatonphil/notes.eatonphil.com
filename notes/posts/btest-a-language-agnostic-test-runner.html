@@ -38,7 +38,7 @@ test_path: tests
 
 runners:
   - name: Run tests with cpython
-    run: python -c
+    run: python test.py
 ```
 
 Here we specify where btest should look for the tests themselves,
@@ -59,14 +59,13 @@ cases:
     status: 1
     stdout: |
       Traceback (most recent call last):
-        File "<string>", line 1, in <module>
-      ZeroDivisionError: integer division or modulo by zero
-
+        File "test.py", line 1, in <module>
+          4 / 0
+      ZeroDivisionError: division by zero
     denominator: 0
-
 templates:
-  test.py: |
-    4 / {{ denominator }}
+  - test.py: |
+      4 / {{ denominator }}
 ```
 
 ### Running btest
@@ -75,10 +74,13 @@ When we run btest from the root directory (the directory
 above <code>tests</code>) we'll see all the tests that btest registers
 and the results of each test:
 
-      ```
-      $ btest
-      
-      ```
+```
+$ btest
+tests/divide-by-zero.yaml
+[PASS] Should exit on divide by zero
+
+1 of 1 tests passed for runner: Run tests with cpython
+```
 
 <style>
   header { background: #730040 !important }
