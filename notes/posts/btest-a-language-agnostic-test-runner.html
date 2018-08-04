@@ -1,0 +1,85 @@
+# btest: a language agnostic test runner
+## August 4, 2018
+
+[btest](https://github.com/briansteffens/btest) is an incredibly
+simple, language agnostic test runner originally written for testing
+compilers. An ex- co-worker from Linode, Brian wrote the first
+implementation in [Crystal](https://crystal-lang.org/) (a compiled
+language copy of Ruby) for testing
+[bshift](https://github.com/briansteffens/bshift), a compiler
+project. I found the format useful and made btest the basis for unit
+test scheduling in
+[BSDScheme](https://github.com/eatonphil/bsdscheme), my Scheme
+implementation. After some issues with Crystal support in
+containerized CI/CD environments, and despite some incredible [support
+from](https://github.com/briansteffens/btest/pull/5) [the Crystal
+community](https://github.com/briansteffens/btest/pull/4), we rewrote
+btest in D to simplify downstream use.
+
+### How it works
+
+Simply put, btest registers a commands to run and tests verifies the
+command output and status. btest iterates over files in a "test"
+directory to discover test groups and individual tests within. It
+supports a limited template language for easily adjusting a
+more-or-less similar set of tests. And it supports running test groups
+and individual tests themselves in parallel. All of this is configured
+via a simple YAML syntax.
+
+### btest.yaml
+
+The first file you create to use btest is a project-level
+configuration including what commands you'll run generally across all
+tests. Let's say we want to run tests against a python program. We
+create a btest.yaml file with the following:
+
+```
+test_path: tests
+
+runners:
+  - name: Run tests with cpython
+    run: python -c
+```
+
+Here we specify where btest should look for the tests themselves,
+the <code>tests</code> directory. We also specify one or more runner
+that all tests will be run against (once per runner). Multiple runners
+is useful when you want to test against different variations. We could
+run tests against cpython and pypy by adding another runner to the
+runners section.
+
+### An example test config
+
+Let's create a <code>divide-by-zero.yaml</code> file in
+the <code>tests</code> directory and add the following:
+
+```
+cases:
+  - name: Should exit on divide by zero
+    status: 1
+    stdout: |
+      Traceback (most recent call last):
+        File "<string>", line 1, in <module>
+      ZeroDivisionError: integer division or modulo by zero
+
+    denominator: 0
+
+templates:
+  test.py: |
+    4 / {{ denominator }}
+```
+
+### Running btest
+
+When we run btest from the root directory (the directory
+above <code>tests</code>) we'll see all the tests that btest registers
+and the results of each test:
+
+      ```
+      $ btest
+      
+      ```
+
+<style>
+  header { background: #730040 !important }
+</style>
