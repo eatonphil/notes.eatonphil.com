@@ -1,39 +1,38 @@
 # btest: a language agnostic test runner
 ## August 4, 2018
 
-[btest](https://github.com/briansteffens/btest) is an incredibly
-simple, language agnostic test runner originally written for testing
-compilers. An ex- co-worker from Linode, Brian wrote the first
+[btest](https://github.com/briansteffens/btest) is a minimal,
+language-agnostic test runner originally written for testing
+compilers. Brian, an ex- co-worker from Linode, wrote the first
 implementation in [Crystal](https://crystal-lang.org/) (a compiled
-language copy of Ruby) for testing
+language clone of Ruby) for testing
 [bshift](https://github.com/briansteffens/bshift), a compiler
-project. I found the format useful and made btest the basis for unit
-test scheduling in
-[BSDScheme](https://github.com/eatonphil/bsdscheme), my Scheme
-implementation. After some issues with Crystal support in
-containerized CI/CD environments, and despite some incredible [support
-from](https://github.com/briansteffens/btest/pull/5) [the Crystal
-community](https://github.com/briansteffens/btest/pull/4), we rewrote
-btest in D to simplify downstream use.
+project. The tool accomplished exactly what I needed for my own
+language project, [BSDScheme](https://github.com/eatonphil/bsdscheme),
+and had very few dependencies. After some issues with Crystal support
+in containerized CI environments, and despite some incredible
+[assistance from](https://github.com/briansteffens/btest/pull/5) [the
+Crystal community](https://github.com/briansteffens/btest/pull/4), we
+rewrote btest in D to simplify downstream use.
 
 ### How it works
 
-Simply put, btest registers a commands to run and tests verifies the
-command output and status. btest iterates over files in a "test"
-directory to discover test groups and individual tests within. It
-supports a limited template language for easily adjusting a
+btest registers a command (or commands) to run and verifies the
+command output and status for different inputs. btest iterates over
+files in a directory to discover test groups and individual tests
+within. It supports a limited template language for easily adjusting a
 more-or-less similar set of tests. And it supports running test groups
-and individual tests themselves in parallel. All of this is configured
-via a simple YAML syntax.
+and individual tests themselves in parallel. All of this is managed
+via a simple YAML config.
 
 ### btest.yaml
 
-The first file you create to use btest is a project-level
-configuration including what commands you'll run generally across all
-tests. Let's say we want to run tests against a python program. We
-create a btest.yaml file with the following:
+btest requires a project-level configuration file to declare the test
+directory, the command(s) to run per test, etc. Let's say we want to
+run tests against a python program. We create
+a <code>btest.yaml</code> file with the following:
 
-```
+```yaml
 test_path: tests
 
 runners:
@@ -41,19 +40,35 @@ runners:
     run: python test.py
 ```
 
-Here we specify where btest should look for the tests themselves,
-the <code>tests</code> directory. We also specify one or more runner
-that all tests will be run against (once per runner). Multiple runners
-is useful when you want to test against different variations. We could
-run tests against cpython and pypy by adding another runner to the
-runners section.
+<code>test_path</code> is the directory in which tests are located.
+<code>runners</code> is an array of commands to run per test. We
+hard-code a file to run <code>test.py</code> as a project-level
+standard file that will get written to disk in an appropriate path for
+each test-case.
+
+#### On multiple runners
+
+Using multiple runners is helpful when we want to run all tests with
+different test commands or test command settings. For instance, we
+could run tests against cpython and pypy by adding another runner to
+the runners section.
+
+```yaml
+test_path: tests
+
+runners:
+  - name: Run tests with cpython
+    run: python test.py
+  - name: Run tests with pypy
+    run: pypy test.py
+```
 
 ### An example test config
 
 Let's create a <code>divide-by-zero.yaml</code> file in
 the <code>tests</code> directory and add the following:
 
-```
+```yaml
 cases:
   - name: Should exit on divide by zero
     status: 1
@@ -68,11 +83,35 @@ templates:
       4 / {{ denominator }}
 ```
 
+In this example, <code>name</code> will be printed out when the test
+is run. <code>status</code> is the expected integer returned by
+running the program. <code>stdout</code> is the entire expected output
+written by the program during execution. None of these three fields
+are required. If <code>status</code> or <case>stdout</case> are not
+provided, btest will skip checking them.
+
+Any additional key-value pairs are treated as template variable values
+and will be substituted if/where it is referenced in the templates
+section when the case is run. <code>denominator</code> is the only
+such variable we use in this example. When this first (and only) case
+is run, <code>test.py</code> will be written to disk
+containing <code>4 / 0</code>.
+
+#### templates section
+
+The <code>templates</code> section is a dictionary allowing us to
+specify files to be created with variable substitution. All files are
+created in the same directory per test case, so if we want to import
+code we can do so with relative paths.
+
+[Here](https://github.com/eatonphil/bsdscheme/blob/master/tests/include.yaml)
+is a simple example of a BSDScheme test that uses this feature.
+
 ### Running btest
 
-When we run btest from the root directory (the directory
-above <code>tests</code>) we'll see all the tests that btest registers
-and the results of each test:
+Run btest from the root directory (the directory
+above <code>tests</code>) and we'll see all the grouped test cases
+that btest registers and the result of each test:
 
 ```
 $ btest
@@ -81,6 +120,93 @@ tests/divide-by-zero.yaml
 
 1 of 1 tests passed for runner: Run tests with cpython
 ```
+
+### Use in CI environments
+
+In the future we may provide pre-built release binaries. But in the
+meantime, the CI step involves downloading git and ldc and
+building/installing btest before calling it.
+
+#### Circle CI
+
+This is the
+[config](https://github.com/eatonphil/bsdscheme/blob/master/.circleci/config.yml)
+file I use for testing BSDScheme:
+
+```
+version: 2
+jobs:
+  build:
+    docker:
+      - image: dlanguage/ldc
+    steps:
+      - checkout
+      - run:
+          name: Install debian-packaged dependencies
+          command: |
+            apt update
+            apt install -y git build-essential
+            ln -s $(which ldc2) /usr/local/bin/ldc
+      - run:
+          name: Install btest
+          command: |
+            git clone https://github.com/briansteffens/btest
+            cd btest
+            make
+            make install
+      - run:
+          name: Install bsdscheme
+          command: |
+            make
+            make install
+      - run:
+          name: Run bsdscheme tests
+          command: btest
+```
+
+#### Travis CI
+
+This is the
+[config](https://github.com/briansteffens/bshift/blob/master/.travis.yml)
+Brian uses for testing BShift:
+
+```
+sudo: required
+
+language: d
+
+d:
+    - ldc
+
+script:
+    # ldc gets installed as other names sometimes
+    - sudo ln -s `which $DC` /usr/local/bin/ldc
+
+    # bshift
+    - make
+    - sudo ln -s $PWD/bin/bshift /usr/local/bin/bshift
+    - sudo ln -s $PWD/lib /usr/local/lib/bshift
+
+    # nasm
+    - sudo apt-get install -y nasm
+
+    # basm
+    - git clone https://github.com/briansteffens/basm
+    - cd basm && cabal build && cd ..
+    - sudo ln -s $PWD/basm/dist/build/basm/basm /usr/local/bin/basm
+
+    # btest
+    - git clone https://github.com/briansteffens/btest
+    - cd btest && make && sudo make install && cd ..
+
+    # run the tests
+    - btest
+```
+
+### Thoughts/Questions
+
+Open an [issue](https://github.com/briansteffens/btest/issues) or
+send a [tweet](https://twitter.com/phil_eaton)!
 
 <style>
   header { background: #730040 !important }
