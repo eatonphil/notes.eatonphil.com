@@ -49,7 +49,7 @@ representation effort... lots of void-pointer conversions.
 
 The next big fix I made was to simplify the way generic functions
 dealt with their arguments. Originally I passed each function its
-arguments unevaluated and left it up to each function to evaluate its
+arguments un-evaluated and left it up to each function to evaluate its
 arguments before operating on them. While there was nothing
 intrinsically wrong with this method, it was overly complicated and
 bug-prone. I refactored the builtin functions into two groups:
