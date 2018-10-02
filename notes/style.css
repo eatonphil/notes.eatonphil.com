@@ -50,7 +50,6 @@ h4 {
 
 p, li {
     font-family: serif;
-    font-size: 1.1rem;
     font-style: normal;
     font-variant: normal;
     font-weight: 400;
@@ -63,7 +62,6 @@ p:last-child, li:last-child {
 
 a {
     color: rgb(34, 102, 216);
-    font-family: serif;
     text-decoration: none;
 }
 
@@ -83,7 +81,6 @@ footer p {
     margin: 0;
     margin-top: 15px;
     padding-top: 15px;
-    font-size: 1rem;
 }
 
 .container {
@@ -120,13 +117,11 @@ header .container {
     margin: 0;
     padding: 0;
     line-height: initial;
-    font-size: .9rem;
 }
 
 .subtitle {
     color: #333;
     text-decoration: none;
-    font-size: 1.15rem;
     font-variant: small-caps;
     font-weight: 500;
 }
@@ -135,12 +130,8 @@ header .container {
     margin-top: 15px;
 }
 
-.summary a {
-    font-size: 1.1rem;
-}
-
 .summary-subtitle {
-    font-size: 1.1rem;
+    font-family: sans-serif;
     color: #333;
 }
 
