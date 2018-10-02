@@ -19,10 +19,6 @@ HOME_PAGE = """
     user interfaces.
   </p>
   <p>
-    I love my plants, my sherry, and reading more books than I did
-    last year. I'm always looking for book recommendations.
-  </p>
-  <p>
     Professionally, I lead a team of software developers on the
     business-logic API and user-facing frontend at a <a
     href="https://capsule8.com">Linux security startup</a>.
@@ -32,6 +28,9 @@ HOME_PAGE = """
     href="https://github.com/eatonphil">Github</a>, <a
     href="https://twitter.com/phil_eaton">Twitter</a>, and <a
     href="https://www.goodreads.com/eatonphil">Goodreads</a>.
+  </p>
+  <p>
+    I'm always looking for book recommendations.
   </p>
 </div>
 <div class="fp-section fp-section--projects">
