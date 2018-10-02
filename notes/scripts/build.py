@@ -9,6 +9,49 @@ POST_SUMMARY = """
   <div class="summary-subtitle">{}</div>
 </div>
 """
+HOME_PAGE = """
+<style>header, footer { display: none !important; }</style>
+<div class="fp-section fp-section--about">
+<h2 class="fp-h2">About</h2>
+  <p>
+    Morning! I'm Phil, a developer living in Brooklyn. I'm into
+    programming languages; operating systems; and complex, beautiful
+    user interfaces.
+  </p>
+  <p>
+    I love my plants, my sherry, and reading more books than I did
+    last year. I'm always looking for book recommendations.
+  </p>
+  <p>
+    Professionally, I lead a team of software developers on the
+    business-logic API and user-facing frontend at a <a
+    href="https://capsule8.com">Linux security startup</a>.
+  </p>
+  <p>
+    Find more of me on <a
+    href="https://github.com/eatonphil">Github</a>, <a
+    href="https://twitter.com/phil_eaton">Twitter</a>, and <a
+    href="https://www.goodreads.com/eatonphil">Goodreads</a>.
+  </p>
+</div>
+<div class="fp-section fp-section--projects">
+  <h2 class="fp-h2">Fun</h2>
+  <a href="http://ponyo.org" class="fp-project">
+    <div>Ponyo</div>
+    <p>High-level library and toolkit for programming Standard ML.</p>
+  </a>
+  <a href="https://github.com/eatonphil/bsdscheme" class="fp-project">
+    <div>BSDScheme</div>
+    <p>A Scheme interpreter and compiler targeting R7RS written in D.</p>
+  </a>
+  <a href="https://github.com/eatonphil/jsc" class="fp-project">
+    <div>Jsc</div>
+    <p>A Javascript to C++ compiler (using V8) written in Rust.</p>
+  </a>
+</div>
+<div class="fp-section fp-section--notes">
+  <h2 class="fp-h2">Notes</h2>
+"""
 TEMPLATE = open('template.html').read()
 TAG = "Notes by a software developer"
 
@@ -62,9 +105,10 @@ def main():
 
     post_data.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
     post_data.reverse()
-    post = "\n".join([POST_SUMMARY.format(*args) for args in post_data])
+    home_page = HOME_PAGE
+    home_page += "\n".join([POST_SUMMARY.format(*args) for args in post_data])
     with open('dist/index.html', 'w') as f:
-        f.write(TEMPLATE.format(post=post + '<style>header { display: none !important; }</style>', title="", tag=TAG, subtitle=""))
+        f.write(TEMPLATE.format(post=home_page, title="", tag=TAG, subtitle=""))
 
     with open('dist/style.css', 'w') as fw:
         with open('style.css') as fr:

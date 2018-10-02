@@ -32,6 +32,12 @@ h2 {
     padding-bottom: 5px;
 }
 
+h2.fp-h2 {
+    color: #333;
+    font-size: 2rem;
+    margin: 1rem 0;
+}
+
 h3 {
     color: #333;
     font-size: 1.3rem;
@@ -63,13 +69,6 @@ a {
 
 pre {
     width: 800px;
-}
-
-@media (max-width: 800px) {
-    pre {
-        width: 100%;
-        margin-left: 0;
-    }
 }
 
 footer .container {
@@ -165,4 +164,58 @@ header .container {
 .note-header {
     background: transparent;
     font-weight: bold;
+}
+
+.fp-section {
+    margin: -1rem;
+    padding: 1rem;
+    margin-top: 4rem;
+}
+
+.fp-section:last-of-type {
+    margin-bottom: 2rem;
+}
+
+.fp-section--about {
+    background: #d5f4ff;
+}
+
+.fp-section--projects {
+    background: #f8e8ff;
+}
+
+.fp-section--notes {
+    background: #ffe8e8;
+}
+
+.fp-project:not(:last-of-type) {
+    display: block;
+    margin-bottom: 1rem;
+}
+
+.fp-project p {
+    color: #333;
+    margin: 0;
+}
+
+@media (max-width: 800px) {
+    pre {
+        width: 100%;
+        margin-left: 0;
+    }
+}
+
+@media only screen and (min-device-width : 320px) and (max-device-width : 480px) {
+    .container {
+        padding: 0;
+    }
+
+    .fp-section {
+        margin: 0;
+        padding: 1rem;
+    }
+
+    .fp-section:not(:last-of-type) {
+        border-bottom: 1px solid white;
+    }
 }
