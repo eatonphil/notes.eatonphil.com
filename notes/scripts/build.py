@@ -14,14 +14,14 @@ HOME_PAGE = """
 <div class="fp-section fp-section--about">
 <h2 class="fp-h2">About</h2>
   <p>
-    Morning! I'm Phil, a developer living in Brooklyn. I'm into
-    programming languages; operating systems; and complex, beautiful
-    user interfaces.
+    Hey! I'm Phil, a developer in Brooklyn. My interests are in
+    programming languages, complex user-interfaces, organizational
+    transparency and education.
   </p>
   <p>
-    Professionally, I lead a team of software developers on the
-    business-logic API and user-facing frontend at a <a
-    href="https://capsule8.com">Linux security startup</a>.
+    I lead a team of software developers on the business-logic API and
+    user-facing frontend at a <a href="https://capsule8.com">Linux
+    security startup</a>.
   </p>
   <p>
     Find more of me on <a

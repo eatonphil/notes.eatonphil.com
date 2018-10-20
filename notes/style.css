@@ -69,6 +69,11 @@ pre {
     width: 800px;
 }
 
+img {
+    width: 640px;
+    max-width: 100%;
+}
+
 footer .container {
     margin-bottom: 15px;
 }
