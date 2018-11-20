@@ -16,8 +16,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 h1 {
-    font-size: 2.5rem;
-    letter-spacing: .05rem;
+    font-size: 1.5rem;
     line-height: 3rem;
     margin: 0;
 }
@@ -26,7 +25,6 @@ h2 {
     font-size: 1rem;
     font-weight: normal;
     line-height: 1.1rem;
-    color: #eee;
     margin: 0;
     padding-bottom: 5px;
 }
@@ -96,14 +94,20 @@ footer p {
 }
 
 header a {
-    color: white;
     font-family: sans-serif;
+    font-size: .8rem;
+    color: #777;
+}
+
+header a::before {
+    display: inline-block;
+    content: '↩';
+    padding-right: 5px;
+    font-size: .6rem;
 }
 
 header .container {
-    padding: 30px 15px;
-    color: white;
-    background: #04928b;
+    padding: 30px 15px 0 15px;
 }
 
 .col-6 {
@@ -164,6 +168,10 @@ header .container {
     margin: -1rem;
     padding: 1rem;
     margin-top: 4rem;
+}
+
+.fp-section:first-of-type {
+    margin-top: 2rem;
 }
 
 .fp-section:last-of-type {

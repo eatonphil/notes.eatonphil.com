@@ -14,9 +14,12 @@ HOME_PAGE = """
 <div class="fp-section fp-section--about">
 <h2 class="fp-h2">About</h2>
   <p>
-    Hey! I'm Phil, a developer in Brooklyn. My interests are in
-    programming languages, complex user-interfaces, organizational
-    transparency and education.
+    Hello! I'm an engineer and manager in Brooklyn. As an engineer my
+    focus is in compilers and interpreters; operating systems; and
+    complex, intuitive user-interfaces. As a manager my focus is in
+    processes and changes for <em>people</em>; transparency within
+    teams and organizations; and education (for employees and for
+    the public).
   </p>
   <p>
     I lead a team of software developers on the business-logic API and
@@ -28,9 +31,7 @@ HOME_PAGE = """
     href="https://github.com/eatonphil">Github</a>, <a
     href="https://twitter.com/phil_eaton">Twitter</a>, and <a
     href="https://www.goodreads.com/eatonphil">Goodreads</a>.
-  </p>
-  <p>
-    I'm always looking for book recommendations.
+    (I'm always looking for book recommendations.)
   </p>
 </div>
 <div class="fp-section fp-section--projects">
