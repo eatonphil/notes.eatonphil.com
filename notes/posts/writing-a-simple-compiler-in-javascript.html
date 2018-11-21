@@ -1,0 +1,194 @@
+# Writing a simple compiler in Javascript
+## November 20, 2018
+
+In this post we'll write a simple compiler in Javascript (on Node)
+without any third-party libraries. Our goal is to take an input
+program like `(+ 1 (+ 2 3))` and produce an output assembly program
+that does these operations to produce `6` as the exit code. The
+resulting compiler can be found
+[here](https://github.com/eatonphil/ulisp).
+
+We'll cover:
+
+* Parsing
+* Code generation
+* Assembly basics
+* Syscalls
+
+And for now we'll omit:
+
+* Programmable function definitions
+* Non-symbol/-numeric data types
+* More than 3 function arguments
+* Lots of safety
+* Lots of error messsages
+
+### Parsing
+
+We pick the [S-expression](https://en.wikipedia.org/wiki/S-expression)
+syntax mentioned earlier because it's very easy to parse. Furthermore,
+our input language is so limited that we won't even break our parser
+into separate lexing/parsing stages.
+
+<p class="note">
+  Once you need to support string literals, comments, decimal
+  literals, and other more complex literals it becomes easier to use
+  separate stages.
+
+  <br />
+  <br />
+
+  If you're curious about these separate stages of parsing, you may be
+  interested in my post
+  on <a href="http://notes.eatonphil.com/writing-a-simple-json-parser.html">writing
+  a JSON parser</a>.
+
+  <br />
+  <br />
+
+  Or, check out my BSDScheme project for a fully-featured
+  <a href="https://github.com/eatonphil/bsdscheme/blob/master/src/lex.d">lexer</a>
+  and
+  <a href="https://github.com/eatonphil/bsdscheme/blob/master/src/parse.d">parser</a>
+  for Scheme.
+</p>
+
+Our goal with the parser is to produce an Abstract Syntax Tree (AST)
+which just means a (non-string) data structure representing
+the input program. Specifically, we want that program `(+ 1 (+ 2 3))`
+to produce this AST in Javascript: `['+', 1, ['+', 2, 3]]`.
+
+There are many different ways to go about parsing but the most
+intuitive to me is to have a function that accepts a program (a
+string) and returns a tuple containing the program parsed so far (an
+AST) and the rest of the program (a string) that hasn't been
+parsed.
+
+That leaves us with a function skeleton that looks like this:
+
+```javascript
+module.exports.parse = function parse(program) {
+  const tokens = [];
+
+  ... logic to be added ...
+
+  return [tokens, ''];
+};
+```
+
+The code that initially calls parse will thus have to deal with
+unwrapping the outermost tuple to get to the AST. For a more helpful compiler
+we could check
+that the entire program *was* actually parsed by failing if the second
+element of the return result is not the empty string.
+
+Within the function we will iterate over each character and accumulate
+until we hit space, left or right parenthesis:
+
+```javascript
+module.exports.parse = function parse(program) {
+  const tokens = [];
+  let currentToken = '';
+
+  for (let i = 0; i < program.length; i++) {
+    const char = program.charAt(i);
+
+    switch (char) {
+      case '(': // TODO
+        break;
+      case ')': // TODO
+        break;
+      case ' ':
+        tokens.push(+currentToken || currentToken);
+        currentToken = '';
+        break;
+      default:
+        currentToken += char;
+        break;
+    }
+  }
+
+  return [tokens, ''];
+};
+```
+
+The recursive parts are always the most challenging. The right paren
+is easiest. We must push the current token and return all tokens with
+the rest of the program:
+
+```javascript
+module.exports.parse = function parse(program) {
+  const tokens = [];
+  let currentToken = '';
+
+  for (let i = 0; i < program.length; i++) {
+    const char = program.charAt(i);
+
+    switch (char) {
+      case '(': // TODO
+        break;
+      case ')':
+        tokens.push(+currentToken || currentToken);
+        return [tokens, program.substring(i + 1)];
+      case ' ':
+        tokens.push(+currentToken || currentToken);
+        currentToken = '';
+        break;
+      default:
+        currentToken += char;
+        break;
+    }
+  }
+
+  return [tokens, ''];
+};
+```
+
+Finally the left paren should recurse, add the parsed tokens to the
+list of sibling tokens, and force the loop to start at the new
+unparsed point.
+
+```javascript
+module.exports.parse = function parse(program) {
+  const tokens = [];
+  let currentToken = '';
+
+  for (let i = 0; i < program.length; i++) {
+    const char = program.charAt(i);
+
+    switch (char) {
+      case '(': {
+        const [parsed, rest] = parse(program.substring(i + 1));
+	tokens.push(parsed);
+	program = rest;
+	i = 0;
+        break;
+      }
+      case ')':
+        tokens.push(+currentToken || currentToken);
+        return [tokens, program.substring(i + 1)];
+      case ' ':
+        tokens.push(+currentToken || currentToken);
+        currentToken = '';
+        break;
+      default:
+        currentToken += char;
+        break;
+    }
+  }
+
+  return [tokens, ''];
+};
+```
+
+Assuming this is all in `parser.js`, let's try it out in the REPL:
+
+```bash
+$ node
+> const { parse } = require('./parser');
+undefined
+> console.log(JSON.stringify(parse('(+ 3 (+ 1 2)')));
+[[["+",3,["+",1,2]]],""]
+```
+
+Solid. We move on.
