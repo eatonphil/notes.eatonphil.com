@@ -53,10 +53,9 @@ into separate lexing/parsing stages.
   for Scheme.
 </p>
 
-Our goal with the parser is to produce an Abstract Syntax Tree (AST)
-which just means a (non-string) data structure representing
-the input program. Specifically, we want that program `(+ 1 (+ 2 3))`
-to produce this AST in Javascript: `['+', 1, ['+', 2, 3]]`.
+The parser should produce an Abstract Syntax Tree (AST), a data
+structure representing the input program. Specifically, we want `(+ 1 (+ 2 3))`
+to produce `['+', 1, ['+', 2, 3]]` in Javascript.
 
 There are many different ways to go about parsing but the most
 intuitive to me is to have a function that accepts a program (a
@@ -77,10 +76,10 @@ module.exports.parse = function parse(program) {
 ```
 
 The code that initially calls parse will thus have to deal with
-unwrapping the outermost tuple to get to the AST. For a more helpful compiler
-we could check
-that the entire program *was* actually parsed by failing if the second
-element of the return result is not the empty string.
+unwrapping the outermost tuple to get to the AST. For a more helpful
+compiler we could check that the entire program *was* actually parsed
+by failing if the second element of the return result is not the empty
+string.
 
 Within the function we will iterate over each character and accumulate
 until we hit space, left or right parenthesis:
@@ -159,9 +158,9 @@ module.exports.parse = function parse(program) {
     switch (char) {
       case '(': {
         const [parsed, rest] = parse(program.substring(i + 1));
-	tokens.push(parsed);
-	program = rest;
-	i = 0;
+        tokens.push(parsed);
+        program = rest;
+        i = 0;
         break;
       }
       case ')':
@@ -195,9 +194,9 @@ Solid. We move on.
 
 ### Assembly 101
 
-Assembly is essentially the lowest-level programming language you can
+Assembly is essentially the lowest-level programming language we can
 use. It is a human readable, 1:1 representation of the binary
-instructions your CPU can interpret. Conversion from assembly to
+instructions the CPU can interpret. Conversion from assembly to
 binary is done with an assembler; the reverse step is done with a
 disassembler. We'll use `gcc` for assembling since it deals with some
 [oddities](http://fabiensanglard.net/macosxassembly/index.php) of
@@ -219,7 +218,7 @@ Now we only need to know a few instructions to compile our program
 * `POP`: remove the top-most value from the stack and store in a register
 * `CALL`: enter a new section of the stack and start running the function
 * `RET`: enter the calling functions stack and return to evaluating from the next instruction after the call
-* `SYSCALL`: make a syscall
+* `SYSCALL`: like `CALL` but where the function is handled by the kernel
 
 ### Function calling convention
 
@@ -336,12 +335,13 @@ We'll define the `plus` built-in function in the prefix code.
 ### The prefix
 
 Assembly programs consist of a few "sections" in memory. The most
-important of which are the "text" and "data" sections. Text is a
+important of which are the `text` and `data` sections. `text` is a
 read-only section where the program instructions themselves are
 stored. The CPU is instructed to start interpreting from some location
-in this text section and it will increment through instructions until
-it reaches an instruction that tells it to jump to a different
-location to evaluate instructions (e.g. with CALL, RET, or JMP).
+in this text section and it will increment through instructions,
+evaluating each instruction until it reaches an instruction that tells
+it to jump to a different location to evaluate instructions (e.g. with
+CALL, RET, or JMP).
 
 To denote the text section we emit `.text` in our prefix before we
 emit our generated code.
@@ -357,10 +357,10 @@ emit our generated code.
 </p>
 
 Additionally, we need to emit an entrypoint (we'll use `_main`) and
-add a notice that the location of this entrypoint should be accessible
-by outside files. This is important because we will let gcc handle the
-hairier parts of generating an executable file and it will need access
-to our entrypoint.
+add a notice (`.global _main`) so that the location of this entrypoint
+is visible externally. This is important because we let `gcc` handle
+the hairier parts of generating an executable file and it needs access
+to the entrypoint.
 
 So far, our prefix looks like this:
 
@@ -404,10 +404,19 @@ The job of the postfix will be simple, call `exit` with the value of
 program.
 
 `exit` is a syscall, so we'll use the `SYSCALL` instruction to call
-it.  The x86_64 calling convention for `SYSCALL` uses parameters the
-same way `CALL` but we also need to set `RAX` to be the integer
-representation of the syscall for the current system. On Linux it will
-be `60`; on macOS it is `0x2000001`.
+it. The x86_64 calling convention on macOS and Linux for `SYSCALL`
+defines parameters the same way `CALL` does. But we also need to tell
+`SYSCALL` what syscall to call. The convention is to set `RAX` to the
+integer representing the syscall on the current system. On Linux it
+will be `60`; on macOS it is `0x2000001`.
+
+<p class="note">
+  When I say "convention", I don't mean that you really have a choice
+  as a programmer. It was arbitrary when the operating system and
+  standard libraries chose it. But if you want to write a working
+  program that uses syscalls or calls out to (say) glibc, you'll need
+  to follow these conventions.
+</p>
 
 The postfix then looks like this:
 
@@ -498,8 +507,8 @@ $ echo $?
 6
 ```
 
-And we've got a working compiler! If you got lost, the full source of
-the compiler is available [here](https://github.com/eatonphil/ulisp).
+And we've got a working compiler! The full source of the compiler is
+available [here](https://github.com/eatonphil/ulisp).
 
 ### Further reading
 

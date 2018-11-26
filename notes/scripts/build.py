@@ -27,7 +27,7 @@ HOME_PAGE = """
     security startup</a>.
   </p>
   <p>
-    Find more of me on <a
+    Find me on <a
     href="https://github.com/eatonphil">Github</a>, <a
     href="https://twitter.com/phil_eaton">Twitter</a>, and <a
     href="https://www.goodreads.com/eatonphil">Goodreads</a>.
