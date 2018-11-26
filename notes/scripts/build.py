@@ -15,11 +15,11 @@ HOME_PAGE = """
 <h2 class="fp-h2">About</h2>
   <p>
     Hello! I'm an engineer and manager in Brooklyn. As an engineer my
-    focus is in compilers and interpreters; operating systems; and
-    complex, intuitive user-interfaces. As a manager my focus is in
-    processes and changes for <em>people</em>; transparency within
-    teams and organizations; and education (for employees and for
-    the public).
+    interests are in compilers and interpreters; operating systems;
+    and complex, intuitive user-interfaces. As a manager my interests
+    are in processes and changes for <em>people</em>; transparency
+    within teams and organizations; and education (for employees and
+    for the public).
   </p>
   <p>
     I lead a team of software developers on the business-logic API and
