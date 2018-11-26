@@ -42,7 +42,7 @@ Take, for example, the <code>equals</code>
 [function](https://github.com/eatonphil/bsdscheme/blob/master/src/common.d#L140)
 in the standard library:
 
-```scheme
+```c++
 Value equals(Value arguments, void** rest) {
   auto tuple = valueToList(arguments);
   auto left = tuple[0];
@@ -90,7 +90,7 @@ on.
 
 To give a concrete example of a whole program compiled, this Scheme program:
 
-```
+```scheme
 (define (exp base pow)
   (if (= pow 0)
       1
@@ -103,7 +103,7 @@ To give a concrete example of a whole program compiled, this Scheme program:
 
 when run through the BSDScheme compiler would become:
 
-```
+```c++
 import std.stdio;
 import lex;
 import common;
@@ -390,3 +390,5 @@ After the low-hanging fruit, more interesting projects for jsc include:
                                                                       
 * generating C++ with embedded V8 rather than only targeting Node addons
 * type inference or type hinting for generating unboxed functions a la Cython and SBCL
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/languages/scheme.min.js"></script>
