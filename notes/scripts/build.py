@@ -17,7 +17,7 @@ HOME_PAGE = """
     Hello! I'm an engineer and manager in Brooklyn. As an engineer my
     interests are in compilers and interpreters; operating systems;
     and complex, intuitive user-interfaces. As a manager my interests
-    are in processes and changes for <em>people</em>; transparency
+    are in effective, minimal processes and changes; transparency
     within teams and organizations; and education (for employees and
     for the public).
   </p>
