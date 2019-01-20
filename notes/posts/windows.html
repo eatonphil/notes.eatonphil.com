@@ -1,0 +1,101 @@
+# Windows
+## January 20, 2019
+
+It has been six years since I last used Windows for any remotely
+serious software development. I've used Ubuntu, Arch, or FreeBSD
+since. But eventually I spent so much time working around common
+workplace tasks that I decided to put Windows 10 Pro on my work
+laptop.
+
+### Windows Subsystem for Linux
+
+Introduced in 2016, this technology allows Windows to run unmodified
+Linux binaries. The core feat being [syscall
+translation](https://blogs.msdn.microsoft.com/wsl/2016/06/08/wsl-system-calls/).
+
+It works nearly flawlessly. This means I can do all my Go, Node,
+PostgreSQL development on Windows without a virtual machine using
+bash, tmux, git, emacs, etc.
+
+I've seen a few minor exceptions over the course of regular software
+development in WSL:
+
+* [ss/netstat does not work](https://github.com/Microsoft/WSL/issues/2249)
+* [vagrant does not work](https://github.com/hashicorp/vagrant/issues/8700)
+
+More generally, Linux programs are heavily file-oriented. And Windows
+I/O [is not designed well for
+that](https://github.com/Microsoft/WSL/issues/873#issuecomment-425272829).
+In the worst cases (installing/adding Node packages) it can take
+minutes to do operations that would take Linux seconds.
+
+### Vagrant
+
+Vagrant-Windows interoperability is abysmal.
+
+As noted above, you cannot manage Hyper-V from vagrant within WSL. So
+you're stuck using Powershell. Even then, managing synced files from
+vagrant is a nightmare. The default sync method requires you to sign
+in using your **Windows Live** username and password on every
+reboot. But Node package installation attempts some file operations
+that are not supported over the default synced, network filesystem.
+
+When I switched to rsync vagrant wouldn't reliable sync when the
+virtual machine went down and came back up.
+
+After hours of trying to get some files synced with vagrant I gave up.
+
+### Hyper-V
+
+Hyper-V's GUI is much more complex/feature-complete than VirtualBox.
+It even provides a Ubuntu-quick-install that I used to jump right in.
+I don't recommend using this though because it gives you no option but
+an 11GB hard disk. I didn't realize this until I went through an hour
+or two of post-install customization only to run out of space. Too
+lazy to boot into a live CD to grow the root filesystem I reinstalled
+with a more suitable 64GB drive and wen through the hour-long
+post-install customization process again.
+
+Networking in Hyper-V is more complex/feature-complete than VirtualBox
+as well. To access a Hyper-V machine you must create a new virtual
+network interface manually and associate it. Static IP address appear
+to be controlled at the host networking level (e.g. Control Panel)
+instead of within the Hyper-V interface. This highlights how these
+virtual interfaces are first-class, but overcomplicates the process of
+getting started.
+
+Ultimately I gave up on a static IP address and decided to reboot less
+frequently.
+
+Performance-wise Hyper-V machines are exactly as expected: excellent.
+
+### Misc
+
+Docker support on Windows needs work. It took me a while to understand
+how Docker interacts with the WSL filesystem and what I needed to do
+to allow Docker to mount. The complexity is similar on macOS when you
+want to mount privileged directories like /var, but the experience is
+worse on Windows.
+
+Apparantly Windows does have tiling window managers, but I have not
+tried one out yet.
+
+Powershell, a language with real types, is pretty compelling. But I
+have not spent enough time with it to be efficient. And since WSL is
+mostly good enough I don't really plan to.
+
+Windows doesn't allow you to delete any files that are "in use". This
+is kinda cool except for that the errors you get when trying to delete
+files that are in use are useless. They are even more useless when you
+get the plain "could not delete directory" when you try to delete a
+directory with some file inside it that is in use. I had to start
+deleting files within by hand until I found the one I realized was in
+use.
+
+### Conclusion
+
+If you have never run Linux or FreeBSD, don't use this post as an
+excuse not to. You should run Linux or FreeBSD for the experience. But
+if you've reached diminishing returns in your Linux/FreeBSD use,
+Windows as a development environment has come a long way. It may be
+the best platform available for software development, the profession.
