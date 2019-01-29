@@ -227,3 +227,7 @@ header .container {
         border-bottom: 1px solid white;
     }
 }
+
+#share {
+    margin-top: 30px;
+}
