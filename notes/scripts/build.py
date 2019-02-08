@@ -52,13 +52,13 @@ HOME_PAGE = """
 <div class="fp-section fp-section--talks">
   <h2 class="fp-h2">Talks</h2>
   <div class="fp-project">
-    <a href="https://www.meetup.com/JS-NYC/events/mwwrjqyxqbqb/">
-      Compiler basics: Lisp to Assembly
+    <a href="https://www.meetup.com/nodejs/events/258732362/">
+      Compiling Javascript to native Node addons with Jsc
     </a>
   </div>
   <div class="fp-project">
-    <a href="https://www.meetup.com/nodejs/events/258732362/">
-      Compiling Javascript to native Node addons with Jsc
+    <a href="https://www.meetup.com/JS-NYC/events/mwwrjqyxqbqb/">
+      Compiler basics: Lisp to Assembly
     </a>
   </div>
 </div>
