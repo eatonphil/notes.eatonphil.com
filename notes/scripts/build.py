@@ -49,6 +49,19 @@ HOME_PAGE = """
     <p>A Javascript to C++ compiler (using V8) written in Rust.</p>
   </a>
 </div>
+<div class="fp-section fp-section--talks">
+  <h2 class="fp-h2">Talks</h2>
+  <div class="fp-project">
+    <a href="https://www.meetup.com/JS-NYC/events/mwwrjqyxqbqb/">
+      Compiler basics: Lisp to Assembly
+    </a>
+  </div>
+  <div class="fp-project">
+    <a href="https://www.meetup.com/nodejs/events/258732362/">
+      Compiling Javascript to native Node addons with Jsc
+    </a>
+  </div>
+</div>
 <div class="fp-section fp-section--notes">
   <h2 class="fp-h2">Notes</h2>
 """

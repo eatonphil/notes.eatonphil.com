@@ -192,6 +192,10 @@ header .container {
     background: #f8e8ff;
 }
 
+.fp-section--talks {
+    background: #d9ffcc;
+}
+
 .fp-section--notes {
     background: #ffe8e8;
 }
