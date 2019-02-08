@@ -51,16 +51,14 @@ HOME_PAGE = """
 </div>
 <div class="fp-section fp-section--talks">
   <h2 class="fp-h2">Talks</h2>
-  <div class="fp-project">
-    <a href="https://www.meetup.com/nodejs/events/258732362/">
-      Compiling Javascript to native Node addons with Jsc
-    </a>
-  </div>
-  <div class="fp-project">
-    <a href="https://www.meetup.com/JS-NYC/events/mwwrjqyxqbqb/">
-      Compiler basics: Lisp to Assembly
-    </a>
-  </div>
+  <a href="https://www.meetup.com/nodejs/events/258732362/" class="fp-project">
+    <div>Compiling Javascript to native Node addons with Jsc</div>
+    <p>February 20, 2019</p>
+  </a>
+  <a href="https://www.meetup.com/JS-NYC/events/mwwrjqyxqbqb/" class="fp-project">
+    <div>Compiler basics: Lisp to Assembly</div>
+    <p>December 20, 2018</p>
+  </a>
 </div>
 <div class="fp-section fp-section--notes">
   <h2 class="fp-h2">Notes</h2>
