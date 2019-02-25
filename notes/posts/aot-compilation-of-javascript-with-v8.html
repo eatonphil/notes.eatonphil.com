@@ -1,0 +1,29 @@
+# AOT-compilation of Javascript with V8
+## February 20, 2019
+
+I mentioned a few months ago (when I first wrote about jsc) how common
+it is for dynamic programming languages to have implementations that
+compile to native binaries:
+
+* Python: [Cython](https://cython.org/)
+* Java: [Graal](https://www.graalvm.org/docs/reference-manual/aot-compilation/)
+* Common Lisp: [SBCL](http://www.sbcl.org/)
+* Scheme: [Chicken Scheme](https://www.call-cc.org/)
+
+I got some experience with the Cython and Chicken Scheme technique in
+particular while developing
+[BSDScheme](https://github.com/eatonphil/bsdscheme) (an interpreter
+and compiler for Scheme). In this technique, you use core aspects of
+the runtime code as a library that compiled code references. Going
+this route takes away most of the time spent building object-memory
+representations, memory management, operations. This allows you to
+very quickly build fully-functional AOT-compilers for dynamic
+languages that produce native binaries and automagically work with any
+library for the language (written in the language itself, native
+addons require some work).
+
+### The first pass
+
+I wrote the initial version of jsc in Rust, using Dave Herman's
+[esprit](https://github.com/dherman/esprit) parser for a subset of ES6
+that included all of ES5.
