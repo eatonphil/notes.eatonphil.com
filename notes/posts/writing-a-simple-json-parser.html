@@ -81,7 +81,7 @@ Here is what the lexer should return for an example input:
 
 ```python
 assert_equal(lex('{"foo": [1, 2, {"bar": 2}]}'),
-             ['{', 'foo', ':', '[', 1, ',', 2, '{', 'bar', ':', 2, '}', ']', '}'])
+             ['{', 'foo', ':', '[', 1, ',', 2, ',', '{', 'bar', ':', 2, '}', ']', '}'])
 ```
 
 Here is what this logic might begin to look like:
