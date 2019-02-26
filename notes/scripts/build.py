@@ -52,11 +52,17 @@ HOME_PAGE = """
 <div class="fp-section fp-section--talks">
   <h2 class="fp-h2">Talks</h2>
   <a href="https://www.meetup.com/nodejs/events/258732362/" class="fp-project">
-    <div>Compiling Javascript to native Node addons with Jsc</div>
+    <div>
+      AOT-compilation of Javascript with V8
+      <a href="https://docs.google.com/presentation/d/e/2PACX-1vQRIjLOcxdbZEDWI8LH2iPtzo4YVTueg1JTlFgJRRjcRDKMOYZ_XS1C-Q9DLpER3AoivyHFzzWT8HQK/pub">Slides</a>
+    </div>
     <p>February 20, 2019</p>
   </a>
   <a href="https://www.meetup.com/JS-NYC/events/mwwrjqyxqbqb/" class="fp-project">
-    <div>Compiler basics: Lisp to Assembly</div>
+    <div>
+      Compiler basics: Lisp to Assembly
+      <a href="https://docs.google.com/presentation/d/e/2PACX-1vQE2HWfQwFzmFkvfGssqp-93dN5no0ozzNwqO6nNF7-yUm_Kv_TOhbBqoIhy1y8imUj6AwPmF1UZaqG/pub">Slides</a>
+    </div>
     <p>December 20, 2018</p>
   </a>
 </div>
