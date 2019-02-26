@@ -119,6 +119,7 @@ header .container {
     padding: 15px;
     background: white;
     border: 1px solid #ccc;
+    max-height: 300px;
 }
 
 .title {
