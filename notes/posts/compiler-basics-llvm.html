@@ -1,0 +1,76 @@
+# Compiler basics: LLVM
+## March 6, 2019
+
+Previously in compiler basics:
+
+1. [Compiler basics: lisp to assembly](/compiler-basics-lisp-to-assembly.html)
+1. [Compiler basics: user-defined functions and variables](/compiler-basics-functions.html)
+
+In this post we'll extend the compiler to emit [LLVM
+IR](https://llvm.org/docs/LangRef.html) as an option instead of x86.
+
+LLVM IR is a portable, human-readable, typed, assembly-like syntax
+that LLVM can apply optimization passes on before generating assembly
+for the current architecture. Many language implementors choose to
+compile to LLVM IR specifically to avoid needing to implement
+sophisticated [optimization
+passes](https://llvm.org/docs/Passes.html).
+
+But the biggest reason I'm adding an LLVM backend is so that I can
+punt on implementing [register
+allocation](https://en.wikipedia.org/wiki/Register_allocation). Register
+allocation is the technique that allows you to use as many registers
+as possible before storing local variables on the stack. While
+register allocation algorithms are not *that* difficult, I got
+bored/lazy trying to implement this for ulisp. And LLVM IR provides
+"infinite" locals that get mapped as needed to registers and the
+stack.
+
+### LLVM IR basics
+
+In LLVM IR, all local variables must be prefixed
+with <code>@</code>. All global variables (including function names)
+must be prefixed with <code>@</code>. LLVM IR must be [single-static
+assignment](https://www.cs.cmu.edu/~fp/courses/15411-f08/lectures/09-ssa.pdf)
+(SSA) which means that no variable is assigned twice. Additionally,
+literals cannot be assigned to variables directly. So we'll work
+around that by adding 0 to the literal. Furthermore, we'll take
+advantage of the <code>add</code>, <code>sub</code>,
+and <code>mul</code> operations built into LLVM IR.
+
+```llvm
+; x = 4
+%x = add i32 4, 0
+```
+
+The type that the operation is operating on must be specified after
+the operation name. In this case we are specifying
+that <code>add</code> is operating on and returning 32-bit integers.
+
+#### Function definition
+
+Functions are defined at the top-level and are much simpler than x86
+assembly since the details of calling conventions are handled by LLVM.
+
+```llvm
+; (def plus (a b) (+ a b))
+define i32 @plus (i32 a, i32 b) {
+  %res = add i32 a, b
+  ret i32 %res
+}
+```
+
+In ulisp, all functions will return a result (and the only supported
+type for now are 32-bit integers). So we annotate the definition with
+this return type (<code>i32</code> in <code>define
+i32</code>). Finally, we return inside the function with
+the <code>ret</code> instruction that must also specify the type
+(again <code>i32</code>).
+
+### Supporting multiple backends
+
+The goal is to be able to switch at compile-time between generating
+x86 assembly or generating LLVM IR. So we'll need to reorganize ulisp
+a little bit.
+
+#### Share
