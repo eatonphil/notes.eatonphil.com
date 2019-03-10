@@ -311,7 +311,7 @@ class Compiler {
 Our first compiler function actually does no code generation
 itself. We'll call <code>compileExpression</code> on each item within
 the begin block. And we'll pass the <code>destination</code> to the
-last expression in the last so that the value of a begin block is set
+last expression in the list so that the value of a begin block is set
 to the value of its last expression. All other expressions will
 receive a temporary variable to store results.
 
@@ -331,6 +331,12 @@ class Compiler {
 
   ...
 }
+```
+
+Example: 
+
+```lisp
+(begin 1 2) ; returns 2
 ```
 
 #### compileExpression(ast, destination, scope)
@@ -370,6 +376,16 @@ class Compiler {
   
   ...
 }
+```
+
+Example:
+
+```lisp
+1
+...
+a
+...
+(+ 1 a)
 ```
 
 #### compileCall(functionName, arguments, destination, scope)
@@ -426,6 +442,14 @@ class Compiler {
 
 Yay LLVM for simplifying calls!
 
+Example:
+
+```lisp
+(foo 1)
+...
+(+ 1 2)
+```
+
 #### compileDefine([functionName, parameters, ...body], destination, scope)
 
 This is the last undefined compile function we've used. The call
@@ -473,6 +497,12 @@ class Compiler {
 }
 ```
 
+Example:
+
+```lisp
+(def plus (a b) (+ a b))
+```
+
 #### compileOp(op)
 
 The last function mentioned above will help us expose some useful
@@ -516,6 +546,12 @@ class Compiler {
 
   ...
 }
+```
+
+Example:
+
+```lisp
+(+ 1 2)
 ```
 
 ### Hello world!
