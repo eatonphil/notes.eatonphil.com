@@ -93,13 +93,18 @@ footer p {
     padding: 0 15px;
 }
 
-header a {
+.subscribe {
+    font-family: sans-serif;
+    font-size: .8rem;
+}
+
+header .notes {
     font-family: sans-serif;
     font-size: .8rem;
     color: #777;
 }
 
-header a::before {
+header .notes::before {
     display: inline-block;
     content: '↩';
     padding-right: 5px;
