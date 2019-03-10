@@ -52,6 +52,9 @@ The type that the operation is operating on must be specified after
 the operation name. In this case we are specifying
 that <code>add</code> is operating on and returning 32-bit integers.
 
+While this might seem very inefficient, we'll see in the end that
+LLVM easily optimizes this away.
+
 #### Function definition
 
 Functions are defined at the top-level and are much simpler than x86
@@ -71,6 +74,12 @@ this return type (<code>i32</code> in <code>define
 i32</code>). Finally, we return inside the function with
 the <code>ret</code> instruction that must also specify the type
 (again <code>i32</code>).
+
+#### Generating LLVM IR
+
+We are going to generate LLVM IR as text. But any large project will
+benefit from generating LLVM IR via
+[API](http://llvm.org/docs/ProgrammersManual.html).
 
 ### Supporting multiple backends
 
@@ -530,6 +539,8 @@ $ echo $?
 9
 ```
 
+#### Generated code
+
 The generated LLVM can be found in <code>./build/prog.ll</code>:
 
 ```llvm
@@ -552,7 +563,26 @@ define i32 @main() {
 }
 ```
 
-And that's all there is to it. :)
+You can see all these unnecessary <code>add, ... 0</code>
+instructions. But let's look at the x86 assembly that LLVM generates
+in <code>build/prog.s</code>:
+
+```assembly
+...
+
+_plus_two:                              ## @plus_two
+        .cfi_startproc
+## %bb.0:
+                                        ## kill: def $esi killed $esi def $rsi
+                                        ## kill: def $edi killed $edi def $rdi
+        leal    2(%rdi,%rsi), %eax
+        retq
+        .cfi_endproc
+                                        ## -- End function
+...
+```
+
+And we see that LLVM easily optimized the inefficiencies away. :)
 
 ### Next up
 
