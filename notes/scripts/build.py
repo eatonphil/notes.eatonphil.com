@@ -45,7 +45,11 @@ HOME_PAGE = """
   </a>
   <a href="https://github.com/eatonphil/jsc" class="fp-project">
     <div>Jsc</div>
-    <p>A Javascript to C++ compiler (using V8) written in Rust.</p>
+    <p>A JavaScript to C++ compiler (using V8) written in TypeScript.</p>
+  </a>
+  <a href="https://github.com/eatonphil/ulisp" class="fp-project">
+    <div>ulisp</div>
+    <p>An educational compiler from Lisp to LLVM written in JavaScript.</p>
   </a>
 </div>
 <div class="fp-section fp-section--talks">
