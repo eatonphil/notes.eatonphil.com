@@ -230,4 +230,7 @@ function getJsonPathParts(path) {
 require('assert').deepEqual(getJsonPathParts('foo.bar[0].biz'), ['foo', 'bar', 0, 'biz']);
 ```
 
-Now we've got a simple JSON path parser with decent error handling!
+Now we've got a simple JSON path parser with decent error handling! Of
+course we wouldn't want to use this little library in production until
+we had some serious test coverage. But writing tests and calling out
+my mistakes will be left here as an exercise for the reader. :)
