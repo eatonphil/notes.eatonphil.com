@@ -5,8 +5,9 @@
 body {
     margin: 0 auto;
     padding: 0;
-    color: #333;
+    color: black;
     background: #fdfdff;
+    font-size: 1.1rem;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -116,7 +117,7 @@ header .container {
 }
 
 .col-6 {
-    width: 30rem;
+    width: 70%;
     max-width: 100%;
 }
 
@@ -172,7 +173,7 @@ header .container {
 
 .fp-section {
     margin: -1rem;
-    padding: 1rem;
+    padding: 2rem;
     margin-top: 4rem;
 }
 
@@ -233,8 +234,16 @@ header .container {
         margin-bottom: 0;
     }
 
+    .fp-section:first-of-type {
+	margin-top: 0;
+    }
+
     .fp-section:not(:last-of-type) {
         border-bottom: 1px solid white;
+    }
+
+    .col-6 {
+	width: 100%;
     }
 }
 

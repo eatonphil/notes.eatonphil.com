@@ -51,9 +51,19 @@ HOME_PAGE = """
     <div>ulisp</div>
     <p>An educational compiler from Lisp to LLVM written in JavaScript.</p>
   </a>
+  <a href="https://github.com/eatonphil/uweb" class="fp-project">
+    <div>uweb</div>
+    <p>An education web server written in JavaScript.</p>
+  </a>
 </div>
 <div class="fp-section fp-section--talks">
   <h2 class="fp-h2">Talks</h2>
+  <a href="https://www.meetup.com/TypeScriptNYC/events/260291994/" class="fp-project">
+    <div>
+      Getting familiar with the TypeScript Compiler API by writing an interpreter
+    </div>
+    <p>April 17, 2019</p>
+  </a>
   <a href="https://www.meetup.com/nodejs/events/258732362/" class="fp-project">
     <div>
       AOT-compilation of Javascript with V8
