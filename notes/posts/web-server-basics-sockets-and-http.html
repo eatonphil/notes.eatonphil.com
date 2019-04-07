@@ -17,7 +17,8 @@ the server is hosted locally we may want to enter
 enter, make a request (done by the browser), receive a response (sent
 by some server), and render the result (done by the browser).
 
-Here is a minimal Node.js program (<100LoC) that would serve this up:
+Here is a minimal Node.js program (about 100 LoC) that would serve
+this:
 
 ```javascript
 const fs = require('fs');
@@ -80,13 +81,11 @@ class HTTPRequestHandler {
   
   requestComplete() {
     if (!this.request.statusLine || !Object.keys(this.request.headers).length || this.request.body === null) {
-      // Incomplete request
       return false;
     }
 
     const [contentLength] = this.request.headers['content-length'] || [];
     if (this.request.statusLine.method !== 'GET' && this.request.body.length !== contentLength) {
-      // Incomplete request
       return false;
     }
     
@@ -94,11 +93,20 @@ class HTTPRequestHandler {
   }
   
   sendResponse() {
+    const response = { status: 200, statusMessage: 'OK', body: '' };
+
     if (this.request.statusLine.path === '/hello-world.html') {
-      this.connection.write(`HTTP/1.1 200 OK\r\nContent-Length: ${HELLO_WORLD.length}\r\n\r\n${HELLO_WORLD}`);
+      response.body = HELLO_WORLD;
     } else {
-      this.connection.write(`HTTP/1.1 404 NOT FOUND\r\nContent-Length: ${NOT_FOUND.length}\r\n\r\n${NOT_FOUND}`);
+      response.status = 404;
+      response.statusMessage = 'NOT FOUND';
+      response.body = NOT_FOUND;
     }
+
+    const serialized = 'HTTP/1.1 ${response.status} ${response.statusMessage}' + CRLF +
+                       'Content-Length: ' + ${response.body.length} + CRLF + CRLF +
+                       body;
+    this.connection.write(serialized);
   }
 
   handle(buffer) {
@@ -227,12 +235,13 @@ how to handle the response).
 
 The response body is similar to the HTTP request body.
 
-### Sockets and ports
+### Sockets
 
 Most operating systems have a built-in means of connecting over TCP/IP
-(and sending and receiving messages) called "sockets". Most
-programming languages have a built-in socket library. Node.js provides
-a high-level interface for listening on a port and handling new
+(and sending and receiving messages) called "sockets". Sockets allow
+you to treat TCP/IP connections like files in memory. Most programming
+languages have a built-in socket library. Node.js provides a
+high-level interface for listening on a port and handling new
 connections.
 
 ```javascript
@@ -288,3 +297,151 @@ function handleConnection(connection) {
 
 ...
 ```
+
+There are three functions we need to implement
+now: <code>parse(buffer)</code>, <code>requestComplete()</code>,
+and <code>sendResponse</code>.
+
+#### parse(buffer)
+
+This function will be responsible for progressively pulling out data
+from the buffer. If the status line has not been received, it will try
+to grab the status line. If the body has not yet started, it will
+accumulate headers. Then it will continue accumulating the body until
+we close the connection (this will happen implicitly when
+<code>requestComplete()</code> returns true).
+
+```javascript
+class HTTPRequestHandler {
+  constructor(connection) {
+    this.connection = connection;
+    this.request = {
+      statusLine: null,
+      headers: {},
+      body: null,
+    };
+  }
+
+  parse(buffer) {
+    const lines = buffer.toString().split(CRLF);
+
+    // Parse/store status line if necessary
+    if (!this.request.statusLine) {
+      const [method, path, protocol] = lines.shift().split(' ');
+      this.request.statusLine = { method, path, protocol };
+    }
+
+    // Parse/store headers if the body hasn't begun
+    if (!this.request.body) {
+      for (let line = lines.shift(); lines.length; line = lines.shift()) {
+        // Reached the end of headers, double CRLF
+        if (line === '') {
+          this.request.body = '';
+          break;
+        }
+
+        const [key, value] = line.split(':');
+
+        const safeKey = key.toLowerCase();
+        if (!this.request.headers[safeKey]) {
+          this.request.headers[safeKey] = [];
+        }
+
+        this.request.headers[safeKey].push(value.trimStart());
+      }
+    }
+
+    this.request.body += lines.join(CRLF);
+  }
+
+...
+
+}
+```
+
+#### requestComplete()
+
+This function will look at the internal request state and return false
+if the status line has not been received, no headers have been
+received (although this is stricter than the HTTP/1.1 standard
+requires), or if the body length is not equal to the value of the
+<code>Content-Length</code> header.
+
+```javascript
+class HTTPRequestHandler {
+
+...
+
+  requestComplete() {
+    if (!this.request.statusLine || !Object.keys(this.request.headers).length || this.request.body === null) {
+      return false;
+    }
+
+    const [contentLength] = this.request.headers['content-length'] || [];
+    if (this.request.statusLine.method !== 'GET' && this.request.body.length !== contentLength) {
+      return false;
+    }
+    
+    return true;
+  }
+
+...
+
+}
+```
+
+#### sendResponse()
+
+Finally we'll hard-code two responses (one for the valid request for
+/hello-world.html and a catch-all 404 response for every other
+request). These responses need to be serialized according the HTTP
+response format described above and written to the connection.
+
+```
+class HTTPRequestHandler {
+
+...
+
+  sendResponse() {
+    const response = { status: 200, statusMessage: 'OK', body: '' };
+
+    if (this.request.statusLine.path === '/hello-world.html') {
+      response.body = HELLO_WORLD;
+    } else {
+      response.status = 404;
+      response.statusMessage = 'NOT FOUND';
+      response.body = NOT_FOUND;
+    }
+
+    const serialized = 'HTTP/1.1 ${response.status} ${response.statusMessage}' + CRLF +
+                       'Content-Length: ' + ${response.body.length} + CRLF + CRLF +
+                       body;
+    this.connection.write(serialized);
+  }  
+
+...
+
+}
+```
+
+### Run it
+
+Now that we've got all the pieces we can finally run the initial program:
+
+```
+$ node server.js &
+$ open localhost:9000/hello-world.html
+```
+
+And we see the page! Try any other path and we receive a 404.
+
+### Review and next steps
+
+We covered the basics of HTTP/1.1: a very simple, plain-text protocol
+oriented around requests and responses over a TCP/IP connection. We
+realize we need to know little about anything but parsing and
+formatting text on top of the TCP/IP blackbox commonly called
+"sockets". We created a simple application that returns different
+responses based on the request. But we're a far shot from a more
+general library, a web framework. Future posts will explore this
+transition as well as performance and more features.
