@@ -333,7 +333,7 @@ class HTTPRequestHandler {
     }
 
     // Parse/store headers if the body hasn't begun
-    if (!this.request.body) {
+    if (this.request.body === null) {
       for (let line = lines.shift(); lines.length; line = lines.shift()) {
         // Reached the end of headers, double CRLF
         if (line === '') {
