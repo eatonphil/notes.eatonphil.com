@@ -17,8 +17,9 @@ the server is hosted locally we may want to enter
 enter, make a request (done by the browser), receive a response (sent
 by some server), and render the result (done by the browser).
 
-Here is a minimal Node.js program (about 100 LoC) that would serve
-this ([code available on Github](https://github.com/eatonphil/uweb)):
+Here is a minimal, often incomplete, and unsafe Node.js program (about
+100 LoC) that would serve this ([code available on
+Github](https://github.com/eatonphil/uweb)):
 
 ```javascript
 const fs = require('fs');
@@ -257,7 +258,7 @@ server.listen('9000');
 Once the program is listening, clients can open TCP/IP connections to
 the address (<code>localhost</code>) and port (<code>9000</code>) and
 our program takes over from there. Each connection is handled
-separately and receives "data" events. Each data event represents new
+separately and receives "data" events. Each data event includes new
 bytes available for us to handle.
 
 Let's encapsulate the state of each connection in HTTPRequestHandler
