@@ -255,10 +255,10 @@ server.listen('9000');
 ```
 
 Once the program is listening, clients can open TCP/IP connections to
-the address (<code>localhost</code>) port (<code>9000</code>) and our
-program takes over from there. Each connection is handled separately
-and receives "data" events. Each data event represents new bytes
-available for us to handle.
+the address (<code>localhost</code>) and port (<code>9000</code>) and
+our program takes over from there. Each connection is handled
+separately and receives "data" events. Each data event represents new
+bytes available for us to handle.
 
 Let's encapsulate the state of each connection in HTTPRequestHandler
 class. It's function will be to parse data as it becomes available and
