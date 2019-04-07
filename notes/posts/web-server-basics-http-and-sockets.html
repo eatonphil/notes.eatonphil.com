@@ -18,7 +18,7 @@ enter, make a request (done by the browser), receive a response (sent
 by some server), and render the result (done by the browser).
 
 Here is a minimal Node.js program (about 100 LoC) that would serve
-this:
+this ([code available on Github](https://github.com/eatonphil/uweb)):
 
 ```javascript
 const fs = require('fs');
@@ -104,8 +104,8 @@ class HTTPRequestHandler {
     }
 
     const serialized = 'HTTP/1.1 ${response.status} ${response.statusMessage}' + CRLF +
-                       'Content-Length: ' + ${response.body.length} + CRLF + CRLF +
-                       body;
+                       'Content-Length: ' + response.body.length + CRLF + CRLF +
+                       response.body;
     this.connection.write(serialized);
   }
 
@@ -414,8 +414,8 @@ class HTTPRequestHandler {
     }
 
     const serialized = 'HTTP/1.1 ${response.status} ${response.statusMessage}' + CRLF +
-                       'Content-Length: ' + ${response.body.length} + CRLF + CRLF +
-                       body;
+                       'Content-Length: ' + response.body.length + CRLF + CRLF +
+                       response.body;
     this.connection.write(serialized);
   }  
 
@@ -429,7 +429,7 @@ class HTTPRequestHandler {
 Now that we've got all the pieces we can finally run the initial program:
 
 ```
-$ node server.js &
+$ node uweb.js &
 $ open localhost:9000/hello-world.html
 ```
 
@@ -445,3 +445,5 @@ formatting text on top of the TCP/IP blackbox commonly called
 responses based on the request. But we're a far shot from a more
 general library, a web framework. Future posts will explore this
 transition as well as performance and more features.
+
+[Code is available on Github](https://github.com/eatonphil/uweb).
