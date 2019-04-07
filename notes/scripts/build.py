@@ -53,7 +53,7 @@ HOME_PAGE = """
   </a>
   <a href="https://github.com/eatonphil/uweb" class="fp-project">
     <div>uweb</div>
-    <p>An education web server written in JavaScript.</p>
+    <p>An educational web server written in JavaScript.</p>
   </a>
 </div>
 <div class="fp-section fp-section--talks">
