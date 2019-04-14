@@ -60,7 +60,7 @@ HOME_PAGE = """
   <h2 class="fp-h2">Talks</h2>
   <a href="https://www.meetup.com/TypeScriptNYC/events/260291994/" class="fp-project">
     <div>
-      Getting familiar with the TypeScript Compiler API by writing an interpreter
+      Interpreting TypeScript
     </div>
     <p>April 17, 2019</p>
   </a>
