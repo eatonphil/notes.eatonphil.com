@@ -1,0 +1,430 @@
+# Interpreting TypeScript
+## April 14, 2019
+
+In addition to providing a static type system and compiler for a
+superset of JavaScript, TypeScript makes much of its functionality
+available programmatically. We can use the TypeScript compiler API to
+parse TypeScript or JavaScript code and allow us to operate on the
+parsed result without using TypeScript to generate compiled output. In
+this post we'll use the TypeScript compiler API to build an
+interpreter. We'll build off a [TypeScript wiki
+article](https://github.com/Microsoft/TypeScript/wiki/Using-the-Compiler-API)
+and cover a few areas that were confusing to me as I built out
+[jsc](https://github.com/eatonphil/jsc).
+
+### Setup
+
+```bash
+$ yarn add typescript @types/node
+```
+
+### Parsing
+
+Parsing a fixed set of files is simple enough. We pass a list of files
+to `createProgram` along with compiler options. But, as a user, we
+don't want to keep track of all files used by a program
+(i.e. everything we import). The most ideal situation is to pass a
+single-file entrypoint (something like a main.js) and have our
+interpreter figure out all the imports and handle them
+recursively. More on this later, for now we'll just parse the
+single-file entrypoint.
+
+
+```typescript
+import * as ts from 'typescript';
+
+const TS_COMPILER_OPTIONS = {
+  allowNonTsExtensions: true,
+};
+
+function parse(fileName: string): ts.Program {
+  return ts.createProgram([fileName], TS_COMPILER_OPTIONS);
+}
+
+function interpret(program: ts.Program) { // TODO }
+
+function main(entrypoint: string) {
+  const program = parse(entrypoint);
+  interpret(program);
+}
+
+main(process.argv[2]);
+```
+
+### interpret and ts.Program
+
+A program contains all source files as well as any implicitly needed
+TypeScript definition files (for us it will just be the TypeScript
+definitions for the Node.js standard library).
+
+<p class="note">
+  The program also gives us access to a type checker that we can use
+  to query the type of any node in the program tree. We'll get into
+  this in another post.
+</p>
+
+Our interpret program will iterate over all the source files, ignoring
+the TypeScript definition files, and call interpretNode on all the
+elements of the source file.
+
+```typescript
+function interpretNode(node: ts.Node) { // TODO }
+
+function interpret(program: ts.Program) {
+  return program.getSourceFiles().map((source) => {
+    const { fileName } = source;
+    if (fileName.endsWith('.d.ts')) {
+      return;
+    }
+
+    const results = [];
+    ts.forEachChild(source, (node) => {
+      results.push(interpretNode(node));
+    });
+    return results;
+  });
+}
+```
+
+### interpretNode and ts.Node
+
+A Node is a wrapper for most elements of what we consider a program to
+be, such as a binary expression (<code>2 + 3</code>), a literal
+expression (<code>2</code>), a function call expression
+(<code>a(c)</code>), and so forth. When exploring a parser, it takes
+time to become familiar with the particular way that a parser breaks
+out a program into a tree of nodes.
+
+As a concrete example, the following program:
+
+```typescript
+print(a);
+```
+
+Will be built into ts.Node tree along these lines:
+
+```
+Node: ExpressionStatement: print(a);
+  Node: CallExpression: print, a
+    Node: Identifier: print
+    Node: Identifier: a
+Node: EndOfFileToken
+```
+
+And another example:
+
+```typescript
+1 + 3;
+```
+
+Will be built into a ts.Node tree along these lines:
+
+```
+Node: Expression: 1 + 3
+  Node: BinaryExpression: 1, 3, +
+    Node: NumericLiteral: 1
+    Node: NumericLiteral: 3
+    Node: PlusToken
+Node: EndOfFileToken
+```
+
+But how would one come to know this?
+
+#### Exploring the ts.Node tree
+
+The easiest thing to do is throw an error on every Node type we don't
+yet know about and fill in support for each program we throw at the
+interpreter.
+
+For example:
+
+```typescript
+function interpretNode(node: ts.Node) {
+  switch (node.kind) {
+    default:
+      throw new Error('Unsupported node type: ' + ts.SyntaxKind[node.kind]);
+  }
+}
+```
+
+Now let's run our interpreter against an input file,
+<code>test.ts</code>, that combines these two to make a
+semi-interesting program:
+
+```bash
+$ cat test.ts
+print(1 + 2);
+$ tsc interpreter.ts
+$ node interpreter.js test.ts
+...
+Error: Unsupported node type: ExpressionStatement
+...
+```
+
+And we see an outer wrapper, an ExpressionStatement. To proceed we
+look up the definition of an ExpressionStatement in TypeScript source
+code,
+[src/compiler/types.ts](https://github.com/Microsoft/TypeScript/blob/master/src/compiler/types.ts)
+to be specific. This file will become our best friend. Hit ctrl-f and
+look for <code>interface ExpressionStatement </code>. We see that it
+has only one child, <code>expression</code>, so we call <code>interpretNode</code>
+on this recursively:
+
+```typescript
+function interpretNode(node: ts.Node) {
+  switch (node.kind) {
+    case ts.SyntaxKind.ExpressionStatement: {
+      const es = node as ts.ExpressionStatement;
+      return interpretNode(es.expression);
+    }
+    default:
+      throw new Error('Unsupported node type: ' + ts.SyntaxKind[node.kind]);
+  }
+}
+```
+
+Thankfully TypeScript will be very quick to call us out if we
+misunderstand this structure.
+
+<p class="note">
+  It's pretty weird to me that the ts.Node tree is organized such that
+  I must cast at each ts.Node but that's what they do even in the
+  TypeScript source so I don't think I'm misunderstanding.
+</p>
+
+Now we recompile and run the interpreter against the program to
+discover the next ts.Node type.
+
+```bash
+$ tsc interpreter.ts
+$ node interpreter.js test.ts
+...
+Error: Unsupported node type: CallExpression
+...
+```
+
+Cool! Back to
+[src/compiler/types.ts](https://github.com/Microsoft/TypeScript/blob/master/src/compiler/types.ts).
+Call expressions are complex enough that we'll break out handling them
+into a separate function.
+
+### interpretCall and ts.CallExpression
+
+From our reading of types.ts we need to handle the expression that
+evaluates to a function, and we need to handle its parameters. We'll
+just call <code>interpretNode</code> on each of these to get their
+real value. And finally we'll call the function with the arguments.
+
+```typescript
+function interpretCall(ce: ts.CallExpression) {
+  const fn = interpretNode(ce.expression);
+  const args = ce.arguments.map(interpretNode);
+  return fn(...args);
+}
+
+function interpretNode() {
+  switch (node.kind) {
+    ...
+    case ts.SyntaxKind.CallExpression: {
+      const ce = node as ts.CallExpression;
+      return interpretCall(ce);
+    }
+    ...
+  }
+}
+```
+
+<p class="node">
+  Please ignore the fact that we are not correctly setting
+  <code>this</code> here. :)
+</p>
+
+Recompile and let's see what's next!
+
+```bash
+$ tsc interpreter.ts
+$ node interpreter.js test.ts
+...
+Error: Unsupported node type: Identifier
+...
+```
+
+And back to types.ts. :)
+
+### ts.Identifier
+
+In order to support identifiers in general we'd need to have a context
+we could use to look up the value of an identifier. But we don't have
+a context like this right now so we'll add builtin support for a
+<code>print</code> function so we can get some output!
+
+```typescript
+function interpretNode() {
+  switch (node.kind) {
+    ...
+    case ts.SyntaxKind.Identifier: {
+      const id = (node as ts.Identifier).escapedText as string;
+      if (id === 'print') {
+        return function (...args) { console.log(...args); };
+      }
+
+      throw new Error('Unsupported identifier: ' + id);
+    }
+    ...
+  }
+}
+```
+
+Recompile and let's see what's next!
+
+```bash
+$ tsc interpreter.ts
+$ node interpreter.js test.ts
+...
+Error: Unsupported node type: BinaryExpression
+...
+```
+
+And we're finally into the parameters. :)
+
+### interpretBinaryExpression and ts.BinaryExpression
+
+Looking into types.ts for this Node type suggests we may want to break
+this out into its own function as well; there are a ton of operator
+types. Within the <code>interpretBinaryExpression</code> helper we'll
+interpet each operand and then switch on the operator type. We'll
+throw an error on operators we don't know about -- all of them at
+first:
+
+```typescript
+function interpretBinaryExpression(be: ts.BinaryExpression) {
+  const left = interpretNode(be.left);
+  const right = interpretNode(be.right);
+  switch (be.operatorToken.kind) {
+    default:
+      throw new Error('Unsupported operator: ' + ts.SyntaxKind[be.operatorToken.kind]);
+  }
+}
+
+function interpretNode() {
+  switch (node.kind) {
+    ...
+    case ts.SyntaxKind.BinaryExpression: {
+      const be = node as ts.BinaryExpression;
+      return interpretBinaryExpression(be);
+    }
+    ...
+  }
+}
+```
+
+We know the drill. :)
+
+```bash
+$ tsc interpreter.ts
+$ node interpreter.js test.ts
+...
+Error: Unsupported node type: FirstLiteralToken
+...
+```
+
+At this point we're actually failing first on an unknown **node type**
+rather than an operator. This is because we interpret the operands
+(which are numeric literals) before we look up the operator. Time to
+revisit types.ts!
+
+### ts.FirstLiteralToken, ts.NumericLiteral
+
+Looking at types.ts shows us that <code>FirstLiteralToken</code> is a
+synonym for <code>NumericLiteral</code>. The latter name is more
+obvious, so let's add that to our supported Node list:
+
+```typescript
+function interpretNode() {
+  switch (node.kind) {
+    ...
+      case ts.SyntaxKind.NumericLiteral: {
+      const nl = node as ts.NumericLiteral;
+      return Number(nl.text);
+    }
+    ...
+  }
+}
+```
+
+And we keep going!
+
+```bash
+$ tsc interpreter.ts
+$ node interpreter.js test.ts
+...
+Error: Unsupported operator: PlusToken
+...
+```
+
+And we're into unknown operator territory!
+
+### interpretBinaryExpression and ts.PlusToken
+
+A simple extension to our existing
+<code>interpretBinaryExpression</code>, we return the sum of the left
+and right values:
+
+```typescript
+function interpretBinaryExpression(be: ts.BinaryExpression) {
+  const left = interpretNode(be.left);
+  const right = interpretNode(be.right);
+  switch (be.operatorToken.kind) {
+    case ts.SyntaxKind.PlusToken:
+      return left + right;
+    default:
+      throw new Error('Unsupported operator: ' + ts.SyntaxKind[be.operatorToken.kind]);
+  }
+}
+```
+
+And we give it another shot. :)
+
+```bash
+$ tsc interpreter.ts
+$ node interpreter.js test.ts
+...
+Error: Unsupported node type: EndOfFileToken
+...
+```
+
+### ts.SyntaxKind.EndOfFileToken
+
+Our final Node type before a working program, we simply do nothing:
+
+```typescript
+function interpretNode() {
+  switch (node.kind) {
+    ...
+    case ts.SyntaxKind.EndOfFileToken:
+      break;
+    ...
+  }
+}
+```
+
+One more time:
+
+
+```bash
+$ tsc interpreter.ts
+$ node interpreter.js test.ts
+3
+```
+
+A working program! And if we jiggle the test?
+
+```
+$ cat test.ts
+print(1 + 5);
+$ node interpreter.js test.ts
+6
+```
+
+We're well on our way to interpreting TypeScript, and have gained some
+familiarity with the TypeScript Compiler API.
