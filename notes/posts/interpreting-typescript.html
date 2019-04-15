@@ -296,7 +296,7 @@ And we're finally into the parameters.
 Looking into types.ts for this Node type suggests we may want to break
 this out into its own function as well; there are a ton of operator
 types. Within the <code>interpretBinaryExpression</code> helper we'll
-interpet each operand and then switch on the operator type. We'll
+interpret each operand and then switch on the operator type. We'll
 throw an error on operators we don't know about -- all of them at
 first:
 
