@@ -10,6 +10,16 @@ article](https://github.com/Microsoft/TypeScript/wiki/Using-the-Compiler-API)
 and cover a few areas that were confusing to me as I built out
 [a separate project](https://github.com/eatonphil/jsc).
 
+The end result we're building will look like this:
+
+```bash
+$ cat test.ts # A program we can interpret
+print(1 + 5);
+$ tsc interpreter.ts # Build the source code for the interpreter
+$ node interpreter.js test.ts # Run the interpreter against test program
+6
+```
+
 [All code is available on Github.](https://github.com/eatonphil/jsi)
 
 ### Setup
