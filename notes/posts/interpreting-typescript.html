@@ -3,11 +3,9 @@
 
 In addition to providing a static type system and compiler for a
 superset of JavaScript, TypeScript makes much of its functionality
-available programmatically. We can use the TypeScript compiler API to
-parse TypeScript or JavaScript code and allow us to operate on the
-parsed result without using TypeScript to generate compiled output. In
-this post we'll use the TypeScript compiler API to build an
-interpreter. We'll build off a [TypeScript wiki
+available programmatically. In this post we'll use the TypeScript
+compiler API to build an interpreter. We'll build off of a [TypeScript
+wiki
 article](https://github.com/Microsoft/TypeScript/wiki/Using-the-Compiler-API)
 and cover a few areas that were confusing to me as I built out
 [jsc](https://github.com/eatonphil/jsc).
@@ -172,8 +170,8 @@ look up the definition of an ExpressionStatement in TypeScript source
 code,
 [src/compiler/types.ts](https://github.com/Microsoft/TypeScript/blob/master/src/compiler/types.ts)
 to be specific. This file will become our best friend. Hit ctrl-f and
-look for <code>interface ExpressionStatement </code>. We see that it
-has only one child, <code>expression</code>, so we call <code>interpretNode</code>
+look for "interface ExpressionStatement ". We see that it has only one
+child, <code>expression</code>, so we call <code>interpretNode</code>
 on this recursively:
 
 ```typescript
@@ -242,7 +240,7 @@ function interpretNode() {
 
 <p class="node">
   Please ignore the fact that we are not correctly setting
-  <code>this</code> here. :)
+  <code>this</code> here.
 </p>
 
 Recompile and let's see what's next!
@@ -255,7 +253,7 @@ Error: Unsupported node type: Identifier
 ...
 ```
 
-And back to types.ts. :)
+And back to types.ts.
 
 ### ts.Identifier
 
@@ -291,7 +289,7 @@ Error: Unsupported node type: BinaryExpression
 ...
 ```
 
-And we're finally into the parameters. :)
+And we're finally into the parameters.
 
 ### interpretBinaryExpression and ts.BinaryExpression
 
@@ -324,7 +322,7 @@ function interpretNode() {
 }
 ```
 
-We know the drill. :)
+We know the drill.
 
 ```bash
 $ tsc interpreter.ts
@@ -389,7 +387,7 @@ function interpretBinaryExpression(be: ts.BinaryExpression) {
 }
 ```
 
-And we give it another shot. :)
+And we give it another shot.
 
 ```bash
 $ tsc interpreter.ts
