@@ -61,6 +61,7 @@ HOME_PAGE = """
   <a href="https://www.meetup.com/TypeScriptNYC/events/260291994/" class="fp-project">
     <div>
       Interpreting TypeScript
+      <a href="https://docs.google.com/presentation/d/e/2PACX-1vQOSorW7HGPvt1qURVK4d82bTxUVzlDUyCtFtbSgvA8CXhg2yw2FLpBD9cCBNvplSUmj-KezR1X1DBt/pub">Slides</a>
     </div>
     <p>April 17, 2019</p>
   </a>
