@@ -1,0 +1,315 @@
+# Compiler basics (4): LLVM conditionals and compiling fibonacci
+## May 4, 2019
+
+<p class="note">
+  Previously in compiler basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/compiler-basics-lisp-to-assembly.html">Compiler basics (1): lisp to assembly</a>
+  <br />
+  <a href="/compiler-basics-functions.html">Compiler basics (2): user-defined functions and variables</a>
+  <br />
+  <a href="/compiler-basics-llvm.html">Compiler basics (3): LLVM</a>
+</p>
+
+In this post we'll extend the
+[compiler](https://github.com/eatonphil/ulisp)'s LLVM backend to
+support compiling conditionals such that we can support an
+implementation of the fibonacci algorithm.
+
+Specifically we're aiming for the following:
+
+```bash
+$ cat tests/fib.lisp
+(def fib (n)
+     (if (< n 2)
+         n
+       (+ (fib (- n 1)) (fib (- n 2)))))
+
+(def main ()
+     (fib 8))
+$ node src/ulisp.js tests/fib.lisp
+$ ./build/prog
+$ echo $?
+21
+```
+
+To do this we'll have to add the <code><</code>, <code>-</code> and
+<code>if</code> built-ins.
+
+[All source code is available on Github](https://github.com/eatonphil/ulisp).
+
+### Subtraction
+
+This is the easiest to add since we already support addition. They are
+both arithmetic operations that produce an integer. We simply add a
+mapping of <code>-</code> to the LLVM instruction <code>sub</code> so
+our LLVM backend constructor (<code>src/backends/llvm.js</code>) looks
+like this:
+
+```javascript
+...
+
+class Compiler {
+  constructor() {
+    this.outBuffer = [];
+    this.primitiveFunctions = {
+      def: this.compileDefine.bind(this),
+      begin: this.compileBegin.bind(this),
+      'if': this.compileIf.bind(this),
+      '+': this.compileOp('add'),
+      '-': this.compileOp('sub'),
+
+...
+```
+
+### Less than
+
+The <code><</code> builtin is a logical operation. These are handled
+differently from arithmetic operations in LLVM IR. A logical operation
+looks like this:
+
+```llvm
+%3 = icmp slt i32 %1, %2
+```
+
+This says that we're doing an integer comparison, <code>icmp</code>,
+(with signed less than, <code>slt</code>) on the <code>i32</code>
+integers in variables <code>%1</code> and <code>%2</code>.
+
+We can shim this into our existing <code>compileOp</code> helper like
+so:
+
+```javascript
+...
+
+class Compiler {
+  constructor() {
+    this.outBuffer = [];
+    this.primitiveFunctions = {
+      def: this.compileDefine.bind(this),
+      begin: this.compileBegin.bind(this),
+      'if': this.compileIf.bind(this),
+      '+': this.compileOp('add'),
+      '-': this.compileOp('sub'),
+      '<': this.compileOp('icmp slt'),
+
+...
+```
+
+### Conditionals
+
+The last part we need to add is support for conditional execution of
+code at runtime. Assembly-like languages handle this with "jumps" and
+"labels". Jumping causes execution to continue at the address being
+jumped to (instead of just the line following the jump
+instruction). Labels give you a way of naming an address instead of
+having to calculate it yourself. Our code will look vaguely like this:
+
+```llvm
+  %test = icmp slt i32 %n, %1
+  br i1 %test, label %iftrue, label %iffalse
+iftrue:
+  ; do true stuff
+iffalse:
+  ; do false stuff
+
+  ; do next stuff
+```
+
+The <code>br</code> instruction can jump (or branch) conditionally or
+unconditionally. This snippet demonstrates a conditional jump.
+
+But there are a few things wrong with this pseudo-code. First off if
+the condition is true, execution will just continue on into the false
+section once finished. Second, LLVM IR actually requires all labels to
+end with a branch instruction. So we'll add a new label after the true
+and false section called <code>ifresult</code> and jump to it
+unconditionally after both.
+
+```llvm
+  %test = icmp slt i32 %n, %1
+  br i1 %test, label %iftrue, label %iffalse
+iftrue:
+  ; do true stuff
+  br label %ifresult
+iffalse:
+  ; do false stuff
+  br label %ifresult
+ifresult:
+  ; do next stuff
+```
+
+### Scope
+
+One last thing we'll need to do before implementing the code
+generation for this is to update our <code>Scope</code> class to
+accept symbol prefixes so we can pass our labels through Scope to make
+sure they are unique but still have useful names.
+
+```javascript
+...
+
+class Scope {
+
+  ...
+
+  symbol(prefix = 'sym') {
+    const nth = Object.keys(this.locals).length + 1;
+    return this.register(prefix + nth);
+  }
+
+...
+```
+
+### compileIf
+
+Now we can add a primitive function mapping <code>if</code> to a new
+<code>compileIf</code> helper and implement the helper.
+
+```javascript
+...
+
+class Compiler {
+  constructor() {
+    this.outBuffer = [];
+    this.primitiveFunctions = {
+      def: this.compileDefine.bind(this),
+      begin: this.compileBegin.bind(this),
+      '+': this.compileOp('add'),
+      '-': this.compileOp('sub'),
+      '<': this.compileOp('icmp slt'),
+      'if': this.compileIf.bind(this),
+
+...
+
+  compileIf([test, thenBlock, elseBlock], destination, scope) {
+    const testVariable = scope.symbol();
+
+    // Compile expression and branch
+    this.compileExpression(test, testVariable, scope);
+    const trueLabel = scope.symbol('iftrue');
+    const falseLabel = scope.symbol('iffalse');
+    this.emit(1, `br i1 %${testVariable}, label %${trueLabel}, label %${falseLabel}`);
+
+    // Compile true section
+    this.emit(0, trueLabel + ':');
+    this.compileExpression(thenBlock, destination, scope);
+    const endLabel = scope.symbol('ifend');
+    this.emit(1, 'br label %' + endLabel);
+    this.emit(0, falseLabel + ':');
+
+    // Compile false section
+    this.compileExpression(elseBlock, destination, scope);
+    this.emit(1, 'br label %' + endLabel);
+
+    // Compile cleanup
+    this.emit(0, endLabel + ':');
+  }
+...
+```
+
+Note that this code generation sends the <code>destination<code>
+variable into both the true and false sections. Let's try it out.
+
+```bash
+$ node src/ulisp.js tests/fib.lisp
+llc: error: llc: build/prog.ll:19:3: error: multiple definition of local value named 'sym5'
+  %sym5 = add i32 %sym15, %sym16
+  ^
+child_process.js:665
+    throw err;
+    ^
+
+Error: Command failed: llc -o build/prog.s build/prog.ll
+llc: error: llc: build/prog.ll:19:3: error: multiple definition of local value named 'sym5'
+  %sym5 = add i32 %sym15, %sym16
+```
+
+That's annoying. An unfortunate aspect of LLVM's required
+single-static assigment form is that you cannot reuse variable names
+within a function even if it is not possible for the variable to be
+actually reused.
+
+To work around this we need to allocate memory on the stack, store the
+result in each true/false section in this location, and read from this
+location afterward to store it in the destination variable.
+
+### Stack memory instructions
+
+LLVM IR gives us <code>alloca</code> to allocate memory on the stack,
+<code>store</code> to store memory at a stack address, and
+<code>load</code> to read the value at a stack address into a
+variable. Here's a simple example:
+
+```llvm
+%myvar = add i32 42, 0
+%stackaddress = alloca i32, align 4
+store i32 %myvar, i32* %stackaddress, align 4
+%newvar = load i32, i32* %stackaddress, align 4
+```
+
+Such that <code>newvar</code> is now 42.
+
+### compileIf again
+
+Applying this back to our <code>compileIf</code> helper gives us:
+
+```javascript
+...
+
+  compileIf([test, thenBlock, elseBlock], destination, scope) {
+    const testVariable = scope.symbol();
+    const result = scope.symbol('ifresult');
+    // Space for result
+    this.emit(1, `%${result} = alloca i32, align 4`);
+
+    // Compile expression and branch
+    this.compileExpression(test, testVariable, scope);
+    const trueLabel = scope.symbol('iftrue');
+    const falseLabel = scope.symbol('iffalse');
+    this.emit(1, `br i1 %${testVariable}, label %${trueLabel}, label %${falseLabel}`);
+
+    // Compile true section
+    this.emit(0, trueLabel + ':');
+    const tmp1 = scope.symbol();
+    this.compileExpression(thenBlock, tmp1, scope);
+    this.emit(1, `store i32 %${tmp1}, i32* %${result}, align 4`);
+    const endLabel = scope.symbol('ifend');
+    this.emit(1, 'br label %' + endLabel);
+    this.emit(0, falseLabel + ':');
+
+    // Compile false section
+    const tmp2 = scope.symbol();
+    this.compileExpression(elseBlock, tmp2, scope);
+    this.emit(1, `store i32 %${tmp2}, i32* %${result}, align 4`);
+    this.emit(1, 'br label %' + endLabel);
+
+    // Compile cleanup
+    this.emit(0, endLabel + ':');
+    this.emit(1, `%${destination} = load i32, i32* %${result}, align 4`);
+  }
+
+...
+```
+
+### Trying it out
+
+We run our compiler one more time:
+
+```bash
+$ node src/ulisp.js tests/fib.lisp
+$ ./build/prog
+$ echo $?
+21
+```
+
+And get what we expect!
+
+### Next up
+
+* Tail call optimization
+* Lists and dynamic memory
+* Strings?
+* Foreign function calls?
+* Self-hosting?
