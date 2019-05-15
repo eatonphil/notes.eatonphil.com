@@ -55,6 +55,10 @@ HOME_PAGE = """
     <div>uweb</div>
     <p>An educational web server written in JavaScript.</p>
   </a>
+  <a href="https://github.com/eatonphil/x86e" class="fp-project">
+    <div>x86e</div>
+    <p>An x86 emulator and graphical debugger in JavaScript.</p>
+  </a>
 </div>
 <div class="fp-section fp-section--talks">
   <h2 class="fp-h2">Talks</h2>
