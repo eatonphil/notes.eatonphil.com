@@ -2,8 +2,8 @@
 ## May 14, 2019
 
 In this post we'll explore what tail calls are, why they are useful,
-and how they can be implemented in an interpreter, a compiler
-targeting C++, and a compiler targeting LLVM IR.
+and how they can be eliminated in an interpreter, a compiler targeting
+C++, and a compiler targeting LLVM IR.
 
 ### Tail calls
 
@@ -347,9 +347,25 @@ ifend19:
 
 The only difference between supporting tail call elimination in is
 whether the <code>call</code> instruction is preceeded by a
-<code>tail</code> directive.
+<code>tail</code> directive. That makes the
+[implementation](https://github.com/eatonphil/ulisp/blob/master/src/backend/llvm.js#L198)
+very simple:
 
-The resulting generated code for that call will be:
+```javascript
+const isTailCall = module.exports.TAIL_CALL_ENABLED &&
+                   context.tailCallTree.includes(validFunction.value);
+const maybeTail = isTailCall ? 'tail ' : '';
+this.emit(1, `%${destination.value} = ${maybeTail}call ${validFunction.type} @${validFunction.value}(${safeArgs})`);
+if (isTailCall) {
+  this.emit(1, `ret ${destination.type} %${destination.value}`);
+}
+```
+
+#### Generated assembly
+
+The resulting generated code (run through
+[llc](https://llvm.org/docs/CommandGuide/llc.html)) for that call will
+be:
 
 ```asm
 ...
