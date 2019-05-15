@@ -2,7 +2,7 @@
 ## May 14, 2019
 
 In this post we'll explore what tail calls are, why they are useful,
-and how they can be implemented in an interpreter, C, and LLVM IR.
+and how they can be implemented in an interpreter, C++, and LLVM IR.
 
 ### Tail calls
 
@@ -72,28 +72,33 @@ two reasons:
 
 ### Implementation 1: Interpreter
 
-In an interpreter, tail call elimination can be implemented by
-wrapping a function definition with a loop and breaking out of it
-under normal conditions. But allowing the loop to take you back to the
-beginning of the function in a tail call.
-
-Here is an example of a standalone function that can be used as a
-reference for how to implement tail-call eliminating (self-recursive
-only) calls:
+Given a tail call recursive fibonacci:
 
 ```javascript
-function fibonacciVanilla(a, b, n) {
+function fibonacci(a, b, n) {
   if (n === 0) {
     return a;
   }
   
-  return fibonacciVanilla(b, a + b, n - 1);
+  if (n === 1) {
+    return b;
+  }
+  
+  return fibonacci(b, a + b, n - 1);
 }
+```
 
-function fibonacciTCEliminated(a, b, n) {
+Here is how we could transform this without a tail call.
+
+```javascript
+function fibonacci(a, b, n) {
   while (true) {
     if (n === 0) {
 	  return a;
+	}
+	
+	if (n === 1) {
+	  return b;
 	}
 	
 	const a1 = b;
@@ -105,6 +110,15 @@ function fibonacciTCEliminated(a, b, n) {
   }
 }
 ```
+
+If this was written in a language with labels and goto we could
+simplify the code slightly by doing that. But it is the same effect as
+a loop.
+
+Since we're in an interpreter (that isn't JIT compiling), we cannot
+pick between these two and must merge them. So we put all function
+bodies in a loop and break if it isn't a tail call. Otherwise we line
+up the paremeters and let the loop take us back.
 
 Here is an example of this strategy used in a [Scheme
 interpreter](https://github.com/eatonphil/bsdscheme).
@@ -175,8 +189,200 @@ Value namedLambda(Value arguments, Context ctx, string name) {
 ```
 
 NOTE: we can not eliminate mutually recursive tail calls with this
-method.
+method. We could use continuation-passing style but that would not
+have addressed the concern: not making a function call.
 
-### Implementation 2: Compiling to C
+### Implementation 2: Compiling to C++
 
+The strategy here is the same as in the interpreter except for that
+tail call recursive functions are known at compile time. This means
+we can generate non-generalized code in function bodies.
 
+Here is how a [JavaScript compiler](https://github.com/eatonphil/jsc)
+transforms the above fibonacci implementation into C++:
+
+```
+void tco_fib(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  double tco_n = toNumber(args[0]);
+  double tco_a = toNumber(args[1]);
+  double tco_b = toNumber(args[2]);
+
+tail_recurse_1:
+
+    ;
+
+  bool sym_if_test_58 = (tco_n == 0);
+  if (sym_if_test_58) {
+    args.GetReturnValue().Set(Number::New(isolate, tco_a));
+    return;
+  }
+
+  bool sym_if_test_70 = (tco_n == 1);
+  if (sym_if_test_70) {
+    args.GetReturnValue().Set(Number::New(isolate, tco_b));
+    return;
+  }
+
+  Local<Value> sym_arg_83 = Number::New(isolate, (tco_n - 1));
+  Local<Value> sym_arg_92 = Number::New(isolate, (tco_a + tco_b));
+  tco_n = toNumber(sym_arg_83);
+  tco_a = tco_b;
+  tco_b = toNumber(sym_arg_92);
+  goto tail_recurse_1;
+}
+```
+
+This is implemented by checking every function call. If the function
+call is in tail call position, we generate code for jumping to the
+beginning of the function.  Otherwise, we generate a call as usual.
+
+Here is how the tail call check and code-generation is done in the 
+[compiler](https://github.com/eatonphil/jsc/blob/master/src/compile/compile.ts#L186):
+
+```ts
+function compileCall(
+  context: Context,
+  destination: Local,
+  ce: ts.CallExpression,
+) {
+  let tcoLabel;
+  let tcoParameters;
+  if (ce.expression.kind === ts.SyntaxKind.Identifier) {
+    const id = identifier(ce.expression as ts.Identifier);
+    const safe = context.locals.get(mangle(context.moduleName, id));
+
+    if (safe && context.tco[safe.getCode()]) {
+      const safeName = safe.getCode();
+      tcoLabel = context.tco[safeName].label;
+      tcoParameters = context.tco[safeName].parameters;
+    }
+  }
+
+  ...
+
+  if (ce.expression.kind === ts.SyntaxKind.Identifier) {
+    const id = identifier(ce.expression as ts.Identifier);
+    const mangled = mangle(context.moduleName, id);
+    const safe = context.locals.get(mangled);
+  
+    if (safe) {
+      if (tcoLabel) {
+        args.forEach((arg, i) => {
+          compileParameter(
+            context,
+            tcoParameters[i],
+            i,
+            i === args.length - 1,
+            arg,
+          );
+        });
+  
+        context.emitStatement(`goto ${tcoLabel}`);
+        context.emit('', 0);
+        destination.tce = true;
+        return;
+      }
+    }
+  }
+  
+  ...
+  
+  // Otherwise generate regular function call
+```
+
+This requires you to have been building up the state throughout the
+AST to know whether or not any particular call is in tail position.
+
+### Implementation 3: Compiling to LLVM IR
+
+LLVM IR is the most boring because all you do is mark any tail call as
+being a tail call. Then so long as the call meets some
+[requirements](https://llvm.org/docs/LangRef.html#id320), the key one
+being that the result of the call must be returned immediately, LLVM
+will generate a jump instead of a call for you.
+
+Given the following lisp-y implementation of the same tail call recursive
+fibonacci function (compiler [here](https://github.com/eatonphil/ulisp)):
+
+```lisp
+(def fib (a b n)
+     (if (= n 0)
+         a
+       (fib b (+ a b) (- n 1))))
+```
+
+We generate the following LLVM IR:
+
+```llvm
+define i64 @fib(i64 %a, i64 %b, i64 %n) {
+  %ifresult13 = alloca i64, align 4
+  %sym14 = add i64 %n, 0
+  %sym15 = add i64 0, 0
+  %sym12 = icmp eq i64 %sym14, %sym15
+  br i1 %sym12, label %iftrue16, label %iffalse17
+iftrue16:
+  %sym18 = add i64 %a, 0
+  store i64 %sym18, i64* %ifresult13, align 4
+  br label %ifend19
+iffalse17:
+  %sym21 = add i64 %b, 0
+  %sym23 = add i64 %a, 0
+  %sym24 = add i64 %b, 0
+  %sym22 = add i64 %sym23, %sym24
+  %sym26 = add i64 %n, 0
+  %sym27 = add i64 1, 0
+  %sym25 = sub i64 %sym26, %sym27
+  ; NOTE the `tail` before `call` here
+  %sym20 = tail call i64 @fib(i64 %sym21, i64 %sym22, i64 %sym25)
+  ret i64 %sym20
+  store i64 %sym20, i64* %ifresult13, align 4
+  br label %ifend19
+ifend19:
+  %sym11 = load i64, i64* %ifresult13, align 4
+  ret i64 %sym11
+}
+```
+
+The only difference between supporting tail call elimination in is
+whether the <code>call</code> instruction is preceeded by a
+<code>tail</code> directive.
+
+The resulting generate code for that call will be:
+
+```asm
+...
+	add	rax, rsi
+	dec	rdx
+	mov	rdi, rsi
+	mov	rsi, rax
+	jmp	_fib               ## TAILCALL
+...
+```
+
+And if tail call elimination is disabled:
+
+```asm
+...
+	add	rax, rsi
+	dec	rdx
+	mov	rdi, rsi
+	mov	rsi, rax
+	call	_fib
+...
+```
+
+### Summary
+
+The last bit I haven't covered is how you track whether or not a call
+is in tail position. That is difficult to cover in a blog post because
+it's a matter of you propagating/not propagating at each syntax node
+type. But generally speaking, if the syntax node is not in tail
+position (e.g. not the last expression in a block), you drop the tail
+state you've built up. When you make a function call, you add the
+function name to the tail state.
+
+But I will be covering this in detail in the LLVM case in the next
+post in my [compiler
+basics](http://notes.eatonphil.com/compiler-basics-llvm-conditionals.html)
+series.
