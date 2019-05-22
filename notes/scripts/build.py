@@ -91,11 +91,15 @@ TEMPLATE = open('template.html').read()
 TAG = "Notes by a software developer"
 
 class Renderer(mistune.Renderer):
-    title = {}
+    def __init__(self):
+        mistune.Renderer.__init__(self)
+        self.title = {}
 
     def header(self, text, level, *args, **kwargs):
         self.title[level] = text
         if level <= 2:
+            return ""
+        if level == 6:
             return ""
         return "<h{level} id=\"{id}\">{text}</h{level}>".format(**{
             "id": text.lower().replace(' ', '-'),
@@ -125,25 +129,43 @@ def get_post_data(in_file):
         return output, markdown.renderer.title
 
 
+def get_tags(tags_raw):
+    tags = ''
+
+    for i, tag in enumerate(tags_raw.split(",")):
+        if not tag:
+            continue
+        if i < 3:
+            tags += '<span class="tag">' + tag + '</span>'
+        else:
+            tags += '<span style="display: none;">' + tag + '</span>'
+    if tags:
+        return '<div class="tags">' + tags + '</div>'
+
+    return ''
+
+
 def main():
     post_data = []
     for post in get_posts():
         out_file = post[len('posts/'):]
         output, title = get_post_data(post)
-        header, date = title[1], title[2]
+        header, date, tags_raw = title[1], title[2], title.get(6, "")
+
+        tags = get_tags(tags_raw)
 
         post_data.append((out_file, title[1], title[2]))
 
         title = title[1]
         with open('dist/' + out_file, 'w') as f:
-            f.write(TEMPLATE.format(post=output, title=title, subtitle=date, tag=title))
+            f.write(TEMPLATE.format(post=output, title=title, subtitle=date, tag=title, tags=tags))
 
     post_data.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
     post_data.reverse()
     home_page = HOME_PAGE
     home_page += "\n".join([POST_SUMMARY.format(*args) for args in post_data])
     with open('dist/index.html', 'w') as f:
-        f.write(TEMPLATE.format(post=home_page, title="", tag=TAG, subtitle=""))
+        f.write(TEMPLATE.format(post=home_page, title="", tag=TAG, subtitle="", tags=""))
 
     with open('dist/style.css', 'w') as fw:
         with open('style.css') as fr:
