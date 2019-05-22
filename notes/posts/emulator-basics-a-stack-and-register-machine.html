@@ -1,0 +1,346 @@
+# Emulator basics: a stack and register machine
+## May 21, 2019
+###### javascript,interpreters,x86_64,linux,amd64,assembly
+
+In this post we'll create a small virtual machine in JavaScript and
+use it to run a simple C program compiled with GCC for an x86_64 (or
+AMD64) CPU running Linux.
+
+### Virtual machine data storage
+
+Our virtual machine will have two means of storing data: registers and
+an integer stack. A register and an element in the stack are 64-bits
+wide.
+
+We'll make the following registers available for modification and use
+by the program(mer):
+
+```
+RDI, RSI, RSP, RBP, RAX, RBX, RCX, RDX, R8, R9, R10, R11, R12, R13, R14, R15
+```
+
+And we'll make the following registers available for use (but not
+modification) by the program(mer):
+
+```
+RIP, CS, DS, FS, SS, ES, GS, CF, ZF, PF, AF, SF, TF, IF, DF, OF
+```
+
+Each of these has a special meaning but we'll focus on just one,
+RIP. This register contains the address of the instruction currently
+being interpreted by our virtual machine. After every instruction the
+virtual machine will increment the value in this register -- except
+for a few special instructions.
+
+### Virtual machine instruction set
+
+In our virtual machine we'll define support for the following instructions:
+
+* <code>MOV <REGISTER>, <REGISTER or MEMORY ADDRESS or LITERAL NUMBER></code>
+  * This instruction copies the second value into the first.
+  * Example: <code>MOV </code>
+* <code>ADD <REGISTER>, <REGISTER></code>
+  * This instruction adds the second value into the first and stores the result into the first.
+* <code>PUSH <REGISTER></code>
+  * This instruction will decrement the <code>RSP</code> register and store the value at the bottom of the stack.
+* <code>POP <REGISTER></code>
+  * This instruction will increment the <code>RSP</code> register, remove the last element in the stack (at the bottom), and store it into the register.
+* <code>CALL <LABEL></code>
+  * This instruction will push the value in the <code>RIP</code> register (plus one) onto the stack and set the <code>RIP</code> register to the line of code of the label. More on this later.
+* <code>RET</code>
+  * This instruction will remove the value at the bottom of the stack and store it in the <code>RIP</code> register.
+  
+  Now we have more than enough instructions to write some interesting
+  programs for the virtual machine.
+
+### Virtual machine semantics
+
+We'll make one last assumption before explaining further. In our
+programs, there must be a <code>_start</code> label which must contain
+a <code>RET</code> instruction. Once we hit the terminal
+<code>RET</code>, we will exit the virtual machine and set the exit
+code to the value stored in the <code>RAX</code> register.
+
+Let's look at a simple program:
+
+```assembly
+_start: ; the required _start label
+  MOV RAX, 1 ; store 1 in RAX
+  MOV RDI, 2 ; store 2 in RDI
+  ADD RAX, RDI ; store the result of adding RAX and RDI in RAX
+  RET ; give control back to the virtual machine
+```
+
+When we run this program, first we initialize a stack (we'll give it
+1000 elements) and set the <code>RSP</code> register to 1000 (the top
+of the stack). Then we look for the <code>_start</code> label and set
+the <code>RIP</code> register to 1, the line number after the label
+appears (0). Then until the <code>RIP</code> register is 1000 again,
+we interpret the instruction at the line number stored in the
+<code>RIP</code> register. Once the <code>RIP</code> register hits
+1000, we exit the program setting <code>RAX</code> as the exit code.
+
+#### One more example
+
+Now let's look at one more program:
+
+```assembly
+plus:
+  ADD RDI, RSI
+  MOV RAX, RDI
+  RET
+
+_start:
+  MOV RDI, 1
+  MOV RSI, 2
+  CALL plus
+  RET
+```
+
+Our virtual machine will start at the line after the
+<code>_start</code> label. Then it will store <code>1</code> into
+<code>RDI</code> and <code>2</code> into <code>RSI</code>. Then it
+will jump to the second line in the program to add <code>RDI</code>
+and <code>RSI</code> and store the result in <code>RDI</code>. Then it
+will copy <code>RDI</code> into <code>RAX</code> and return control to
+the final line. This last <code>RET</code> will in turn return control
+to the virtual machine. Then the program will exit with exit code
+<code>3</code>.
+
+### Parsing
+
+Now that we've finished up describing our virtual machine language and
+semantics, we need to parse the instructions into a format we can
+easily interpret.
+
+To do this we'll iterate over the program skip any lines that start
+with a `.`. These are virtual machine directives that are important
+for us to ignore for now. We'll also remove any characters including
+and following a semi-colon, until the end of the line. These are
+comments.
+
+We'll store a dictionary of label names to line numbers (the line
+number of the label plus one) and without the colon.
+
+And we'll store the instructions as an array of objects composed of an
+operation and optional operands.
+
+#### Code
+
+```javascript
+function parse(program) {
+  const labels = {};
+  const instructions = [];
+
+  const lines = program.split('\n');
+  
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].trim(); // Remove any trailing, leading whitespace
+	// TODO: handle each line
+  }
+  
+  return { labels, instructions };
+}
+```
+
+First let's handle the directives we want to ignore:
+
+```javascript
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].trim(); // Remove any trailing, leading whitespace
+
+    if (line.startsWith('.')) {
+	  continue;
+	}
+  }
+```
+
+And then comments:
+
+```javascript
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].trim(); // Remove any trailing, leading whitespace
+
+    if (line.startsWith('.') || line.startsWith(';')) {
+	  continue;
+	}
+	
+	if (line.contains(';')) {
+	  line = line.split(';')[0];
+	}
+  }
+```
+
+And then labels:
+
+```javascript
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].trim(); // Remove any trailing, leading whitespace
+
+    if (line.startsWith('.') || line.startsWith(';')) {
+	  continue;
+	}
+	
+	if (line.contains(';')) {
+	  line = line.split(';')[0];
+	}
+
+	if (line.contains(':')) {
+	  const label = line.split(':')[0];
+	  labels[label] = instructions.length + 1;
+	  continue;
+	}
+  }
+```
+
+And finally instructions and everything together:
+
+```javascript
+function parse(program) {
+  const labels = {};
+  const instructions = [];
+
+  const lines = program.split('\n');
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].trim(); // Remove any trailing, leading whitespace
+
+    if (line.startsWith('.') || line.startsWith(';')) {
+	  continue;
+	}
+	
+	if (line.contains(';')) {
+	  line = line.split(';')[0];
+	}
+
+	if (line.contains(':')) {
+	  const label = line.split(':')[0];
+	  labels[label] = instructions.length + 1;
+	  continue;
+	}
+	
+	const operation = line.split(' ')[0].toLowerCase();
+	const operands = line.substring(operation.length).split(',').map(t => t.trim());
+	instructions.push({
+	  operation,
+	  operands,
+	});
+  }
+  
+  return { labels, instructions };
+}
+```
+
+Hurray! A brittle parser.
+
+### Interpreting
+
+We've already described the semantics a few times. So let's get
+started with the foundation and initialization.
+
+We'll use
+[BigInt](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt)s
+because JavaScript integers are 53-bits wide. This isn't incredibly
+important in our basic programs but it will quickly became painful
+without.
+
+```javascript
+const REGISTERS = [
+  'rdi', 'rsi', 'rsp', 'rbp', 'rax', 'rbx', 'rcx', 'rdx', 'rip', 'r8',
+  'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15', 'cs', 'ds', 'fs',
+  'ss', 'es', 'gs', 'cf', 'zf', 'pf', 'af', 'sf', 'tf', 'if', 'df', 'of',
+];
+
+function interpret(process) {
+  // TODO: interpret
+}
+
+function main() {
+  const memory = new Array(1000);
+  const code = fs.readFileSync(process.argv[2]).toString();
+  const { instructions, labels } = parse(code);
+
+  const registers = REGISTERS.reduce((rs, r) => ({ ...rs, [r]: 0n }), {}),
+
+  registers.rip = labels._start;
+  registers.rsp = BigInt(memory.length);
+  memory[memory.length - 1] = registers.rsp;
+
+  const process = {
+    registers,
+	memory,
+	instructions,
+	labels,
+  };
+
+  interpret(process);
+  process.exit(registers.RAX);
+}
+```
+
+To interpret, we grab the instruction pointed to in <code>RIP</code>
+and switch on the operation.
+
+```javascript
+function interpret(process) {
+  do {
+    const instruction = process.instructions[process.registers.RIP];
+	switch (instruction.operation.toLowerCase()) {
+	  case 'mov':
+	    break;
+	  case 'add':
+	    break;
+	  case 'call':
+	    break;
+	  case 'ret':
+	    break;
+	  case 'push':
+	    break;
+	  case 'pop':
+	    break;
+	}
+  } while (process.registers.RIP != BigInt(process.memory.length));
+}
+```
+
+#### Interpreting MOV
+
+This instruction will store a value into a register and increment <code>RIP</code>.
+
+```javascript
+      case 'mov': {
+	    const lhs = interpretValue(process, instruction.operands[0], { lhs: true });
+		const rhs = interpretValue(process, instruction.operands[1]);
+		process.registers[lhs] = rhs;
+		process.registers.RIP++;
+	    break;
+	  }
+```
+
+We're delegating to a helper function to handle registers vs. literals
+appropriately. We're doing this for the left-hand side too because
+eventually we'll want to support memory addresses here.
+
+```javascript
+function interpretValue(process, value, { lhs }) {
+  if (REGISTERS.includes(value)) {
+    if (lhs) {
+	  return value;
+    } else {
+	  return process.registers[value];
+    }
+  }
+
+  return BigInt.asIntN(64, value);
+}
+```
+
+#### Interpreting ADD
+
+#### Interpreting CALL
+
+#### Interpreting RET
+
+#### Interpreting PUSH
+
+#### Interpreting POP
