@@ -69,16 +69,15 @@ in <code>RAX</code>.
 
 In our virtual machine we'll define support for the following instructions:
 
-* <code>MOV <REGISTER>, <REGISTER or MEMORY ADDRESS or LITERAL NUMBER></code>
+* <code>MOV $REGISTER, $REGISTER or $MEMORY ADDRESS or $LITERAL NUMBER</code>
   * This instruction copies the second value into the first.
-  * Example: <code>MOV </code>
-* <code>ADD <REGISTER>, <REGISTER or MEMORY ADDRESS></code>
+* <code>ADD $REGISTER, $REGISTER or $MEMORY ADDRESS</code>
   * This instruction adds the second value into the first and stores the result into the first.
-* <code>PUSH <REGISTER></code>
+* <code>PUSH $REGISTER</code>
   * This instruction will decrement the <code>RSP</code> register and store the value at the bottom of the stack.
-* <code>POP <REGISTER></code>
+* <code>POP $REGISTER</code>
   * This instruction will increment the <code>RSP</code> register, remove the last element in the stack (at the bottom), and store it into the register.
-* <code>CALL <LABEL></code>
+* <code>CALL $LABEL</code>
   * This instruction will push the value in the <code>RIP</code> register (plus one) onto the stack and set the <code>RIP</code> register to the line of code of the label. More on this later.
 * <code>RET</code>
   * This instruction will remove the value at the bottom of the stack and store it in the <code>RIP</code> register.
