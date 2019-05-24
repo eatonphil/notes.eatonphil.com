@@ -149,8 +149,8 @@ easily interpret.
 To do this we'll iterate over the program skip any lines that start
 with a `.`. These are virtual machine directives that are important
 for us to ignore for now. We'll also remove any characters including
-and following a semi-colon, until the end of the line. These are
-comments.
+and following a semi-colon or hash-tag, until the end of the
+line. These are comments.
 
 We'll store a dictionary of label names to line numbers (the line
 number of the label plus one) and without the colon.
@@ -169,7 +169,7 @@ function parse(program) {
   
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i].trim(); // Remove any trailing, leading whitespace
-	// TODO: handle each line
+    // TODO: handle each line
   }
   
   return { labels, instructions };
@@ -183,8 +183,8 @@ First let's handle the directives we want to ignore:
     let line = lines[i].trim(); // Remove any trailing, leading whitespace
 
     if (line.startsWith('.')) {
-	  continue;
-	}
+      continue;
+    }
   }
 ```
 
@@ -194,13 +194,21 @@ And then comments:
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i].trim(); // Remove any trailing, leading whitespace
 
-    if (line.startsWith('.') || line.startsWith(';')) {
-	  continue;
-	}
-	
-	if (line.includes(';')) {
-	  line = line.split(';')[0];
-	}
+    if (line.startsWith('.') || line.startsWith(';') || line.startsWith('#')) {
+      continue;
+    }
+    
+    if (line.includes(';')) {
+      line = line.split(';')[0];
+    }
+    
+    if (line.includes('#')) {
+      line = line.split('#')[0];
+    }
+    
+    if (!line) {
+      continue;
+    }
   }
 ```
 
@@ -210,19 +218,27 @@ And then labels:
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i].trim(); // Remove any trailing, leading whitespace
 
-    if (line.startsWith('.') || line.startsWith(';')) {
-	  continue;
-	}
-	
-	if (line.includes(';')) {
-	  line = line.split(';')[0];
-	}
+    if (line.startsWith('.') || line.startsWith(';') || line.startsWith('#')) {
+      continue;
+    }
+    
+    if (line.includes(';')) {
+      line = line.split(';')[0];
+    }
+    
+    if (line.includes('#')) {
+      line = line.split('#')[0];
+    }
+    
+    if (!line) {
+      continue;
+    }
 
-	if (line.includes(':')) {
-	  const label = line.split(':')[0];
-	  labels[label] = instructions.length;
-	  continue;
-	}
+    if (line.includes(':')) {
+      const label = line.split(':')[0];
+      labels[label] = instructions.length;
+      continue;
+    }
   }
 ```
 
@@ -239,25 +255,25 @@ function parse(program) {
     let line = lines[i].trim(); // Remove any trailing, leading whitespace
 
     if (line.startsWith('.') || line.startsWith(';')) {
-	  continue;
-	}
-	
-	if (line.includes(';')) {
-	  line = line.split(';')[0];
-	}
+      continue;
+    }
+    
+    if (line.includes(';')) {
+      line = line.split(';')[0];
+    }
 
-	if (line.includes(':')) {
-	  const label = line.split(':')[0];
-	  labels[label] = instructions.length + 1;
-	  continue;
-	}
-	
-	const operation = line.split(' ')[0].toLowerCase();
-	const operands = line.substring(operation.length).split(',').map(t => t.trim());
-	instructions.push({
-	  operation,
-	  operands,
-	});
+    if (line.includes(':')) {
+      const label = line.split(':')[0];
+      labels[label] = instructions.length;
+      continue;
+    }
+    
+    const operation = line.split(/\s/)[0].toLowerCase();
+    const operands = line.substring(operation.length).split(',').map(t => t.trim());
+    instructions.push({
+      operation,
+      operands,
+    });
   }
   
   return { labels, instructions };
@@ -293,14 +309,14 @@ const REGISTERS = [
 function writeMemoryBytes(process, address, value, size) {
   for (let i = 0n; i < size; i++) {
     value >>= i * 8n;
-	process.memory[address + i] = value & 0xFFn;
+    process.memory[address + i] = value & 0xFFn;
   }
 }
 
 function readMemoryBytes(process, address, size) {
   let value = 0n;
   for (let i = 0n; i < size; i++) {
-    value |= BigInt(process.memory[address + i] << (i * 8));
+    value |= (process.memory[address + i] || 0n) << (i * 8n);
   }
   return value;
 }
@@ -315,7 +331,7 @@ function main(file) {
   const { instructions, labels } = parse(code);
 
   const registers = REGISTERS.reduce((rs, r) => ({ ...rs, [r]: 0n }), {});
-  registers.RIP = labels.main;
+  registers.RIP = BigInt(labels.main || labels._main);
   registers.RSP = BigInt(memory.length - 8);
 
   const process = {
@@ -328,11 +344,15 @@ function main(file) {
   writeMemoryBytes(process, registers.RSP, registers.RSP, 8);
 
   interpret(process);
-  return registers.RAX;
+  return Number(registers.RAX);
 }
 
 process.exit(main(process.argv[2]));
 ```
+
+We'll accept <code>_main</code> as an entry point as well as
+<code>main</code> to support our macOS users. If you know why our
+macOS users use <code>_main</code> I'd love to know.
 
 To interpret, we grab the instruction pointed to in <code>RIP</code>
 and switch on the operation.
@@ -341,20 +361,20 @@ and switch on the operation.
 function interpret(process) {
   do {
     const instruction = process.instructions[process.registers.RIP];
-	switch (instruction.operation.toLowerCase()) {
-	  case 'mov':
-	    break;
-	  case 'add':
-	    break;
-	  case 'call':
-	    break;
-	  case 'ret':
-	    break;
-	  case 'push':
-	    break;
-	  case 'pop':
-	    break;
-	}
+    switch (instruction.operation.toLowerCase()) {
+      case 'mov':
+        break;
+      case 'add':
+        break;
+      case 'call':
+        break;
+      case 'ret':
+        break;
+      case 'push':
+        break;
+      case 'pop':
+        break;
+    }
   } while (process.registers.RIP != BigInt(readMemoryBytes(process, memory.length - 8, 8)));
 }
 ```
@@ -366,18 +386,25 @@ Example:
 ```assembly
   MOV RAX, 1
   MOV RAX, RDI
+  MOV DWORD PTR [RBP - 4], 8
 ```
 
-This instruction will store a value into a register and increment <code>RIP</code>.
+This instruction will store a value into a register and increment
+<code>RIP</code>.  If the left-hand side is a memory address we will
+write to memory.
 
 ```javascript
       case 'mov': {
-	    const lhs = interpretValue(process, instruction.operands[0], { lhs: true });
-		const rhs = interpretValue(process, instruction.operands[1]);
-		process.registers[lhs] = rhs;
-		process.registers.RIP++;
-	    break;
-	  }
+        const lhs = interpretValue(process, instruction.operands[0], { lhs: true });
+        const rhs = interpretValue(process, instruction.operands[1]);
+        if (REGISTERS.includes(lhs)) {
+          process.registers[lhs] = rhs;
+        } else {
+          writeMemoryBytes(process, lhs.address, rhs, lhs.size);
+        }
+        process.registers.RIP++;
+        break;
+      }
 ```
 
 We're delegating to a helper function to handle registers vs. memory
@@ -388,9 +415,9 @@ simple function:
 function interpretValue(process, value, { lhs } = { lhs: false }) {
   if (REGISTERS.includes(value)) {
     if (lhs) {
-	  return value;
+      return value;
     } else {
-	  return process.registers[value];
+      return process.registers[value];
     }
   }
 
@@ -404,22 +431,22 @@ We need to do some hacking to support memory addresses:
 function interpretValue(process, value, { lhs } = { lhs: false }) {
   if (REGISTERS.includes(value)) {
     if (lhs) {
-	  return value;
+      return value;
     } else {
-	  return process.registers[value];
+      return process.registers[value];
     }
   }
 
-  if (value.startsWith('dword ptr [')) {
-    const offsetString = value.substring('dword ptr ['.length, value.length - 1).trim();
+  if (value.startsWith('DWORD PTR [')) {
+    const offsetString = value.substring('DWORD PTR ['.length, value.length - 1).trim();
     if (offsetString.includes('-')) {
       const [l, r] = offsetString.split('-').map(l => interpretValue(process, l.trim()));
       const address = l - r;
-      if (isLValue) {
-        return address;
+      const bytes = 4; // dword is 4 bytes
+      if (lhs) {
+        return { address, size: bytes };
       } else {
-	    // dword is 4 bytes
-        return readMemoryBytes(process, address, 4);
+        return readMemoryBytes(process, address, bytes);
       }
     }
 
@@ -443,12 +470,12 @@ the first, then increment the <code>RIP</code> register.
 
 ```javascript
       case 'add': {
-	    const lhs = interpretValue(process, instruction.operands[0], { lhs: true });
-		const rhs = interpretValue(process, instruction.operands[1]);
-		process.registers[lhs] += rhs;
-		process.registers.RIP++;
-	    break;
-	  }
+        const lhs = interpretValue(process, instruction.operands[0], { lhs: true });
+        const rhs = interpretValue(process, instruction.operands[1]);
+        process.registers[lhs] += rhs;
+        process.registers.RIP++;
+        break;
+      }
 ```
 
 #### Interpreting CALL
@@ -465,11 +492,11 @@ location specified by the label.
 
 ```javascript
       case 'call': {
-	    writeMemoryBytes(process, --process.registers.RSP, process.register.RIP + 1n, 8);
-		const label = args[0];
-	    process.registers.RIP = process.labels[label];
-	    break;
-	  }
+        writeMemoryBytes(process, --process.registers.RSP, process.registers.RIP + 1n, 8);
+        const label = instruction.operands[0];
+        process.registers.RIP = process.labels[label];
+        break;
+      }
 ```
 
 #### Interpreting RET
@@ -485,10 +512,10 @@ in the <code>RIP</code> register.
 
 ```javascript
       case 'ret': {
-	    const value = readMemoryBytes(process, process.registers.RSP++, 8);
-		process.registers.RIP = value;
-	    break;
-	  }
+        const value = readMemoryBytes(process, process.registers.RSP++, 8);
+        process.registers.RIP = value;
+        break;
+      }
 ```
 
 #### Interpreting PUSH
@@ -504,11 +531,11 @@ increments <code>RIP</code>.
 
 ```javascript
       case 'push': {
-		const value = interpretValue(process, args[0]);
-		writeMemoryBytes(process, --process.registers.RSP, value, 8);
-		process.registers.RIP++;
-	    break;
-	  }
+        const value = interpretValue(process, instruction.operands[0]);
+        writeMemoryBytes(process, --process.registers.RSP, value, 8);
+        process.registers.RIP++;
+        break;
+      }
 ```
 
 #### Interpreting POP
@@ -524,12 +551,12 @@ into the register specified. Then it increments <code>RIP</code>.
 
 ```javascript
       case 'pop': {
-        const lhs = interpretValue(process, args[0], { lhs: true });
-		const value = readMemoryBytes(process, process.register.RSP++, 8);
+        const lhs = interpretValue(process, instruction.operands[0], { lhs: true });
+        const value = readMemoryBytes(process, process.registers.RSP++, 8);
         process.registers[lhs] = value;
-		process.registers.RIP++;
-	    break;
-	  }
+        process.registers.RIP++;
+        break;
+      }
 ```
 
 ### All together
@@ -556,9 +583,39 @@ int main() {
   return a + b;
 }
 $ gcc -S -masm=intel -o plus.s plus.c
+$ # Manual step where you swap out registers starting with `e` for `r` (e.g. `eax` -> `rax`)
 $ node emulator.js plus.s
 $ echo $?
 11
 ```
 
 And we've got the start of a working x86 emulator.
+
+### Next steps
+
+We aren't setting flags appropriately to support conditionals, so
+that's low-hanging fruit. Additionally, syscalls open up a new world
+(that we'll end up needing since exit codes are limited to 8-bits of
+information). Additionally, our parsing is brittle. Dealing with ELF
+files may be a better direction to go and also enables more. We'll
+explore these aspects and others in follow-up posts.
+
+### Human interest             
+
+I originally intended to build a GameBoy emulator because the hardware
+is simple and uniform. But I found it easiest to start hacking
+together an AMD64 emulator because AMD64 is well-documented and gcc is
+easy enough to use. I'm still interested though unless/until I figure
+out how to emulate a graphics card for AMD64.
+
+It's tricky! But not that tricky. I built a [graphical
+debugger](https://github.com/eatonphil/x86e) around this emulator to
+help out with the logic and off-by-one errors. But ultimately it's
+been surprising to me how easy it is to get started -- especially when
+I'm not concerned about absolute correctness (yet).
+
+There are a number of resources I should link to and I'll get to that.
+
+#### Share
+
+<blockquote class="twitter-tweet"><p lang="en" dir="ltr">Here&#39;s my first post on a series on emulator basics. It&#39;s baby&#39;s first stack and register virtual machine and it turns out it runs x86 code. <a href="https://t.co/WiWmGedawt">https://t.co/WiWmGedawt</a> <a href="https://twitter.com/hashtag/linux?src=hash&amp;ref_src=twsrc%5Etfw">#linux</a> <a href="https://twitter.com/hashtag/assembly?src=hash&amp;ref_src=twsrc%5Etfw">#assembly</a> <a href="https://t.co/xjiMkhgpdN">https://t.co/xjiMkhgpdN</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1132036835964870657?ref_src=twsrc%5Etfw">May 24, 2019</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
