@@ -45,20 +45,20 @@ like <code>CALL</code> and <code>RET</code>.
 #### Memory addresses
 
 It will become useful to provide direct access to memory with a special
-syntax. We'll focus just on 32-bit addresses that will look like this:
+syntax. We'll focus just on 64-bit addresses that will look like this:
 
 ```assembly
-  MOV DWORD PTR [RBP - 4], 12
+  MOV QWORD PTR [RBP - 8], 12
 ```
 
 This asks for the value <code>12</code> to be written into the memory
-address at <code>RBP - 4</code> bytes. The <code>DWORD PTR</code> part
-clarifies that we want to write 4 bytes worth of the value. Since
-<code>12</code> is less than 4 bytes, the rest will be filled with
+address at <code>RBP - 8</code> bytes. The <code>QWORD PTR</code> part
+clarifies that we want to write 8 bytes worth of the value. Since
+<code>12</code> is less than 8 bytes, the rest will be filled with
 zeros.
 
 ```assembly
-  ADD RAX, DWORD PTR [RBP - 4]
+  ADD RAX, QWORD PTR [RBP - 8]
 ```
 
 This asks for four bytes starting from the memory address <code>RBP -
@@ -82,8 +82,8 @@ In our virtual machine we'll define support for the following instructions:
 * <code>RET</code>
   * This instruction will remove the value at the bottom of the stack and store it in the <code>RIP</code> register.
   
-  Now we have more than enough instructions to write some interesting
-  programs for the virtual machine.
+Now we have more than enough instructions to write some interesting
+programs for the virtual machine.
 
 ### Virtual machine semantics
 
@@ -146,7 +146,7 @@ semantics, we need to parse the instructions into a format we can
 easily interpret.
 
 To do this we'll iterate over the program skip any lines that start
-with a `.`. These are virtual machine directives that are important
+with a dot. These are virtual machine directives that are important
 for us to ignore for now. We'll also remove any characters including
 and following a semi-colon or hash-tag, until the end of the
 line. These are comments.
@@ -385,12 +385,12 @@ Example:
 ```assembly
   MOV RAX, 1
   MOV RAX, RDI
-  MOV DWORD PTR [RBP - 4], 8
+  MOV QWORD PTR [RBP - 8], 8
 ```
 
-This instruction will store a value into a register and increment
-<code>RIP</code>.  If the left-hand side is a memory address we will
-write to memory.
+This instruction will store a value into a register or address and
+increment <code>RIP</code>. If the left-hand side is a memory address
+we will write to memory.
 
 ```javascript
       case 'mov': {
@@ -436,12 +436,12 @@ function interpretValue(process, value, { lhs } = { lhs: false }) {
     }
   }
 
-  if (value.startsWith('DWORD PTR [')) {
-    const offsetString = value.substring('DWORD PTR ['.length, value.length - 1).trim();
+  if (value.startsWith('QWORD PTR [')) {
+    const offsetString = value.substring('QWORD PTR ['.length, value.length - 1).trim();
     if (offsetString.includes('-')) {
       const [l, r] = offsetString.split('-').map(l => interpretValue(process, l.trim()));
       const address = l - r;
-      const bytes = 4; // dword is 4 bytes
+      const bytes = 8; // qword is 8 bytes
       if (lhs) {
         return { address, size: bytes };
       } else {
@@ -576,19 +576,18 @@ And finally, let's see what we can do with a simple C program:
 
 ```bash
 $ cat plus.c
-int main() {
-  int a = 5;
-  int b = 6;
+long main() {
+  long a = 5;
+  long b = 6;
   return a + b;
 }
 $ gcc -S -masm=intel -o plus.s plus.c
-$ # Manual step where you swap out registers starting with `e` for `r` (e.g. `eax` -> `rax`)
 $ node emulator.js plus.s
 $ echo $?
 11
 ```
 
-And we've got the start of a working x86 emulator.
+And we've got the start of a working x86_64/AMD64 emulator.
 
 ### Next steps
 
@@ -612,8 +611,6 @@ debugger](https://github.com/eatonphil/x86e) around this emulator to
 help out with the logic and off-by-one errors. But ultimately it's
 been surprising to me how easy it is to get started -- especially when
 I'm not concerned about absolute correctness (yet).
-
-There are a number of resources I should link to and I'll get to that.
 
 #### Share
 
