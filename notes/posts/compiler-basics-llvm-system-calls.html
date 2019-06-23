@@ -32,7 +32,7 @@ simpler right now because we don't yet support strings (or arrays in
 general).
 
 The shortest path forward is to add support for system calls so we can
-print one character at a time. Here's a version of a <code>print<code>
+print one character at a time. Here's a version of a <code>print</code>
 form that hacks around not having arrays to send each integer in a
 number to stdout.
 
@@ -70,20 +70,24 @@ the variable's address.
 If we were compiling to C we could just pass the address of a local
 variable. But LLVM doesn't allow us to take the address of variables
 directly. We need to push the variable onto the LLVM stack to get an
-address. But under the hood LLVM will likely optimize this into a
-local variable reference instead of first pushing to the stack.
+address.
 
-And since LLVM IR is typed, it will return an integer pointer and
-we'll need to mark all uses of it as an integer pointer. So we'll need
-to modify all code to track and use local types rather than
-hard-coding <code>i64</code> everywhere.
+<p class="note">
+  Under the hood LLVM will likely optimize this into a local variable
+  reference instead of first pushing to the stack.
+</p>
+
+Since LLVM IR is typed, the value representing the address of a local
+variable will be a pointer type. We'll need to refer to all uses of
+this value as a pointer. So we'll need to modify ulisp to track local
+types rather than hard-coding <code>i64</code> everywhere.
 
 #### Scope
 
 To begin we'll modify the <code>Scope</code> class to track types. We
-only need to do this on registration. And we'll have to find all uses
-of local variables to make sure they reference <code>value</code> or
-<code>type</code> appropriately.
+only need to do this on registration. Afterward, we'll have to find
+all uses of local variables to make sure they use the
+local's <code>value</code> and <code>type</code> fields appropriately.
 
 ```javascript
 class Scope {
@@ -109,22 +113,22 @@ class Scope {
 }
 ```
 
-I won't list out every line of local variable to change, but you can
-find it in the related [commit to
+We won't go through every use of a <code>Scope</code> variable in this
+post, but you can find it in the related [commit to
 ulisp](https://github.com/eatonphil/ulisp/commit/213b83b8e952c210ba408bf38e59ae677d19e643).
 
 #### Reference
 
-The long-term approach for handling a reference syntactically would
-probably be to have the parser rewrite <code>&x</code> to <code>(&
-x)</code>. The lazy approach is to handle a reference in
-<code>compileExpression</code> code.
+The long-term approach for handling a reference syntactically is
+probably to rewrite <code>&x</code> to <code>(& x)</code> in the
+parser. The lazy approach we'll take for now is to handle a reference
+as a special kind of identifier in <code>compileExpression</code>.
 
-We'll use the LLVM <code>alloca</code> code to push the variable being
-referenced onto the stack and return its address. Then we use
-<code>store</code> to set the destination to this address. Along the
-way we need to modify the destination variable's type to be a pointer
-to the pushed type.
+We'll use the LLVM <code>alloca</code> instruction to create space on
+the stack. This will return a pointer and will turn the destination
+variable into a pointer type. Then we'll use <code>store</code> to set
+the value at the address to the current value of the variable being
+referenced.
 
 ```javascript
 class Compiler {
@@ -155,19 +159,19 @@ class Compiler {
 }
 ```
 
-And now we're set to take the address of any identifier.
+And now we're set to take the address of any code.
 
 ### System calls
 
-LLVM IR provides no high-level means for making system calls.  The
+LLVM IR provides no high-level means for making system calls. The
 only way is to use inline assembly. This syntax is based on GCC inline
 assembly and is confusing, with few explained examples, and unhelpful
 error messages.
 
 Thankfully the assembly code needed for a syscall is only one line,
-one word: the <code>syscall</code> assembly instruction. Then we use
-the inline assembly variable-to-register mapping functionality to line
-up all the parameters for the syscall. Here is an example:
+one word: the <code>syscall</code> assembly instruction. We use inline
+assembly variable-to-register mapping functionality to line up all the
+parameters for the syscall. Here is an example:
 
 ```llvm
 %result = call i64 asm sideeffect "syscall", "=r,{rax},{rdi},{rsi},{rdx}" (i64 %raxArg, i64 %rdiArg, i64 %rsiArg, i64 %rdxArg)
@@ -266,7 +270,7 @@ class Compiler {
 
 ### print
 
-We're set to give our print function a shot.
+We're ready to give our print function a shot.
 
 ```bash
 $ cat test.lisp
@@ -290,3 +294,5 @@ $ node ulisp.js test.lisp
 $ ./build/a.out
 1234
 ```
+
+Looks good! In the next post we'll talk about tail call elimination.
