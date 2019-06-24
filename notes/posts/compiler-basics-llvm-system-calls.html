@@ -26,10 +26,10 @@ the result of the program computation. But the exit code is an eight
 bit integer. What if we want to validate a computation that produces
 a result larger than 255?
 
-To do this we need a way to print integers. We could link against libc
-and use something like <code>printf</code>. But that is not strictly
-simpler right now because we don't yet support strings (or arrays in
-general).
+To do this we need a way to print integers. This is challenging
+because printing normally deals with byte arrays. libc's
+<code>printf</code>, for example, takes a byte array as its first
+argument.
 
 The shortest path forward is to add support for system calls so we can
 print one character at a time. Here's a version of a <code>print</code>
@@ -184,6 +184,12 @@ means the inline assembly returns a value, and the rest of the string
 is the list of registers that arguments should be mapped to. Finally
 we call the function with all the LLVM variables we want to be mapped.
 
+<p class="note">
+  Eventually we should also use the inline assembly syntax to list
+  registers that are modified so that LLVM can know to save them
+  before and after.
+</p>
+
 #### Code
 
 We'll add a mapping for <code>syscall/sys_write</code> and a helper
@@ -238,7 +244,7 @@ class Compiler {
 }
 ```
 
-### <code>></code>, <code>&</code>, <code>/</code>
+### <code>></code>, <code>/</code>
 
 Finally, we have a few new operations to add support for. But they'll
 be pretty simple using the <code>compileOp</code> helper function.
