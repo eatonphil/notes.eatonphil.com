@@ -1,0 +1,148 @@
+# Emulator basics (2): System calls
+## July 20, 2019
+###### emulator,amd64,javascript,x86,syscalls
+
+<p class="note">
+  Previously in emulator basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/emulator-basics-a-stack-and-register-machine.html">Emulator basics (1): a stack and register machine</a>
+</p>
+
+In this post we'll extend x86e to support the exit and write Linux
+system calls, or syscalls. A syscall is a function handled by the
+kernel that allows the process to interact with data outside of its
+memory. The <code>SYSCALL</code> instruction takes arguments in the
+same order that the regular <code>CALL</code> instruction does.
+But <code>SYSCALL</code> additionally requires the <code>RAX</code>
+register to container the integer number of the syscall.
+
+Historically, there have been a number of different ways to make
+syscalls. All methods perform variations on a software interrupt.
+Before AMD64, on x86 processors, there was <code>SYSENTER</code>
+instruction. And before that there there was only <code>INT 80h</code>
+to trigger the interrupt with the syscall handler (since interrupts
+can be used for more than just syscalls).  The various instructions
+around interrupts have been added for efficiency as the processors and
+use by operating systems evolved.
+
+Since this is a general need and AMD64 processors are among the most
+common today, you'll see similar code in every modern operating system
+such as FreeBSD, OpenBSD, NetBSD, macOS, and Linux. (I have no
+background in Windows.) The calling convention may differ (e.g. which
+arguments are in which registers) and the syscall numbers differ.
+Even within Linux both the calling convention and the syscall numbers
+differ between x86 (32-bit) and AMD64/x86_64 (64-bit) versions.
+
+See this [StackOverflow
+post](https://stackoverflow.com/a/15169141/1507139) for some more
+detail.
+
+[All code for this post is available on
+Github.](https://github.com/eatonphil/x86e)
+
+#### Exit
+
+The exit syscall is how a child process communicates with the process
+that spawned it (its parent) when the child is finished running. Exit
+takes one argument, called the exit code or status code. It is an
+arbitrary signed 8-bit integer. If the high bit is set (i.e. the
+number is negative), this is interpreted to mean the process exited
+abnormally such as due to a segfault. Shells additionally
+interpret any non-zero exit code as a "failure". Otherwise, and
+ignoring these two common conventions, it can be used to mean anything
+the programmer wants.
+
+<p class="note">
+  The wait syscall is how the parent process can block until exit is
+  called by the child and receive its exit code.
+</p>
+
+On AMD64 Linux the syscall number is 60.
+
+#### Write
+
+The write syscall is how a process can send data to file descriptors,
+which are integers representing some file-like object. By default, a
+Linux process is given access to three file descriptors with
+consistent integer values: stdin is 0, stdout is 1, and stderr is
+2. Write takes three arguments: the file descriptor integer to write
+to, a starting address to memory that is interpreted as a byte array,
+and the number of bytes to write to the file descriptor beginning at
+the start address.
+
+On AMD64 Linux the syscall number is 1.
+
+### Implementing syscalls
+
+Our emulator is simplistic and is currently only implementing process
+emulation, not full CPU emulation. So the syscalls themselves will be
+handled in JavaScript. First we'll write out stubs for the two
+syscalls we are adding. And we'll provide a map from syscall id to the
+syscall.
+
+```javascript
+const SYSCALLS_BY_ID = {
+  1: function sys_write(process) {},
+  60: function sys_exit(process) {},
+};
+```
+
+We need to add an instruction handler to our instruction switch. In
+doing so we must convert the value in <code>RAX</code> from a BigInt
+to a regular Number so we can look it up in the syscall map.
+
+```javascript
+      case 'syscall': {
+        const idNumber = Number(process.registers.RAX);
+        SYSCALLS_BY_ID[idNumber](process);
+        process.registers.RIP++;
+        break;
+      }
+```
+
+#### Exit
+
+Exit is really simple. It will be implemented by calling Node's
+<code>global.process.exit()</code>. Again we'll need to convert the
+register's BigInt value to a Number.
+
+```javascript
+const SYSCALLS_BY_ID = {
+  1: function sys_write(process) {},
+  60: function sys_exit(process) {
+    global.process.exit(Number(process.registers.RDI));
+  },
+};
+```
+
+#### Write
+
+Write will be implemented by iterating over the process memory as
+bytes and by calling <code>write()</code> on the relevant file
+descriptor. We'll store a map of these on the process object and
+supply stdout, stderr, and stdin proxies on startup.
+
+The base address is stored in <code>RDI</code>, the number of bytes to
+write are stored in <code>RDX</code>. And the file descriptor to write
+to is stored in <code>RDI</code>.
+
+```javascript
+const SYSCALLS_BY_ID = {
+  1: function sys_write(process) {
+    const msg = BigInt(process.registers.RSI);
+    const bytes = Number(process.registers.RDX);
+    for (let i = 0; i < bytes; i++) {
+      const offsetInMemory = BigInt(
+        Math.floor(i / (process.memoryWidthBytes * 8))
+      );
+      const offsetInValue = BigInt(i % process.memoryWidthBytes) * 8n;
+      const byte =
+        (readMemoryBytes(process, msg + offsetInMemory, 1) >> offsetInValue) &
+        0xFFn;
+      const char = String.fromCharCode(Number(byte));
+      process.fd[Number(process.registers.RDI)].write(char);
+    }
+  },
+  ...
+```
