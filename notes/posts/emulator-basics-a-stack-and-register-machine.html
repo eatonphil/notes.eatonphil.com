@@ -337,7 +337,7 @@ function main(file) {
   const { instructions, labels } = parse(code);
 
   const registers = REGISTERS.reduce((rs, r) => ({ ...rs, [r]: 0n }), {});
-  registers.RIP = BigInt(labels.main || labels._main);
+  registers.RIP = BigInt(labels.main === undefined ? labels._main : labels.main);
   registers.RSP = BigInt(memory.length - 8);
 
   const process = {

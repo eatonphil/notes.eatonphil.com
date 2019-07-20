@@ -38,8 +38,8 @@ See this [StackOverflow
 post](https://stackoverflow.com/a/15169141/1507139) for some more
 detail.
 
-[All code for this post is available on
-Github.](https://github.com/eatonphil/x86e)
+[Code for this post in full is available as a
+Gist.](https://gist.github.com/eatonphil/2d16bc3dae33bff8a8d7f2a9d13025c3)
 
 #### Exit
 
@@ -142,6 +142,25 @@ bytes and by calling <code>write()</code> on the relevant file
 descriptor. We'll store a map of these on the process object and
 supply stdout, stderr, and stdin proxies on startup.
 
+```javascript
+function main(file) {
+  ...
+
+  const process = {
+    registers,
+    memory,
+    instructions,
+    labels,
+    fd: {
+      // stdout
+      1: global.process.stdout,
+    }
+  };
+
+  ...
+}
+```
+
 The base address is stored in <code>RDI</code>, the number of bytes to
 write are stored in <code>RDX</code>. And the file descriptor to write
 to is stored in <code>RDI</code>.
@@ -152,13 +171,7 @@ const SYSCALLS_BY_ID = {
     const msg = BigInt(process.registers.RSI);
     const bytes = Number(process.registers.RDX);
     for (let i = 0; i < bytes; i++) {
-      const offsetInMemory = BigInt(
-        Math.floor(i / 64)
-      );
-      const offsetInValue = BigInt(i % 8) * 8n;
-      const byte =
-        (readMemoryBytes(process, msg + offsetInMemory, 1) >> offsetInValue) &
-        0xFFn;
+      const byte = readMemoryBytes(process, msg + BigInt(i), 1);
       const char = String.fromCharCode(Number(byte));
       process.fd[Number(process.registers.RDI)].write(char);
     }
@@ -195,7 +208,7 @@ main:
 
   MOV RDI, 1   ; stdout
   MOV RSI, RSP ; address of string
-  MOV RDX, 48  ; 6 8-bit characters in the string but PUSH acts on 64-bit integers
+  MOV RDX, 56  ; 7 8-bit characters in the string but PUSH acts on 64-bit integers
   MOV RAX, 1   ; write
   SYSCALL
 
