@@ -166,7 +166,7 @@ const SYSCALLS_BY_ID = {
   ...
 ```
 
-### Testing out
+### All together
 
 ```bash
 $ cat exit3.asm
@@ -177,13 +177,13 @@ main:
 
   MOV RAX, 60 ; exit
   SYSCALL
-$ node emulator.js test1.asm
+$ node emulator.js exit3.asm
 $ echo $?
 3
 ```
 
 ```bash
-$ cat print.asm
+$ cat hello.asm
 main:
   PUSH 10  ; \n
   PUSH 33  ; !
@@ -202,7 +202,7 @@ main:
   MOV RDI, 0
   MOV RAX, 60
   SYSCALL
-$ node emulator.js print.asm
+$ node emulator.js hello.asm
 Hello!
 $
 ```
@@ -212,4 +212,5 @@ $
 We still aren't setting flags appropriately to support conditionals,
 so that's low-hanging fruit. There are some other fun syscalls to
 implement that would also give us access to an emulated VGA card so we
-could render graphics.
+could render graphics. Syntactic support for string constants would
+also be convenient and more efficient.
