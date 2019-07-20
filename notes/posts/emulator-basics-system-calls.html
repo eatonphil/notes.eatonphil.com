@@ -58,7 +58,15 @@ the programmer wants.
   called by the child and receive its exit code.
 </p>
 
-On AMD64 Linux the syscall number is 60.
+On AMD64 Linux the syscall number is 60. For example:
+
+```assembly
+  MOV RDI, 0
+  MOV RAX, 60
+  SYSCALL
+```
+
+This calls exit with a status code of 0.
 
 #### Write
 
@@ -71,7 +79,18 @@ to, a starting address to memory that is interpreted as a byte array,
 and the number of bytes to write to the file descriptor beginning at
 the start address.
 
-On AMD64 Linux the syscall number is 1.
+On AMD64 Linux the syscall number is 1. For example:
+
+```assembly
+  MOV RDI, 1   ; stdout
+  MOV RSI, R12 ; address of string
+  MOV RDX, 8   ; 8 bytes to write
+  MOV RAX, 1   ; write
+  SYSCALL
+```
+
+This writes 8 bytes to stdout starting from the string whose address
+is in R12.
 
 ### Implementing syscalls
 
@@ -134,9 +153,9 @@ const SYSCALLS_BY_ID = {
     const bytes = Number(process.registers.RDX);
     for (let i = 0; i < bytes; i++) {
       const offsetInMemory = BigInt(
-        Math.floor(i / (process.memoryWidthBytes * 8))
+        Math.floor(i / 64)
       );
-      const offsetInValue = BigInt(i % process.memoryWidthBytes) * 8n;
+      const offsetInValue = BigInt(i % 8) * 8n;
       const byte =
         (readMemoryBytes(process, msg + offsetInMemory, 1) >> offsetInValue) &
         0xFFn;
@@ -146,3 +165,51 @@ const SYSCALLS_BY_ID = {
   },
   ...
 ```
+
+### Testing out
+
+```bash
+$ cat exit3.asm
+main:
+  MOV RDI, 1
+  MOV RSI, 2
+  ADD RDI, RSI
+
+  MOV RAX, 60 ; exit
+  SYSCALL
+$ node emulator.js test1.asm
+$ echo $?
+3
+```
+
+```bash
+$ cat print.asm
+main:
+  PUSH 10  ; \n
+  PUSH 33  ; !
+  PUSH 111 ; o
+  PUSH 108 ; l
+  PUSH 108 ; l
+  PUSH 101 ; e
+  PUSH 72  ; H
+
+  MOV RDI, 1   ; stdout
+  MOV RSI, RSP ; address of string
+  MOV RDX, 48  ; 6 8-bit characters in the string but PUSH acts on 64-bit integers
+  MOV RAX, 1   ; write
+  SYSCALL
+
+  MOV RDI, 0
+  MOV RAX, 60
+  SYSCALL
+$ node emulator.js print.asm
+Hello!
+$
+```
+
+### Next steps
+
+We still aren't setting flags appropriately to support conditionals,
+so that's low-hanging fruit. There are some other fun syscalls to
+implement that would also give us access to an emulated VGA card so we
+could render graphics.
