@@ -2,11 +2,25 @@
 ## May 21, 2019
 ###### javascript,assembly,amd64,linux,x86_64,interpreters
 
+<p class="note">
+  Next up in emulator basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/compiler-basics-system-calls.html">Emulator basics (2): system calls</a>
+</p>
+
 In this post we'll create a small virtual machine in JavaScript and
 use it to run a simple C program compiled with GCC for an x86_64 (or
 AMD64) CPU running Linux.
 
 [All source code is available on Github.](https://github.com/eatonphil/x86e)
+
+<p class="note">
+  The first version of this post incremented/decremented the stack
+  pointer, RSP, by 1 instead of 8 bytes. This was a mistake because
+  the first version of this project stored the stack as an array of
+  64-bit integers rather than 8-bit integers (a byte array).
+</p>
 
 ### Virtual machine data storage
 
@@ -74,9 +88,9 @@ In our virtual machine we'll define support for the following instructions:
 * <code>ADD $REGISTER, $REGISTER or $MEMORY ADDRESS</code>
   * This instruction adds the second value into the first and stores the result into the first.
 * <code>PUSH $REGISTER</code>
-  * This instruction will decrement the <code>RSP</code> register and store the value at the bottom of the stack.
+  * This instruction will decrement the <code>RSP</code> register by 8 bytes and store the value at the bottom of the stack.
 * <code>POP $REGISTER</code>
-  * This instruction will increment the <code>RSP</code> register, remove the last element in the stack (at the bottom), and store it into the register.
+  * This instruction will increment the <code>RSP</code> register by 8 bytes, remove the last element in the stack (at the bottom), and store it into the register.
 * <code>CALL $LABEL</code>
   * This instruction will push the value in the <code>RIP</code> register (plus one) onto the stack and set the <code>RIP</code> register to the line of code of the label. More on this later.
 * <code>RET</code>
@@ -330,7 +344,7 @@ function main(file) {
   const { instructions, labels } = parse(code);
 
   const registers = REGISTERS.reduce((rs, r) => ({ ...rs, [r]: 0n }), {});
-  registers.RIP = BigInt(labels.main || labels._main);
+  registers.RIP = BigInt(labels.main === undefined ? labels._main : labels.main);
   registers.RSP = BigInt(memory.length - 8);
 
   const process = {
@@ -491,7 +505,8 @@ location specified by the label.
 
 ```javascript
       case 'call': {
-        writeMemoryBytes(process, --process.registers.RSP, process.registers.RIP + 1n, 8);
+        process.registers.RSP -= 8n;
+        writeMemoryBytes(process, process.registers.RSP, process.registers.RIP + 1n, 8);
         const label = instruction.operands[0];
         process.registers.RIP = process.labels[label];
         break;
@@ -511,7 +526,8 @@ in the <code>RIP</code> register.
 
 ```javascript
       case 'ret': {
-        const value = readMemoryBytes(process, process.registers.RSP++, 8);
+        const value = readMemoryBytes(process, process.registers.RSP, 8);
+        process.registers.RSP += 8n;
         process.registers.RIP = value;
         break;
       }
@@ -531,7 +547,8 @@ increments <code>RIP</code>.
 ```javascript
       case 'push': {
         const value = interpretValue(process, instruction.operands[0]);
-        writeMemoryBytes(process, --process.registers.RSP, value, 8);
+        process.registers.RSP -= 8n;
+        writeMemoryBytes(process, process.registers.RSP, value, 8);
         process.registers.RIP++;
         break;
       }
@@ -551,7 +568,8 @@ into the register specified. Then it increments <code>RIP</code>.
 ```javascript
       case 'pop': {
         const lhs = interpretValue(process, instruction.operands[0], { lhs: true });
-        const value = readMemoryBytes(process, process.registers.RSP++, 8);
+        const value = readMemoryBytes(process, process.registers.RSP, 8);
+        process.registers.RSP += 8n;
         process.registers[lhs] = value;
         process.registers.RIP++;
         break;
