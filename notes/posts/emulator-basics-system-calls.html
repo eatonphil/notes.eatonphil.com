@@ -74,8 +74,8 @@ This calls exit with a status code of 0.
 The write syscall is how a process can send data to file descriptors,
 which are integers representing some file-like object. By default, a
 Linux process is given access to three file descriptors with
-consistent integer values: stdin is 0, stdout is 1, and stderr is
-2. Write takes three arguments: the file descriptor integer to write
+consistent integer values: stdin is 0, stdout is 1, and stderr is 2.
+Write takes three arguments: the file descriptor integer to write
 to, a starting address to memory that is interpreted as a byte array,
 and the number of bytes to write to the file descriptor beginning at
 the start address.
