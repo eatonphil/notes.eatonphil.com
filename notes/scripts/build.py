@@ -12,25 +12,31 @@ POST_SUMMARY = """
 HOME_PAGE = """
 <style>header, footer { display: none !important; }</style>
 <div class="fp-section fp-section--about">
-<h2 class="fp-h2">About</h2>
+<h2 class="fp-h2">Bio</h2>
   <p>
-    Hello! I'm an engineer and manager in Brooklyn. As an engineer my
-    interests are in compilers and interpreters; operating systems;
-    and complex, intuitive user-interfaces. As a manager my interests
-    are in transparent, inclusive, and minimal processes; and
-    education (for employees/coworkers and the public).
+    Hello! I'm an engineering manager in Brooklyn. I lead a fantastic
+    group of humans building SIEM tools at a <a
+    href="https://capsule8.com">kick-eass Linux security
+    startup</a>. Before this, I led the frontend group at a <a
+    href="https://linode.com">Linux hosting company in Philly</a>.
   </p>
   <p>
-    I lead a team of software developers on the business-logic API and
-    user-facing frontend at a <a href="https://capsule8.com">Linux
-    security startup</a>.
+    I'm interested in compilers, networks, and operating systems. At
+    some point I'd like to work in shipping, Internet services,
+    manufacturing, hardware, and graphics. Having studied Chinese and
+    Japanese in school, and with family in Korea, I'd also like to
+    spend some years working in East Asia.
   </p>
   <p>
-    Find me on <a
+    You can find me elsewhere on <a
     href="https://github.com/eatonphil">Github</a>, <a
     href="https://twitter.com/phil_eaton">Twitter</a>, and <a
     href="https://www.goodreads.com/eatonphil">Goodreads</a>.
-    (I'm always looking for book recommendations.)
+  </p>
+  <p>
+    <a class="subscribe"
+    href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">Subscribe
+    to updates</a>
   </p>
 </div>
 <div class="fp-section fp-section--projects">
