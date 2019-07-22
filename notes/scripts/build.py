@@ -16,7 +16,7 @@ HOME_PAGE = """
   <p>
     Hello! I'm an engineering manager in Brooklyn. I lead a fantastic
     group of humans building SIEM tools at a <a
-    href="https://capsule8.com">kick-eass Linux security
+    href="https://capsule8.com">kick-ass Linux security
     startup</a>. Before this, I led the frontend group at a <a
     href="https://linode.com">Linux hosting company in Philly</a>.
   </p>
