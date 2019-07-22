@@ -190,9 +190,11 @@ Value namedLambda(Value arguments, Context ctx, string name) {
 }
 ```
 
-NOTE: we can not eliminate mutually recursive tail calls with this
-method. We could use continuation-passing style but that would not
-have addressed the concern: not making a function call.
+<p class="note">
+  We can not eliminate mutually recursive tail calls with this
+  method. We could use continuation-passing style but that would not
+  have addressed the concern: not making a function call.
+</p>
 
 ### Implementation 2: Compiling to C++
 
