@@ -2,21 +2,24 @@
 ## August 31, 2019
 ###### c,cmake,ctest
 
-I've got a few projects in C now out of ease or in search of a
-challenge but it has taken a while to find an easy, minimal unit
-testing setup. I finally got around to a working setup using [Google's
-gtest](https://github.com/google/googletest) for a WIP [JavaScript
+I've got a few projects in C now (for network programming and/or in
+search of a challenge) but it has taken a while to find an easy,
+minimal unit testing setup. I finally got around to a working setup
+using [Google's gtest](https://github.com/google/googletest) for a
+work-in-progress [JavaScript
 interpreter](https://github.com/eatonphil/slowjs). I'm writing about
-this since it will be the build/testing foundation for a couple new
-projects I'll be writing about soon.
+this setup to use as a foundation for a few more projects I'll be
+writing about soon.
 
-### The testy project
+### The "testy" sample project
 
-In this projects, we'll put source code in `src/` and publicly
+In this project, we'll put source code in `src/` and publicly
 exported symbols (functions, structs, etc.) in header files in
 `include/testy/`. There will be a `main.c` in the `src/`
 directory. Tests are written in C++ (since gtest is a C++ testing
 framework) and are in the `test/` directory.
+
+Here's an overview of the source and test code.
 
 #### src/testy.c
 
@@ -57,9 +60,9 @@ int main() {
 
 #### test/testy.cpp
 
-This is one of our test files (actually our only one for now) and
-registers test cases and uses gtest to make assertions. We need to
-wrap the `testy/testy.h` include in an `extern "C"` to stop C++ from
+This is one of our test files (the only one for now). It registers
+test cases and uses gtest to make assertions. We need to wrap the
+`testy/testy.h` include in an `extern "C"` to stop C++ from
 [name-mangling](https://www.geeksforgeeks.org/extern-c-in-c/).
 
 ```cpp
@@ -78,7 +81,8 @@ TEST(testy, not_ok) {
 }
 ```
 
-You can see a good high-level overview of gtest
+You can see a good high-level overview of gtest testing utilities like
+`ASSERT_EQ` and `TEST`
 [here](https://github.com/google/googletest/blob/master/googletest/docs/primer.md).
 
 #### test/main.cpp
@@ -105,7 +109,7 @@ CMake options/rules are defined in a CMakeLists.txt file. We'll have
 one in the root directory, one in the test directory, and a template
 for one that will handle the gtest dependency.
 
-A first draft of the top-level CMakeLists.txt will look like this:
+A first draft of the top-level CMakeLists.txt might look like this:
 
 ```cmake
 cmake_minimum_required(VERSION 3.1)
@@ -123,7 +127,7 @@ file(GLOB sources "${PROJECT_SOURCE_DIR}/src/*.c")
 add_executable(testy ${sources})
 ```
 
-Using `include_directory` will make sure we get compiled with the `-I` flag
+Using `include_directory` will make sure we compile with the `-I` flag
 set up correctly for our include directory.
 
 Using `add_executable` sets up the binary name to produce from the
@@ -172,9 +176,9 @@ $ echo $?
 
 ### CMakeLists.txt.in
 
-This template file will be copied into a subdirectory during
-configuration and handle downloading the gtest dependency from
-github.com pinned to a release.
+This template file handles downloading the gtest dependency from
+github.com pinned to a release. It will be copied into a subdirectory
+during the `cmake ..` step.
 
 ```cmake
 cmake_minimum_required(VERSION 3.1)
@@ -194,8 +198,8 @@ ExternalProject_Add(googletest
 )
 ```
 
-Once in place, we'll tell CMake about it and how to build within the
-top-level CMakeLists.txt file.
+Now we can tell CMake about it and how to build, within the top-level
+CMakeLists.txt file.
 
 ```cmake
 cmake_minimum_required(VERSION 3.1)
@@ -234,13 +238,13 @@ add_executable(testy ${sources})
 ```
 
 The `add_subdirectory` calls register a directory that contains its
-own CMakeLists.txt. So we'll need to add the last one in the test
-directory for this to build now.
+own CMakeLists.txt. It would fail now without a `CMakeLists.txt` file
+in the `test/` directory.
 
 ### test/CMakeLists.txt
 
-This handles compiling against the source code, including the project
-header files, and compiling all test code.
+This final file registers a `unit_test` executable compiling against
+the source and test code, and includes the project header files.
 
 ```cmake
 include_directories(${PROJECT_SOURCE_DIR}/include)
@@ -331,7 +335,6 @@ Scanning dependencies of target unit_tests
 [100%] Linking CXX executable unit_tests
 [100%] Built target unit_tests
 $ ctest
-$ ctest
 Test project /Users/philipeaton/tmp/testy/build
     Start 1: unit
 1/1 Test #1: unit .............................   Passed    0.00 sec
@@ -340,3 +343,6 @@ Test project /Users/philipeaton/tmp/testy/build
 
 Total Test time (real) =   0.01 sec
 ```
+
+And now we're in a good place with most of the challenges of unit
+testing C code (i.e. ignoring mocks) past us.
