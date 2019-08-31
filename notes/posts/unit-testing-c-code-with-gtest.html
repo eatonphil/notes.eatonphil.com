@@ -1,0 +1,342 @@
+#Unit testing C code with gtest
+## August 31, 2019
+###### c,cmake,ctest
+
+I've got a few projects in C now out of ease or in search of a
+challenge but it has taken a while to find an easy, minimal unit
+testing setup. I finally got around to a working setup using [Google's
+gtest](https://github.com/google/googletest) for a WIP [JavaScript
+interpreter](https://github.com/eatonphil/slowjs). I'm writing about
+this since it will be the build/testing foundation for a couple new
+projects I'll be writing about soon.
+
+### The testy project
+
+In this projects, we'll put source code in `src/` and publicly
+exported symbols (functions, structs, etc.) in header files in
+`include/testy/`. There will be a `main.c` in the `src/`
+directory. Tests are written in C++ (since gtest is a C++ testing
+framework) and are in the `test/` directory.
+
+#### src/testy.c
+
+This file has some library code that we should be able to test.
+
+```c
+int private_ok_value = 2;
+
+int testy_ok(int a, int b) {
+  return a + b == private_ok_value;
+}
+```
+
+#### include/testy/testy.h
+
+This file handles exported symbols.
+
+```c
+#ifndef _TESTY_H_
+#define _TESTY_H_
+
+int testy_ok(int, int);
+
+#endif
+```
+
+#### src/main.c
+
+This is the entrypoint to a program built around libtesty.
+
+```c
+#include "testy/testy.h"
+
+int main() {
+  return testy_ok(1, 1);
+}
+```
+
+#### test/testy.cpp
+
+This is one of our test files (actually our only one for now) and
+registers test cases and uses gtest to make assertions. We need to
+wrap the `testy/testy.h` include in an `extern "C"` to stop C++ from
+[name-mangling](https://www.geeksforgeeks.org/extern-c-in-c/).
+
+```cpp
+#include "gtest/gtest.h"
+
+extern "C" {
+#include "testy/testy.h"
+}
+
+TEST(testy, ok) {
+  ASSERT_EQ(testy_ok(1, 1), 1);
+}
+
+TEST(testy, not_ok) {
+  ASSERT_EQ(testy_ok(1, 2), 0);
+}
+```
+
+You can see a good high-level overview of gtest
+[here](https://github.com/google/googletest/blob/master/googletest/docs/primer.md).
+
+#### test/main.cpp
+
+This is a standard entrypoint for the test runner.
+
+```cpp
+#include "gtest/gtest.h"
+
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
+```
+
+### Building with CMake
+
+[CMake](https://cmake.org) is a build tool that (among other things)
+produces a Makefile we can run to build our code. We will also use it
+for dependency management. But fundementally we use it because gtest
+requires it.
+
+CMake options/rules are defined in a CMakeLists.txt file. We'll have
+one in the root directory, one in the test directory, and a template
+for one that will handle the gtest dependency.
+
+A first draft of the top-level CMakeLists.txt will look like this:
+
+```cmake
+cmake_minimum_required(VERSION 3.1)
+
+project(testy)
+
+##
+### Source definitions ###
+##
+
+include_directories(${PROJECT_SOURCE_DIR}/include)
+
+file(GLOB sources "${PROJECT_SOURCE_DIR}/src/*.c")
+
+add_executable(testy ${sources})
+```
+
+Using `include_directory` will make sure we get compiled with the `-I` flag
+set up correctly for our include directory.
+
+Using `add_executable` sets up the binary name to produce from the
+given sources. And we're using the `file` helper to get a glob match
+of C files rather than listing them all out verbatim in the
+`add_executable` call.
+
+#### Building and running
+
+CMake pollutes the current directory, and is fine running in a
+different directory, so we'll make a `build/` directory so we don't
+pollute root. Then we'll build a Makefile with CMake, run Make, and
+run our program.
+
+```bash
+$ mkdir build
+$ cd build
+$ cmake ..
+-- The C compiler identification is AppleClang 10.0.1.10010046
+-- The CXX compiler identification is AppleClang 10.0.1.10010046
+-- Check for working C compiler: /Library/Developer/CommandLineTools/usr/bin/cc
+-- Check for working C compiler: /Library/Developer/CommandLineTools/usr/bin/cc -- works
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Check for working CXX compiler: /Library/Developer/CommandLineTools/usr/bin/c++
+-- Check for working CXX compiler: /Library/Developer/CommandLineTools/usr/bin/c++ -- works
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /Users/philipeaton/tmp/testy/build
+$ make
+Scanning dependencies of target testy
+[ 33%] Building C object CMakeFiles/testy.dir/src/main.c.o
+[ 66%] Building C object CMakeFiles/testy.dir/src/testy.c.o
+[100%] Linking C executable testy
+[100%] Built target testy
+$ ./testy
+$ echo $?
+1
+```
+
+### CMakeLists.txt.in
+
+This template file will be copied into a subdirectory during
+configuration and handle downloading the gtest dependency from
+github.com pinned to a release.
+
+```cmake
+cmake_minimum_required(VERSION 3.1)
+
+project(googletest-download NONE)
+
+include(ExternalProject)
+ExternalProject_Add(googletest
+  GIT_REPOSITORY    https://github.com/google/googletest.git
+  GIT_TAG           release-1.8.1
+  SOURCE_DIR        "${CMAKE_BINARY_DIR}/googletest-src"
+  BINARY_DIR        "${CMAKE_BINARY_DIR}/googletest-build"
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND     ""
+  INSTALL_COMMAND   ""
+  TEST_COMMAND      ""
+)
+```
+
+Once in place, we'll tell CMake about it and how to build within the
+top-level CMakeLists.txt file.
+
+```cmake
+cmake_minimum_required(VERSION 3.1)
+
+project(testy)
+
+##
+### Test definitions ###
+##
+
+configure_file(CMakeLists.txt.in
+        googletest-download/CMakeLists.txt)
+execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/googletest-download )
+execute_process(COMMAND ${CMAKE_COMMAND} --build .
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/googletest-download )
+
+add_subdirectory(${CMAKE_BINARY_DIR}/googletest-src
+        ${CMAKE_BINARY_DIR}/googletest-build)
+
+enable_testing()
+add_subdirectory(test)
+
+##
+### Source definitions ###
+##
+
+include_directories(
+  ${PROJECT_SOURCE_DIR}/include)
+
+file(GLOB sources
+  "${PROJECT_SOURCE_DIR}/include/testy/*.h"
+  "${PROJECT_SOURCE_DIR}/src/*.c")
+
+add_executable(testy ${sources})
+```
+
+The `add_subdirectory` calls register a directory that contains its
+own CMakeLists.txt. So we'll need to add the last one in the test
+directory for this to build now.
+
+### test/CMakeLists.txt
+
+This handles compiling against the source code, including the project
+header files, and compiling all test code.
+
+```cmake
+include_directories(${PROJECT_SOURCE_DIR}/include)
+
+file(GLOB sources "${PROJECT_SOURCE_DIR}/src/*.c")
+list(REMOVE_ITEM sources "${PROJECT_SOURCE_DIR}/src/main.c")
+
+file(GLOB tests "${PROJECT_SOURCE_DIR}/test/*.cpp")
+
+add_executable(unit_tests
+  ${sources}
+  ${tests})
+target_link_libraries(unit_tests gtest_main)
+add_test(NAME unit COMMAND unit_tests)
+```
+
+#### Building and running test
+
+Similar to building and running the source, we run CMake in a
+subdirectory but run `make test` or `ctest` after building all sources
+and tests with `make`.
+
+```bash
+$ cd build
+$ cmake ..
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /Users/philipeaton/tmp/testy/build/googletest-download
+Scanning dependencies of target googletest
+[ 11%] Creating directories for 'googletest'
+[ 22%] Performing download step (git clone) for 'googletest'
+Cloning into 'googletest-src'...
+Note: checking out 'release-1.8.1'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by performing another checkout.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -b with the checkout command again. Example:
+
+  git checkout -b <new-branch-name>
+
+HEAD is now at 2fe3bd99 Merge pull request #1433 from dsacre/fix-clang-warnings
+[ 33%] No patch step for 'googletest'
+[ 44%] Performing update step for 'googletest'
+[ 55%] No configure step for 'googletest'
+[ 66%] No build step for 'googletest'
+[ 77%] No install step for 'googletest'
+[ 88%] No test step for 'googletest'
+[100%] Completed 'googletest'
+[100%] Built target googletest
+-- Found PythonInterp: /usr/local/bin/python (found version "2.7.16")
+-- Looking for pthread.h
+-- Looking for pthread.h - found
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /Users/philipeaton/tmp/testy/build
+$ make
+Scanning dependencies of target testy
+[  6%] Building C object CMakeFiles/testy.dir/src/main.c.o
+[ 13%] Building C object CMakeFiles/testy.dir/src/testy.c.o
+[ 20%] Linking C executable testy
+[ 20%] Built target testy
+Scanning dependencies of target gtest
+[ 26%] Building CXX object googletest-build/googlemock/gtest/CMakeFiles/gtest.dir/src/gtest-all.cc.o
+[ 33%] Linking CXX static library libgtest.a
+[ 33%] Built target gtest
+Scanning dependencies of target gmock
+[ 40%] Building CXX object googletest-build/googlemock/CMakeFiles/gmock.dir/src/gmock-all.cc.o
+[ 46%] Linking CXX static library libgmock.a
+[ 46%] Built target gmock
+Scanning dependencies of target gmock_main
+[ 53%] Building CXX object googletest-build/googlemock/CMakeFiles/gmock_main.dir/src/gmock_main.cc.o
+[ 60%] Linking CXX static library libgmock_main.a
+[ 60%] Built target gmock_main
+Scanning dependencies of target gtest_main
+[ 66%] Building CXX object googletest-build/googlemock/gtest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.o
+[ 73%] Linking CXX static library libgtest_main.a
+[ 73%] Built target gtest_main
+Scanning dependencies of target unit_tests
+[ 80%] Building C object test/CMakeFiles/unit_tests.dir/__/src/testy.c.o
+[ 86%] Building CXX object test/CMakeFiles/unit_tests.dir/main.cpp.o
+[ 93%] Building CXX object test/CMakeFiles/unit_tests.dir/testy.cpp.o
+[100%] Linking CXX executable unit_tests
+[100%] Built target unit_tests
+$ ctest
+$ ctest
+Test project /Users/philipeaton/tmp/testy/build
+    Start 1: unit
+1/1 Test #1: unit .............................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =   0.01 sec
+```
