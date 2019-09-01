@@ -1,6 +1,6 @@
 #Unit testing C code with gtest
 ## August 31, 2019
-###### c,cmake,ctest
+###### c,cmake,ctest,testing
 
 I've got a few projects in C now (for network programming and/or in
 search of a challenge) but it has taken a while to find an easy,
@@ -10,6 +10,19 @@ work-in-progress [JavaScript
 interpreter](https://github.com/eatonphil/slowjs). I'm writing about
 this setup to use as a foundation for a few more projects I'll be
 writing about soon.
+
+<p class="note">
+  The first version of this post only included one library to
+  test. The <code>test/CMakeLists.txt</code> would also only expose a
+  single pass-fail status for all libraries. The second version of
+  this post extends the <code>test/CMakeLists.txt</code> to expose
+  each <code>test/*.cpp</code> file as its own CMake test so that
+  results are displayed by <code>ctest</code> per file. The second
+  version also splits the original <code>src/testy.c</code>
+  and <code>include/testy/testy.h</code> module into
+  a <code>widget</code> and <code>customer</code> module to
+  demonstrate the changes to the CMake configuration.
+</p>
 
 ### The "testy" sample project
 
@@ -21,27 +34,54 @@ framework) and are in the `test/` directory.
 
 Here's an overview of the source and test code.
 
-#### src/testy.c
+#### src/widget.c
 
 This file has some library code that we should be able to test.
 
 ```c
+#include "testy/widget.h"
+
 int private_ok_value = 2;
 
-int testy_ok(int a, int b) {
+int widget_ok(int a, int b) {
   return a + b == private_ok_value;
 }
 ```
 
-#### include/testy/testy.h
+#### include/testy/widget.h
 
-This file handles exported symbols.
+This file handles exported symbols for widget code.
 
 ```c
-#ifndef _TESTY_H_
-#define _TESTY_H_
+#ifndef _WIDGET_H_
+#define _WIDGET_H_
 
-int testy_ok(int, int);
+int widget_ok(int, int);
+
+#endif
+```
+
+#### src/customer.c
+
+This file has some more library code that we should be able to test.
+
+```c
+#include "testy/customer.h"
+
+int customer_check(int a) {
+  return a == 5;
+}
+```
+
+#### include/testy/customer.h
+
+This file handles exported symbols for customer code.
+
+```c
+#ifndef _CUSTOMER_H_
+#define _CUSTOMER_H_
+
+int customer_check(int);
 
 #endif
 ```
@@ -51,39 +91,65 @@ int testy_ok(int, int);
 This is the entrypoint to a program built around libtesty.
 
 ```c
-#include "testy/testy.h"
+#include "testy/customer.h"
+#include "testy/widget.h"
 
 int main() {
-  return testy_ok(1, 1);
+  if (widget_ok(1, 1)) {
+    return customer_check(5);
+  }
+  
+  return 0;
 }
 ```
 
-#### test/testy.cpp
+#### test/widget.cpp
 
-This is one of our test files (the only one for now). It registers
-test cases and uses gtest to make assertions. We need to wrap the
-`testy/testy.h` include in an `extern "C"` to stop C++ from
+This is one of our test files. It registers test cases and uses gtest
+to make assertions. We need to wrap the `testy/widget.h` include in an
+`extern "C"` to stop C++ from
 [name-mangling](https://www.geeksforgeeks.org/extern-c-in-c/).
 
 ```cpp
 #include "gtest/gtest.h"
 
 extern "C" {
-#include "testy/testy.h"
+#include "testy/widget.h"
 }
 
-TEST(testy, ok) {
-  ASSERT_EQ(testy_ok(1, 1), 1);
+TEST(widget, ok) {
+  ASSERT_EQ(widget_ok(1, 1), 1);
 }
 
 TEST(testy, not_ok) {
-  ASSERT_EQ(testy_ok(1, 2), 0);
+  ASSERT_EQ(widget_ok(1, 2), 0);
 }
 ```
 
 You can see a good high-level overview of gtest testing utilities like
 `ASSERT_EQ` and `TEST`
 [here](https://github.com/google/googletest/blob/master/googletest/docs/primer.md).
+
+
+#### test/customer.cpp
+
+This is another one of our test files.
+
+```cpp
+#include "gtest/gtest.h"
+
+extern "C" {
+#include "testy/customer.h"
+}
+
+TEST(customer, ok) {
+  ASSERT_EQ(customer_check(5), 1);
+}
+
+TEST(testy, not_ok) {
+  ASSERT_EQ(customer_check(0), 0);  
+}
+```
 
 #### test/main.cpp
 
@@ -120,7 +186,7 @@ project(testy)
 ### Source definitions ###
 ##
 
-include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories("${PROJECT_SOURCE_DIR}/include")
 
 file(GLOB sources "${PROJECT_SOURCE_DIR}/src/*.c")
 
@@ -164,9 +230,9 @@ $ cmake ..
 -- Generating done
 -- Build files have been written to: /Users/philipeaton/tmp/testy/build
 $ make
-Scanning dependencies of target testy
-[ 33%] Building C object CMakeFiles/testy.dir/src/main.c.o
-[ 66%] Building C object CMakeFiles/testy.dir/src/testy.c.o
+[ 25%] Building C object CMakeFiles/testy.dir/src/customer.c.o
+[ 50%] Building C object CMakeFiles/testy.dir/src/widget.c.o
+[ 75%] Building C object CMakeFiles/testy.dir/src/main.c.o
 [100%] Linking C executable testy
 [100%] Built target testy
 $ ./testy
@@ -227,8 +293,7 @@ add_subdirectory(test)
 ### Source definitions ###
 ##
 
-include_directories(
-  ${PROJECT_SOURCE_DIR}/include)
+include_directories("${PROJECT_SOURCE_DIR}/include")
 
 file(GLOB sources
   "${PROJECT_SOURCE_DIR}/include/testy/*.h"
@@ -247,21 +312,30 @@ This final file registers a `unit_test` executable compiling against
 the source and test code, and includes the project header files.
 
 ```cmake
-include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories("${PROJECT_SOURCE_DIR}/include")
 
 file(GLOB sources "${PROJECT_SOURCE_DIR}/src/*.c")
 list(REMOVE_ITEM sources "${PROJECT_SOURCE_DIR}/src/main.c")
 
 file(GLOB tests "${PROJECT_SOURCE_DIR}/test/*.cpp")
+list(REMOVE_ITEM tests "${PROJECT_SOURCE_DIR}/test/main.cpp")
 
-add_executable(unit_tests
-  ${sources}
-  ${tests})
-target_link_libraries(unit_tests gtest_main)
-add_test(NAME unit COMMAND unit_tests)
+foreach(file ${tests})
+  set(name)
+  get_filename_component(name ${file} NAME_WE)
+  add_executable("${name}_tests"
+    ${sources}
+    ${file}
+    "${PROJECT_SOURCE_DIR}/test/main.cpp")
+  target_link_libraries("${name}_tests" gtest_main)
+  add_test(NAME ${name} COMMAND "${name}_tests")
+endforeach()
 ```
 
-#### Building and running test
+We have to register a test for each file otherwise each file's tests
+won't show up by default (i.e. without a `--verbose` flag).
+
+#### Building and running tests
 
 Similar to building and running the source, we run CMake in a
 subdirectory but run `make test` or `ctest` after building all sources
@@ -307,45 +381,55 @@ HEAD is now at 2fe3bd99 Merge pull request #1433 from dsacre/fix-clang-warnings
 -- Generating done
 -- Build files have been written to: /Users/philipeaton/tmp/testy/build
 $ make
-Scanning dependencies of target testy
-[  6%] Building C object CMakeFiles/testy.dir/src/main.c.o
-[ 13%] Building C object CMakeFiles/testy.dir/src/testy.c.o
-[ 20%] Linking C executable testy
-[ 20%] Built target testy
-Scanning dependencies of target gtest
-[ 26%] Building CXX object googletest-build/googlemock/gtest/CMakeFiles/gtest.dir/src/gtest-all.cc.o
-[ 33%] Linking CXX static library libgtest.a
-[ 33%] Built target gtest
-Scanning dependencies of target gmock
-[ 40%] Building CXX object googletest-build/googlemock/CMakeFiles/gmock.dir/src/gmock-all.cc.o
-[ 46%] Linking CXX static library libgmock.a
-[ 46%] Built target gmock
-Scanning dependencies of target gmock_main
-[ 53%] Building CXX object googletest-build/googlemock/CMakeFiles/gmock_main.dir/src/gmock_main.cc.o
-[ 60%] Linking CXX static library libgmock_main.a
-[ 60%] Built target gmock_main
-Scanning dependencies of target gtest_main
-[ 66%] Building CXX object googletest-build/googlemock/gtest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.o
-[ 73%] Linking CXX static library libgtest_main.a
-[ 73%] Built target gtest_main
-Scanning dependencies of target unit_tests
-[ 80%] Building C object test/CMakeFiles/unit_tests.dir/__/src/testy.c.o
-[ 86%] Building CXX object test/CMakeFiles/unit_tests.dir/main.cpp.o
-[ 93%] Building CXX object test/CMakeFiles/unit_tests.dir/testy.cpp.o
-[100%] Linking CXX executable unit_tests
-[100%] Built target unit_tests
+[  4%] Building C object CMakeFiles/testy.dir/src/customer.c.o
+[  9%] Building C object CMakeFiles/testy.dir/src/widget.c.o
+[ 13%] Building C object CMakeFiles/testy.dir/src/main.c.o
+[ 18%] Linking C executable testy
+[ 18%] Built target testy
+[ 22%] Building CXX object googletest-build/googlemock/gtest/CMakeFiles/gtest.dir/src/gtest-all.cc.o
+[ 27%] Linking CXX static library libgtest.a
+[ 27%] Built target gtest
+[ 31%] Building CXX object googletest-build/googlemock/CMakeFiles/gmock.dir/src/gmock-all.cc.o
+[ 36%] Linking CXX static library libgmock.a
+[ 36%] Built target gmock
+[ 40%] Building CXX object googletest-build/googlemock/CMakeFiles/gmock_main.dir/src/gmock_main.cc.o
+[ 45%] Linking CXX static library libgmock_main.a
+[ 45%] Built target gmock_main
+[ 50%] Building CXX object googletest-build/googlemock/gtest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.o
+[ 54%] Linking CXX static library libgtest_main.a
+[ 54%] Built target gtest_main
+[ 59%] Building C object test/CMakeFiles/customer_tests.dir/__/src/customer.c.o
+[ 63%] Building C object test/CMakeFiles/customer_tests.dir/__/src/widget.c.o
+[ 68%] Building CXX object test/CMakeFiles/customer_tests.dir/customer.cpp.o
+[ 72%] Building CXX object test/CMakeFiles/customer_tests.dir/main.cpp.o
+[ 77%] Linking CXX executable customer_tests
+[ 77%] Built target customer_tests
+Scanning dependencies of target widget_tests
+[ 81%] Building C object test/CMakeFiles/widget_tests.dir/__/src/customer.c.o
+[ 86%] Building C object test/CMakeFiles/widget_tests.dir/__/src/widget.c.o
+[ 90%] Building CXX object test/CMakeFiles/widget_tests.dir/widget.cpp.o
+[ 95%] Building CXX object test/CMakeFiles/widget_tests.dir/main.cpp.o
+[100%] Linking CXX executable widget_tests
+[100%] Built target widget_tests
+```
+
+After running `cmake` and `make`, we're finally ready to run `ctest`.
+
+```bash
 $ ctest
 Test project /Users/philipeaton/tmp/testy/build
-    Start 1: unit
-1/1 Test #1: unit .............................   Passed    0.00 sec
+    Start 1: customer
+1/2 Test #1: customer ..........................   Passed    0.01 sec
+    Start 2: widget
+2/2 Test #2: widget ............................   Passed    0.00 sec
 
-100% tests passed, 0 tests failed out of 1
+100% tests passed, 0 tests failed out of 2
 
 Total Test time (real) =   0.01 sec
 ```
 
-And now we're in a good place with most of the challenges of unit
-testing C code (i.e. ignoring mocks) past us.
+Now we're in a good place with most of the challenges of unit testing
+C code (i.e. ignoring mocks) past us.
 
 #### Share
 
