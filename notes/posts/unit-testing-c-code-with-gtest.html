@@ -2,14 +2,12 @@
 ## August 31, 2019
 ###### c,cmake,ctest,testing
 
-I've got a few projects in C now (for network programming and/or in
-search of a challenge) but it has taken a while to find an easy,
-minimal unit testing setup. I finally got around to a working setup
-using [Google's gtest](https://github.com/google/googletest) for a
-work-in-progress [JavaScript
-interpreter](https://github.com/eatonphil/slowjs). I'm writing about
-this setup to use as a foundation for a few more projects I'll be
-writing about soon.
+This post covers building and testing a minimal, but still useful, C
+project. We'll use [Google's
+gtest](https://github.com/google/googletest) and
+[CMake](https://cmake.org) for testing C code. This will serve as a
+foundation for some upcoming posts/projects on programming Linux,
+userland networking and interpreters.
 
 <p class="note">
   The first version of this post only included one module to
