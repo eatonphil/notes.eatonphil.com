@@ -1,12 +1,19 @@
 import glob
+import os
 from datetime import datetime
 
 import mistune
 
 POST_SUMMARY = """
 <div class="summary">
-  <a href="{}">{}</a>
+  <a href="/{}">{}</a>
   <div class="summary-subtitle">{}</div>
+</div>
+"""
+TAG_PAGE = """
+<div class="summary">
+  <h1>{}</h1>
+  <div class="summary-subtitle">Tag</div>
 </div>
 """
 HOME_PAGE = """
@@ -135,36 +142,43 @@ def get_post_data(in_file):
         return output, markdown.renderer.title
 
 
-def get_tags(tags_raw):
+def get_html_tags(all_tags):
     tags = ''
 
-    for i, tag in enumerate(tags_raw.split(",")):
+    for i, tag in enumerate(all_tags):
         if not tag:
             continue
-        if i < 3:
-            tags += '<span class="tag">' + tag + '</span>'
-        else:
-            tags += '<span style="display: none;">' + tag + '</span>'
+        #if i < 3:
+        tags += '<a href="/tags/{}.html" class="tag">{}</a>'.format(tag, tag)
+        #else:
+        #    tags += '<span style="display: none;">{}</span>'.format(tag)
     if tags:
-        return '<div class="tags">' + tags + '</div>'
+        return '<div class="tags">{}</div>'.format(tags)
 
     return ''
 
 
 def main():
+    all_tags = {}
     post_data = []
     for post in get_posts():
         out_file = post[len('posts/'):]
         output, title = get_post_data(post)
         header, date, tags_raw = title[1], title[2], title.get(6, "")
 
-        tags = get_tags(tags_raw)
+        tags = tags_raw.split(",")
+        tags_html = get_html_tags(tags)
 
         post_data.append((out_file, title[1], title[2]))
+        for tag in tags:
+            if tag not in all_tags:
+                all_tags[tag] = []
+
+            all_tags[tag].append((out_file, title[1], title[2]))
 
         title = title[1]
         with open('dist/' + out_file, 'w') as f:
-            f.write(TEMPLATE.format(post=output, title=title, subtitle=date, tag=title, tags=tags))
+            f.write(TEMPLATE.format(post=output, title=title, subtitle=date, tag=title, tags=tags_html))
 
     post_data.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
     post_data.reverse()
@@ -176,6 +190,17 @@ def main():
     with open('dist/style.css', 'w') as fw:
         with open('style.css') as fr:
             fw.write(fr.read())
+
+    if not os.path.exists('dist/tags'):
+        os.makedirs('dist/tags')
+    for tag in all_tags:
+        posts = all_tags[tag]
+        with open('dist/tags/%s.html' % tag, 'w') as f:
+            posts.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
+            posts.reverse()
+            tag_page = TAG_PAGE.format(tag)
+            tag_page += "\n".join([POST_SUMMARY.format(*args) for args in posts])
+            f.write(TEMPLATE.format(post=tag_page, title="", tag=TAG, subtitle="", tags=""))
 
 
 if __name__ == '__main__':
