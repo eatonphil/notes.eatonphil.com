@@ -1,0 +1,40 @@
+# Administering Kubernetes is hard
+## September 30, 2019
+###### containers,orchestration,aws
+
+Kubernetes is easy to use after some exposure; it's pretty convenient
+too. But it is super hard to set up.
+
+[eksctl](https://eksctl.io) is a good tool for folks who don't want to
+spend hours/days/weeks debugging VPC configuration in 1000s of lines
+of CloudFormation. None of the other tools seem to be that much easier
+to use (kops, kubeadm, etc.).
+
+But even with EKS and eksctl you are constrained to Amazon Linux
+worker nodes. AMIs are practically impossible to discover.
+
+I haven't spent much time with GKE.
+
+And while eksctl operates on the right level for developers needing to
+administrate small/medium-sized systems, it... doesn't exist outside
+EKS.
+
+It is unfortunate the only major container orchestration system is
+this complex to administer. The user-facing APIs are pretty solid and
+guide toward sustainable system design. It is _really_ hard to see the
+value for most companies with medium-sized deployments tasked with
+administration. Among serious proprietary alternatives, sure, there's
+ECS and Google App Engine. But there's little advantage in existing
+Kubernetes user knowledge. The OSS alternatives don't have the
+adoption to seem like a good investment.
+
+OpenStack's [magnum](https://wiki.openstack.org/wiki/Magnum) or
+OpenShift seem like possible high-level providers for a generic
+environment. But neither are particularly known for stability.
+
+In all, the ecosystem has gotten friendlier. There will probably be a
+time in the future (3-5 years from now?) when Kubernetes is fairly
+easy to administer.
+
+I'd love to hear your thoughts and experiences administering
+Kubernetes.
