@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 
 import mistune
+from feedgen.feed import FeedGenerator
 
 POST_SUMMARY = """
 <div class="summary">
@@ -169,7 +170,7 @@ def main():
         tags = tags_raw.split(",")
         tags_html = get_html_tags(tags)
 
-        post_data.append((out_file, title[1], title[2]))
+        post_data.append((out_file, title[1], title[2], post))
         for tag in tags:
             if tag not in all_tags:
                 all_tags[tag] = []
@@ -190,6 +191,22 @@ def main():
     with open('dist/style.css', 'w') as fw:
         with open('style.css') as fr:
             fw.write(fr.read())
+
+    fg = FeedGenerator()
+    for url, title, _, post in reversed(post_data):
+        fe = fg.add_entry()
+        fe.id('http://notes.eatonphil.com/' + url)
+        fe.title(title)
+        fe.link(href='http://notes.eatonphil.com/' + url)
+
+    fg.id('http://notes.eatonphil.com/')
+    fg.link(href='http://notes.eatonphil.com/')
+    fg.title(TAG)
+    fg.description(TAG)
+    fg.author(name='Phil Eaton', email='me@eatonphil.com')
+    fg.language('en')
+    fg.atom_file('dist/atom.xml')
+    fg.rss_file('dist/rss.xml')
 
     if not os.path.exists('dist/tags'):
         os.makedirs('dist/tags')
