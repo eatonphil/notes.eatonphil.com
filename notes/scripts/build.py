@@ -1,6 +1,6 @@
 import glob
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 import mistune
 from feedgen.feed import FeedGenerator
@@ -193,11 +193,12 @@ def main():
             fw.write(fr.read())
 
     fg = FeedGenerator()
-    for url, title, _, post in reversed(post_data):
+    for url, title, date, post in reversed(post_data):
         fe = fg.add_entry()
         fe.id('http://notes.eatonphil.com/' + url)
         fe.title(title)
         fe.link(href='http://notes.eatonphil.com/' + url)
+        fe.pubDate(datetime.strptime(date, '%B %d, %Y').replace(tzinfo=timezone.utc))
 
     fg.id('http://notes.eatonphil.com/')
     fg.link(href='http://notes.eatonphil.com/')
