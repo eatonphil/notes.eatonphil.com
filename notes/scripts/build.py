@@ -205,7 +205,6 @@ def main():
     fg.description(TAG)
     fg.author(name='Phil Eaton', email='me@eatonphil.com')
     fg.language('en')
-    fg.atom_file('dist/atom.xml')
     fg.rss_file('dist/rss.xml')
 
     if not os.path.exists('dist/tags'):
