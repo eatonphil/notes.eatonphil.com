@@ -133,14 +133,14 @@ A function declaration is going to need to add its name to a context
 map, mapped to a function reference for use in function calls. Since
 Go throws everything into the same context namespace this we can
 simply pass around a map of strings to <code>value</code>s where a
-<code>value</code> can be any Go value. To faciliate this, we'll
+<code>value</code> can be any Go value. To facilitate this, we'll
 define a <code>value</code> struct to hold an integer to represent
 "kind" and an empty interface "value". When a value is referenced it
 will have to switch on the "kind" and then cast the "value".
 
 Additionally, and unlike a value-oriented language like Scheme, we'll
 need to track a set of <code>return</code> values at all stages
-through interpretation so, when set, we can short-circuit execution.
+through interpretation so, when set, we can short circuit execution.
 
 ```golang
 type kind uint
@@ -251,7 +251,7 @@ Next step!
 
 For this AST node, we'll iterate over each statement and interpret
 it. If the return value has been set we'll execute the loop to
-shortcircuit execution.
+short circuit execution.
 
 ```golang
 func interpretStmt(ctx context, r *ret, stmt ast.Stmt) {}
