@@ -23,9 +23,12 @@ HOME_PAGE = """
 <h2 class="fp-h2">Bio</h2>
   <p>
     Hello! I'm Phil, an engineering manager in New York City. I lead a
-    fantastic group building security web tooling at a <a
+    fantastic group building web tooling at a <a
     href="https://capsule8.com">kick-ass Linux security
-    startup</a>. Before this, I led the frontend group at a <a
+    startup</a>. <a href="https://capsule8.com/careers">Come work with me!</a>.
+  </p>
+  <p>
+    Before this, I led the frontend group at a <a
     href="https://linode.com">Linux hosting company in Philly</a>.
   </p>
   <p>
@@ -63,7 +66,7 @@ HOME_PAGE = """
   </a>
   <a href="https://github.com/eatonphil/ulisp" class="fp-project">
     <div>ulisp</div>
-    <p>An educational compiler from Lisp to LLVM written in JavaScript.</p>
+    <p>An educational compiler from Lisp to LLVM and x86 assembly, written in JavaScript.</p>
   </a>
   <a href="https://github.com/eatonphil/uweb" class="fp-project">
     <div>uweb</div>
