@@ -447,10 +447,10 @@ operations.
 
 There are two major kind of arithmetic instructions we'll wrap for now:
 
-* "General" instructions that operate on two arguments and set the
+* "General" instructions that operate on two arguments, putting the
   return result in the first argument
-* "RAX" instructions that operate on RAX and the first argument and
-  set the return result in <code>RAX</code> and possibly
+* "RAX" instructions that operate on RAX and the first argument,
+  putting the return result in <code>RAX</code> and possibly
   <code>RDX</code>
 
 #### prepareGeneral
@@ -632,7 +632,7 @@ all expression values are thrown away and the last expression value is
 the result of the begin form.
 
 To compile this form we will compile each expression passed in and pop
-from the stack to through its value away. If the expression is the
+from the stack to throw its value away. If the expression is the
 last in the list we will not pop since it is the result of the begin
 form.
 
@@ -660,8 +660,8 @@ the current stack pointer (<code>RSP</code>) as the new frame pointer
 (<code>RBP</code>).
 
 Remember that we use the frame pointer as a point of reference when
-setting and getting local and parameter values. It is entirely be
-convention that we set up that it works out.
+setting and getting local and parameter values. It works out entirely
+by convention.
 
 ```javascript
   compileDefine([name, params, ...body], scope, depth) {
@@ -771,7 +771,8 @@ $ cat tests/meaning-of-life.lisp
   (+ 8 (* 2 17)))
 ```
 
-We'll compile this program without the ulisp kernel:
+We'll compile this program without the ulisp kernel (which contains a
+lisp library we cannot currently compile):
 
 ```bash
 $ node src/ulisp.js tests/meaning-of-life.lisp --no-kernel --backend x86
@@ -793,10 +794,11 @@ branch.
 
 But we're going to resort to an instruction I just learned about
 called <code>CMOV</code>. This allows us to conditionally assign a
-value based on flags, similar to how you can conditionally jump.
+value based on flags, similar to how you can conditionally branch.
 
-Other than <code>CMOV</code> this wrapper follows the exact same
-patterns as the arithmetic wrappers:
+Otherwise we'll follow a pattern similar to our arithmetic
+wrappers. At the end of the procedure we will have a 0 or a 1 on the
+top of the stack.
 
 ```javascript
   prepareLogicalWrappers() {
@@ -851,8 +853,8 @@ patterns as the arithmetic wrappers:
 
 ### prepareSyscallWrappers
 
-This helper is very similar to <code>compileCall</code> except for
-that it needs to follow the SYS V ABI and use the <code>SYSCALL</code>
+This helper is similar to <code>compileCall</code> except for that it
+needs to follow the SYS V ABI and use the <code>SYSCALL</code>
 instruction rather than <code>CALL</code>.
 
 ```javascript
@@ -888,10 +890,17 @@ And we're set! Last up is <code>compileIf</code>.
 
 ### compileIf
 
-This is very standard code generation but gets a little weird due to
-our stack commitments.  Testing must pop the test value off the
-stack. And then/else blocks must <em>push</em> a value onto the stack
-(even if there is no else block).
+This is standard code generation but gets a little tricky due to our
+stack commitments. Testing must pop the test value off the stack. And
+then/else blocks must <em>push</em> a value onto the stack (even if
+there is no else block).
+
+Here is an example we'd like to support:
+
+```lisp
+(if (foo)
+  (do-bar))
+```
 
 We compile the test and branch:
 
@@ -963,13 +972,6 @@ a zero onto the stack (possibly to represent null).
     this.emit(0, `.after_${branch}:`);
     this.emit(depth, '# End if');
   }
-```
-
-This is so that we can support code like this:
-
-```lisp
-(if (foo)
-  (do-bar))
 ```
 
 And we're ready for an interesting program! Let's print (to stdout)
