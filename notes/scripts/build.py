@@ -25,7 +25,8 @@ HOME_PAGE = """
     Hello! I'm Phil, an engineering manager in New York City. I lead a
     fantastic group building web tooling at a <a
     href="https://capsule8.com">kick-ass Linux security
-    startup</a>. <a href="https://capsule8.com/careers">Come work with me!</a>.
+    startup</a>. Come <a href="https://capsule8.com/careers">work with
+    me!</a>
   </p>
   <p>
     Before this, I led the frontend group at a <a
