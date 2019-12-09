@@ -22,15 +22,19 @@ HOME_PAGE = """
 <div class="fp-section fp-section--about">
 <h2 class="fp-h2">Bio</h2>
   <p>
-    Hello! I'm an engineering manager in Brooklyn. I lead a fantastic
-    group building SIEM tools at a <a
+    Hello! I'm Phil, an engineering manager in New York City. I lead a
+    fantastic group building web tooling at a <a
     href="https://capsule8.com">kick-ass Linux security
-    startup</a>. Before this, I led the frontend group at a <a
+    startup</a>. Come <a href="https://capsule8.com/careers">work with
+    me!</a>
+  </p>
+  <p>
+    Before this, I led the frontend group at a <a
     href="https://linode.com">Linux hosting company in Philly</a>.
   </p>
   <p>
     I'm interested in compilers, networks, and operating systems. At
-    some point I'd like to work in finance, shipping, Internet
+    some point I'd like to work in banking, shipping, Internet
     services, manufacturing, hardware, and graphics. Having studied
     Chinese and Japanese in school, and with family in Korea, I'd also
     like to spend some years working in East Asia.
@@ -63,7 +67,7 @@ HOME_PAGE = """
   </a>
   <a href="https://github.com/eatonphil/ulisp" class="fp-project">
     <div>ulisp</div>
-    <p>An educational compiler from Lisp to LLVM written in JavaScript.</p>
+    <p>An educational compiler from Lisp to LLVM and x86 assembly, written in JavaScript.</p>
   </a>
   <a href="https://github.com/eatonphil/uweb" class="fp-project">
     <div>uweb</div>
@@ -102,7 +106,7 @@ HOME_PAGE = """
   <h2 class="fp-h2">Notes</h2>
 """
 TEMPLATE = open('template.html').read()
-TAG = "Notes by a software developer"
+TAG = "My notes"
 
 class Renderer(mistune.Renderer):
     def __init__(self):
