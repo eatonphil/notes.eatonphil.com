@@ -15,13 +15,6 @@ AMD64) CPU running Linux.
 
 [All source code is available on Github.](https://github.com/eatonphil/x86e)
 
-<p class="note">
-  The first version of this post incremented/decremented the stack
-  pointer, RSP, by 1 instead of 8 bytes. This was a mistake because
-  the first version of this project stored the stack as an array of
-  64-bit integers rather than 8-bit integers (a byte array).
-</p>
-
 ### Virtual machine data storage
 
 Our virtual machine will have two means of storing data: registers and
