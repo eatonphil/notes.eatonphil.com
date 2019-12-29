@@ -28,7 +28,8 @@ h2 {
     font-weight: normal;
     line-height: 1.1rem;
     margin: 0;
-    padding-bottom: 5px;
+    padding-top: 15px;
+    margin-bottom: -10px;
 }
 
 h2.fp-h2 {
@@ -148,14 +149,14 @@ footer p {
 }
 
 .tags {
-    margin: 10px 0;
+    padding-bottom: 5px;
 }
 
 .tag {
     display: inline-block;
     margin-right: 10px;
-    padding: 5px;
-    background: #ddd;
+    padding: 3px 5px;
+    background: #f8d2ff;
     color: #777;
     font-size: .9rem;
 }
@@ -165,6 +166,11 @@ footer p {
 }
 
 .summary-subtitle {
+    color: #333;
+}
+
+.sm-link:not(:last-of-type) {
+    padding-right: 5px;
     color: #333;
 }
 
