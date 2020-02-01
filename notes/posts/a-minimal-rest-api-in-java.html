@@ -1,0 +1,592 @@
+# A minimal REST API in Java
+## February 1, 2020
+###### java,rest,api,jersey,jooq,postgres
+
+There's a style of Java that is a joy to write. This post will cover
+how to set up a basic PostgreSQL-integrated REST API using
+[Jersey](https://eclipse-ee4j.github.io/jersey/) and
+[JOOQ](https://www.jooq.org/) in a style not dissimilar to Flask and
+SQLAlchemy in Python.
+
+In particular, we'll try to avoid as much runtime
+reflection/class-loading as possible. This will make the application
+less flexible but easier to debug and understand.
+
+I'd appreciate pointers in email if you see anything weird or can fix
+any of my bugs.
+
+### Dependencies
+
+Install [Maven](https://maven.apache.org/), a recent
+[JDK](https://openjdk.java.net/), and PostgreSQL.
+
+Copy the following into <code>pom.xml</code> to tell Maven about Java
+dependencies:
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>api</groupId>
+  <artifactId>api</artifactId>
+  <version>1.0-SNAPSHOT</version>
+
+  <properties>
+    <maven.compiler.source>13</maven.compiler.source>
+    <maven.compiler.target>13</maven.compiler.target>
+  </properties>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.8.1</version>
+        <configuration>
+          <compilerArgs>
+            <arg>-Xlint:all,-options,-path</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>1.6.0</version>
+        <configuration>
+          <mainClass>api.Main</mainClass>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.glassfish.jersey.containers</groupId>
+      <artifactId>jersey-container-jetty-http</artifactId>
+      <version>2.30</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.jooq</groupId>
+      <artifactId>jooq</artifactId>
+      <version>3.12.3</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.jooq</groupId>
+      <artifactId>jooq-meta</artifactId>
+      <version>3.12.3</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <version>42.2.9</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.glassfish.jersey.inject</groupId>
+      <artifactId>jersey-hk2</artifactId>
+      <version>2.30</version>
+    </dependency>
+
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-core</artifactId>
+      <version>1.2.3</version>
+    </dependency>
+    
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>1.7.30</version>
+    </dependency>
+
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <version>1.2.3</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.glassfish.jersey.media</groupId>
+      <artifactId>jersey-media-json-jackson</artifactId>
+      <version>2.30</version>
+    </dependency>
+
+    <dependency>
+      <groupId>javax.persistence</groupId>
+      <artifactId>javax.persistence-api</artifactId>
+      <version>2.2</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <version>1.18.10</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>com.fasterxml.jackson</groupId>
+      <artifactId>jackson-bom</artifactId>
+      <version>2.10.2</version>
+      <type>pom</type>
+    </dependency>
+  </dependencies>
+</project>
+```
+
+Now run `mvn install` to download and configure all dependencies.
+
+### Project setup
+
+The <code>Main</code> class will be our entrypoint
+within <code>src/main/java/api/Main.java</code>.
+
+It will handle loading configuration, setting up the application
+server, and starting it.
+
+```java
+package api;
+
+import java.io.InputStream;
+
+import api.app.Application;
+import api.app.Config;
+
+public class Main {
+  public static void main(String[] args) {
+    try {
+      var cfg = new Config();
+      var server = new Application(cfg);
+      server.start();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+}
+```
+
+The <code>Config</code> class in
+<code>src/main/java/api/app/Config.java</code> will contain a few
+hard-coded settings for now. In the future it could be read from a
+file.
+
+```java
+package api.app;
+
+import java.io.InputStream;
+import java.time.Duration;
+import java.util.Properties;
+
+public final class Config {
+  public final String server_address = "http://localhost";
+  public final int server_port = 7780;
+
+  public final String db_connection = "jdbc:postgresql://localhost/todo";
+  public final String db_username = "todo";
+  public final String db_password = "todo";
+}
+```
+
+And finally the <code>Application</code> class
+in <code>src/main/java/api/app/Application.java</code> will handle
+loading a PostgreSQL connection, registering the class path to look
+for Jersey routes/controllers, registering the PostgreSQL connection
+in the dependency injection controller and starting the Jersey
+controller.
+
+```java
+package api.app;
+
+import javax.ws.rs.core.UriBuilder;
+
+import org.glassfish.jersey.internal.inject.AbstractBinder;
+import org.glassfish.jersey.jetty.JettyHttpContainerFactory;
+import org.glassfish.jersey.server.ResourceConfig;
+import org.slf4j.LoggerFactory;
+
+import api.dao.Dao;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+
+public class Application {
+  private static final Logger logger = (Logger) LoggerFactory.getLogger(Application.class);
+  private static final Logger rootLogger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+  static {
+    rootLogger.setLevel(Level.INFO);
+  }
+
+  Config cfg;
+
+  public Application(final Config _cfg) {
+    cfg = _cfg;
+  }
+
+  private void addShutdownHook(final Runnable hook) {
+    Runtime.getRuntime().addShutdownHook(new Thread(hook));
+  }
+
+  public void start() {
+    var dao = new Dao(cfg.db_connection, cfg.db_username, cfg.db_password);
+    try {
+      dao.initialize();
+    } catch (Exception e) {
+      e.printStackTrace();
+      return;
+    }
+    addShutdownHook(() -> {
+      try {
+        dao.close();
+      } catch (java.sql.SQLException e) {
+        e.printStackTrace();
+      }
+    });
+
+    var resourceConfig = new ResourceConfig();
+    resourceConfig.packages("api.controller");
+    resourceConfig.register(new AbstractBinder() {
+      @Override
+      protected void configure() {
+        bind(dao).to(Dao.class);
+      }
+    });
+    
+    var baseUri = UriBuilder.fromUri(cfg.server_address).port(cfg.server_port).build();
+    var server = JettyHttpContainerFactory.createServer(baseUri, resourceConfig);
+    logger.info("Started listening on {}:{}", cfg.server_address, cfg.server_port);
+  }
+}
+```
+
+<p class="note">
+  I couldn't figure out a reasonable way to avoid the class path
+  registration for routes.
+  <br />
+  <br />
+  It's also important to note that the <code>AbstractBinder</code>
+  appears to search the class path implicitly for any available
+  dependency injection controller. I'd rather we had specified it
+  explicitly but I'm not sure how. It will succeed because we
+  installed
+  <a href="https://javaee.github.io/hk2/">HK2</a> as a dependency
+  (see <code>pom.xml</code>).
+</p>
+
+With the <code>Application</code> code finished, we'll need to build
+out the referenced <code>Dao</code> and controller classes.
+
+### Dao
+
+The <code>Dao</code> class in
+<code>src/main/java/api/dao/Dao.java</code> will enclose the
+connection to PostgreSQL via JOOQ.
+
+```java
+package api.dao;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+import org.jooq.DSLContext;
+import org.jooq.SQLDialect;
+import org.jooq.impl.DSL;
+
+public class Dao {
+  private Connection conn;
+  private String url;
+  private String username;
+  private String password;
+
+  public Dao(final String _url, final String _username, final String _password) {
+    url = _url;
+    username = _username;
+    password = _password;
+  }
+
+  public void initialize() throws SQLException {
+    conn = DriverManager.getConnection(url, username, password);
+  }
+
+  public void close() throws SQLException {
+    conn.close();
+  }
+
+  public DSLContext getDSLContext() {
+    return DSL.using(conn, SQLDialect.POSTGRES);
+  }
+}
+```
+
+And this will be enough to use in our controller. But let's take a
+moment to talk about the data model.
+
+### Data
+
+This API will return results from a TODO list. The database should
+store each TODO item and a timestamp of completion, if completed.
+
+We'll start by creating a database and user for the application:
+
+```bash
+$ sudo su postgres
+postgres $ psql
+postgres=# CREATE DATABASE todo;
+postgres=# CREATE USER todo WITH PASSWORD 'todo';
+postgres=# GRANT ALL ON DATABASE todo TO todo;
+```
+
+Then we'll write an initial migration:
+
+```sql
+$ cat migrations/1_init.sql
+CREATE TABLE todo_item (
+  id BIGSERIAL NOT NULL PRIMARY KEY,
+  item TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
+```
+
+And a helper script for running migrations:
+
+```bash
+$ cat scripts/migrate.sh
+#!/usr/bin/env bash
+
+set -e
+
+export PGPASSWORD=todo
+
+for file in $(ls migrations); do
+    echo "Running migration: $file"
+    psql -U todo -f "migrations/$file"
+done
+```
+
+Run it:
+
+```bash
+$ chmod +x ./scripts/migrate.sh
+$ ./scripts/migrate.sh
+Running migration: 1_init.sql
+CREATE TABLE
+```
+
+And let's add some data:
+
+```bash
+$ sudo su postgres
+postgres $ psql -U todo
+todo=# INSERT INTO todo_item (item) VALUES ('My note');
+```
+
+Now we're ready to model the data in Java. 
+
+### Models
+
+While it's possible to have [JOOQ generate Java data
+classes](https://www.jooq.org/doc/3.12/manual/code-generation/) (or
+POJOs) by reading the database schema, the generated class cannot be
+directly serialized to a JSON string.
+
+So for each table (there's only one) we'll write a class with fields
+for each column. We'll use the [Java Persistence
+API](https://javaee.github.io/tutorial/persistence-intro.html) (JPA)
+to annotate the class and fields so JOOQ will know how to deserialize
+query results into an instance of the model.
+
+We'll use [Lombok](https://projectlombok.org/) to label the whole
+object as <code>Data</code> so that getter and setter methods are
+generated automatically for each private field. And we'll use a
+[Jackson](https://github.com/FasterXML/jackson) annotation to label
+the JSON field name of each column.
+
+This is the <code>TodoItem</code> class in
+<code>src/main/java/api/model/TodoItem.java</code>:
+
+```java
+package api.model;
+
+import java.time.OffsetDateTime;
+
+import javax.persistence.Column;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import lombok.Data;
+
+@Data
+@Table(name = "todo_item")
+public class TodoItem {
+  @Column(name = "id")
+  @JsonProperty("id")
+  @Id
+  private long id;
+
+  @Column(name = "name")
+  @JsonProperty("name")
+  private String name;
+
+  @Column(name = "created_at")
+  @JsonProperty("createdAt")
+  @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ssZ")
+  private OffsetDateTime createdAt;
+  
+  @Column(name = "completed_at")
+  @JsonProperty("completedAt")
+  @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ssZ")
+  private OffsetDateTime completedAt;
+}
+```
+
+<p class="note">
+  The JSON format specifications for the timestamp fields aren't
+  actually working. The formatted JSON returns a giant object and I
+  haven't figured out how to get it to serialize to the RFC3339 string
+  yet.
+</p>
+
+We're set! The last step is a simple controller to return a list of
+TODO items.
+
+### The /items controller
+
+In the <code>ItemsController</code> class in
+<code>src/main/java/api/model/ItemsController.java</code> we'll inject
+the <code>Dao</code> object and use it to return a page of TODO items
+as JSON.
+
+```java
+package api.controller;
+
+import java.util.List;
+
+import javax.inject.Inject;
+import javax.persistence.Table;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+
+import org.jooq.DSLContext;
+
+import api.dao.Dao;
+import api.model.TodoItem;
+
+@Path("items")
+public class ItemsController {
+  @Inject
+  Dao dao;
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  public List<TodoItem> getServers() {
+    DSLContext dslCtx = dao.getDSLContext();
+    Table table = TodoItem.class.getAnnotation(Table.class);
+    return dslCtx.select().from(table.name()).fetch().into(TodoItem.class);
+  }
+}
+```
+
+<p class="note">
+  There's some more implicit magic here when we return a list of
+  <code>TodoItem</code>s. Since we marked the endpoint as producing
+  JSON, and since Jackson is in our class path, Jersey will
+  automatically use Jackson to serialize the list to JSON.
+  <br />
+  <br />
+  The API is quite nice but I could do without the automatic
+  class-loading magic.
+</p>
+
+Now we're ready to build, run and test.
+
+### Building and running
+
+```bash
+$ mvn clean compile
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------------------< api:api >-------------------------------
+[INFO] Building api 1.0-SNAPSHOT
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ api ---
+[INFO] Deleting /Users/philipeaton/tmp/test/target
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ api ---
+[WARNING] Using platform encoding (UTF-8 actually) to copy filtered resources, i.e. build is platform dependent!
+[INFO] skip non existing resourceDirectory /Users/philipeaton/tmp/test/src/main/resources
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.8.1:compile (default-compile) @ api ---
+[INFO] Changes detected - recompiling the module!
+[WARNING] File encoding has not been set, using platform encoding UTF-8, i.e. build is platform dependent!
+[INFO] Compiling 6 source files to /Users/philipeaton/tmp/test/target/classes
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  2.198 s
+[INFO] Finished at: 2020-02-01T17:07:14-05:00
+[INFO] ------------------------------------------------------------------------
+$ mvn exec:java
+[INFO] Scanning for projects...
+[INFO]
+[INFO] ------------------------------< api:api >-------------------------------
+[INFO] Building api 1.0-SNAPSHOT
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- exec-maven-plugin:1.6.0:java (default-cli) @ api ---
+17:06:53.793 [api.Main.main()] INFO org.eclipse.jetty.util.log - Logging initialized @2017ms to org.eclipse.jetty.util.log.Slf4jLog
+17:06:54.378 [api.Main.main()] INFO org.eclipse.jetty.server.Server - jetty-9.4.17.v20190418; built: 2019-04-18T19:45:35.259Z; git: aa1c656c315c011c01e7b21aabb04066635b9f67; jvm 13+33
+17:06:54.425 [api.Main.main()] INFO org.eclipse.jetty.server.AbstractConnector - Started ServerConnector@3943a159{HTTP/1.1,[http/1.1]}{0.0.0.0:7780}
+17:06:54.425 [api.Main.main()] INFO org.eclipse.jetty.server.Server - Started @2651ms
+17:06:54.425 [api.Main.main()] INFO api.app.Application - Started listening on http://localhost:7780
+```
+
+In a new terminal curl the endpoint:
+
+```bash
+$ curl localhost:7780/items | jq
+[
+  {
+    "id": 1,
+    "name": null,
+    "createdAt": {
+      "offset": {
+        "totalSeconds": -18000,
+        "id": "-05:00",
+        "rules": {
+          "transitions": [],
+          "transitionRules": [],
+          "fixedOffset": true
+        }
+      },
+      "dayOfWeek": "SATURDAY",
+      "dayOfYear": 32,
+      "nano": 594440000,
+      "year": 2020,
+      "monthValue": 2,
+      "dayOfMonth": 1,
+      "hour": 17,
+      "minute": 8,
+      "second": 0,
+      "month": "FEBRUARY"
+    },
+    "completedAt": null
+  }
+]
+```
+
+And we're done!
+
+#### Share
+
+<blockquote class="twitter-tweet"><p lang="en" dir="ltr">I really enjoy using Java for REST APIs, avoiding Spring and Play. Use simple but mature libraries that are no more difficult to cobble together than everything you must do in Go or Flask for a REST API. vs Go you get generics and vs python you get safety<a href="https://t.co/twmjZprow6">https://t.co/twmjZprow6</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1223733417453465601?ref_src=twsrc%5Etfw">February 1, 2020</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
