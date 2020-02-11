@@ -174,7 +174,7 @@ def main():
         tags = tags_raw.split(",")
         tags_html = get_html_tags(tags)
 
-        post_data.append((out_file, title[1], title[2], post))
+        post_data.append((out_file, title[1], title[2], post, output))
         for tag in tags:
             if tag not in all_tags:
                 all_tags[tag] = []
@@ -197,12 +197,13 @@ def main():
             fw.write(fr.read())
 
     fg = FeedGenerator()
-    for url, title, date, post in reversed(post_data):
+    for url, title, date, post, content in reversed(post_data):
         fe = fg.add_entry()
         fe.id('http://notes.eatonphil.com/' + url)
         fe.title(title)
         fe.link(href='http://notes.eatonphil.com/' + url)
         fe.pubDate(datetime.strptime(date, '%B %d, %Y').replace(tzinfo=timezone.utc))
+        fe.content(content)
 
     fg.id('http://notes.eatonphil.com/')
     fg.link(href='http://notes.eatonphil.com/')
