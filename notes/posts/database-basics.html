@@ -1,0 +1,1348 @@
+# Database basics
+## March 6, 2020
+###### database,golang,parsing
+
+In this series we'll write a rudimentary database from
+scratch in Go. Project source code is available on
+[Github](https://github.com/eatonphil/gosql).
+
+In this first post we'll build enough of a parser to run some simple
+<code>CREATE</code>, <code>INSERT</code>, and <code>SELECT</code>
+queries. Then we'll build an in-memory backend
+supporting <code>TEXT</code> and <code>INT</code> types and write a
+basic REPL.
+
+We'll be able to support the following interaction:
+
+```sql
+$ go run *.go
+Welcome to gosql.
+# CREATE TABLE users (id INT, name TEXT);
+ok
+# INSERT INTO users VALUES (1, 'Phil');
+ok
+# SELECT id, name FROM users;
+| id | name |
+====================
+| 1 |  Phil |
+ok
+# INSERT INTO users VALUES (2, 'Kate');
+ok
+# SELECT name, id FROM users;
+| name | id |
+====================
+| Phil |  1 |
+| Kate |  2 |
+ok
+```
+
+The first stage will be to map a SQL source into a list of tokens
+(lexing). Then we'll call parse functions to find individual SQL
+statements (such as <code>SELECT</code>). These parse functions will
+in turn call their own helper functions to find patterns of
+recursively parseable chunks, keywords, symbols (like parenthesis),
+identifiers (like a table name), and numeric or string literals.
+
+Then, we'll write an in-memory backend to do operations based on an
+AST. Finally, we'll write a REPL to accept SQL from a CLI and pass it
+to the in-memory backend.
+
+### Lexing
+
+The lexer is responsible for finding every distinct group of
+characters in source code: tokens. This will consist primarily of
+identifiers, numbers, strings, and symbols.
+
+The gist of the logic will be to iterate over the source string and
+collect characters until we find a delimiting character such as a
+space or comma. In this first pass, we'll pretend users don't insert
+delimiting characters into strings. Once we've reached a delimiting
+character, we'll "finalize" the token and decide whether it is valid
+or not.
+
+First off, we'll define a few types and constants for use
+in <code>lexer.go</code>:
+
+```go
+package main
+
+import (
+	"fmt"
+	"io"
+	"strings"
+)
+
+type location struct {
+	line uint
+	col  uint
+}
+
+type keyword string
+
+const (
+	selectKeyword keyword = "select"
+	fromKeyword   keyword = "from"
+	asKeyword     keyword = "as"
+	tableKeyword  keyword = "table"
+	createKeyword keyword = "create"
+	insertKeyword keyword = "insert"
+	intoKeyword   keyword = "into"
+	valuesKeyword keyword = "values"
+	intKeyword    keyword = "int"
+	textKeyword   keyword = "text"
+)
+
+type symbol string
+
+const (
+	semicolonSymbol  symbol = ";"
+	asteriskSymbol   symbol = "*"
+	commaSymbol      symbol = ","
+	leftparenSymbol  symbol = "("
+	rightparenSymbol symbol = ")"
+)
+
+type tokenKind uint
+
+const (
+	keywordKind tokenKind = iota
+	symbolKind
+	identifierKind
+	stringKind
+	numericKind
+)
+
+type token struct {
+	value string
+	kind  tokenKind
+	loc   location
+}
+
+func (t *token) equals(other *token) bool {
+	return t.value == other.value && t.kind == other.kind
+}
+
+func (t *token) finalize() bool {
+	return true
+}
+```
+
+Next we'll write out the main loop:
+
+```go
+func lex(source io.Reader) ([]*token, error) {
+	buf := make([]byte, 1)
+	tokens := []*token{}
+	current := token{}
+	var line uint = 0
+	var col uint = 0
+
+	for {
+		_, err := source.Read(buf)
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+
+		// Add semi-colon for EOF
+		var c byte = ';'
+		if err == nil {
+			c = buf[0]
+		}
+
+		switch c {
+		case '\n':
+			line++
+			col = 0
+			continue
+		case ' ':
+			fallthrough
+		case ',':
+			fallthrough
+		case '(':
+			fallthrough
+		case ')':
+			fallthrough
+		case ';':
+			if !current.finalize() {
+				return nil, fmt.Errorf("Unexpected token '%s' at %d:%d", current.value, current.loc.line, current.loc.col)
+			}
+
+			if current.value != "" {
+				copy := current
+				tokens = append(tokens, &copy)
+			}
+
+			if c == ';' || c == ',' || c == '(' || c == ')' {
+				tokens = append(tokens, &token{
+					loc:   location{col: col, line: line},
+					value: string(c),
+					kind:  symbolKind,
+				})
+			}
+
+			current = token{}
+			current.loc.col = col
+			current.loc.line = line
+		default:
+			current.value += string(c)
+		}
+
+		if err == io.EOF {
+			break
+		}
+		col++
+	}
+
+	return tokens, nil
+}
+```
+
+Last, we'll write a finalizer helper for each kind of fundemental
+token and check on each in a reasonable order.
+
+#### Validating numbers
+
+Numbers are the most complex. So we'll refer to the [PostgreSQL
+documentation (section
+4.1.2.6)](https://www.postgresql.org/docs/current/sql-syntax-lexical.html)
+for what constitutes a valid number.
+
+```go
+func (t *token) finalizeNumeric() bool {
+	if len(t.value) == 0 {
+		return false
+	}
+
+	periodFound := false
+	expMarkerFound := false
+
+	i := 0
+	for i < len(t.value) {
+		c := t.value[i]
+
+		isDigit := c >= '0' && c <= '9'
+		isPeriod := c == '.'
+		isExpMarker := c == 'e'
+
+		// Must start with a digit or period
+		if i == 0 {
+			if !isDigit && !isPeriod {
+				return false
+			}
+
+			periodFound = isPeriod
+			i++
+			continue
+		}
+
+		if isPeriod {
+			if periodFound {
+				return false
+			}
+
+			periodFound = true
+			i++
+			continue
+		}
+
+		if isExpMarker {
+			if expMarkerFound {
+				return false
+			}
+
+			// No periods allowed after expMarker
+			periodFound = true
+			expMarkerFound = true
+
+			// expMarker must be followed by digits
+			if i == len(t.value)-1 {
+				return false
+			}
+
+			cNext := t.value[i+1]
+			if cNext == '-' || cNext == '+' {
+				i++
+			}
+
+			i++
+			continue
+		}
+
+		if !isDigit {
+			return false
+		}
+
+		i++
+	}
+
+	t.kind = numericKind
+	return true
+}
+```
+
+#### Validating strings
+					    
+Strings must start and end with a single apostrophe. But once we
+identify this is a string, we'll rewrite the value dropping these for
+easier use by the rest of the project.
+
+```go
+func (t *token) finalizeString() bool {
+	if len(t.value) == 0 {
+		return false
+	}
+
+	if t.value[0] == '\'' && t.value[len(t.value)-1] == '\'' {
+		t.kind = stringKind
+		t.value = t.value[1 : len(t.value)-1]
+		return true
+	}
+
+	return false
+}
+```
+
+#### Validating symbols and keywords
+
+Symbols and keywords come from a fixed set of strings, so they're easy
+to compare against.
+
+```go
+func (t *token) finalizeSymbol() bool {
+	switch t.value {
+	case "*":
+		break
+	case ";":
+		break
+	case "(":
+		break
+	case ")":
+		break
+	default:
+		return false
+	}
+
+	t.kind = symbolKind
+	return true
+}
+
+func (t *token) finalizeKeyword() bool {
+	switch strings.ToLower(t.value) {
+	case "select":
+		break
+	case "from":
+		break
+	case "as":
+		break
+	case "table":
+		break
+	case "create":
+		break
+	case "insert":
+		break
+	case "into":
+		break
+	case "values":
+		break
+	case "int":
+		break
+	case "text":
+		break
+	default:
+		return false
+	}
+
+	t.value = strings.ToLower(t.value)
+	t.kind = keywordKind
+	return true
+}
+```
+
+#### Validating identifiers
+
+Now we can finish up the original <code>finalize</code> function and
+assume any token not matching one of these is a valid identifier.
+
+```go
+func (t *token) finalizeIdentifier() bool {
+	t.kind = identifierKind
+	return true
+}
+
+func (t *token) finalize() bool {
+	if t.finalizeSymbol() {
+		return true
+	}
+
+	if t.finalizeKeyword() {
+		return true
+	}
+
+	if t.finalizeNumeric() {
+		return true
+	}
+
+	if t.finalizeString() {
+		return true
+	}
+
+	if t.finalizeIdentifier() {
+		return true
+	}
+
+	return false
+}
+```
+
+And that's it for the lexer! If you copy
+[lexer_test.go](https://github.com/eatonphil/gosql/blob/master/lexer_test.go)
+from the main project, the tests should now pass.
+
+### AST model
+
+At the highest level, an AST is a collection of statements:
+
+```go
+package main
+
+type Ast struct {
+	Statements []*Statement
+}
+```
+
+A statement, for now, is one of <code>INSERT</code>,
+<code>CREATE</code>, or <code>SELECT</code>:
+
+```go
+type AstKind uint
+
+const (
+	SelectKind AstKind = iota
+	CreateTableKind
+	InsertKind
+)
+
+type Statement struct {
+	SelectStatement      *SelectStatement
+	CreateTableStatement *CreateTableStatement
+	InsertStatement      *InsertStatement
+	Kind                 AstKind
+}
+```
+
+#### INSERT
+
+An insert statement, for now, has a table name and a list of values to
+insert:
+
+```go
+type InsertStatement struct {
+	table  token
+	values *[]*expression
+}
+```
+
+An expression is a literal token or (in the future) a function call or
+inline operation:
+
+```go
+type expressionKind uint
+
+const (
+	literalKind expressionKind = iota
+)
+
+type expression struct {
+	literal *token
+	kind    expressionKind
+}
+```
+
+#### CREATE
+
+A create statement, for now, has a table name and a list of column
+names and types:
+
+```go
+type columnDefinition struct {
+	name     token
+	datatype token
+}
+
+type CreateTableStatement struct {
+	name token
+	cols *[]*columnDefinition
+}
+```
+
+#### SELECT
+
+A select statement, for now, has a table name and a list of column
+names:
+
+```go
+type SelectStatement struct {
+	item []*expression
+	from token
+}
+```
+
+And that's it for the AST.
+
+### Parsing
+
+The <code>Parse</code> entrypoint will take a list of tokens and
+attempt to parse statements, separated by a semi-colon, until it
+reaches the last token.
+
+In general our strategy will be to increment and pass around a cursor
+containing the current position of unparsed tokens. Each helper will
+return the new cursor that the caller should start from.
+
+```go
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+func tokenFromKeyword(k keyword) token {
+	return token{
+		kind:  keywordKind,
+		value: string(k),
+	}
+}
+
+func tokenFromSymbol(s symbol) token {
+	return token{
+		kind:  symbolKind,
+		value: string(s),
+	}
+}
+
+func expectToken(tokens []*token, cursor uint, t token) bool {
+	if cursor >= uint(len(tokens)) {
+		return false
+	}
+
+	return t.equals(tokens[cursor])
+}
+
+func helpMessage(tokens []*token, cursor uint, msg string) {
+	var c *token
+	if cursor < uint(len(tokens)) {
+		c = tokens[cursor]
+	} else {
+		c = tokens[cursor-1]
+	}
+
+	fmt.Printf("[%d,%d]: %s, got: %s\n", c.loc.line, c.loc.col, msg, c.value)
+}
+
+func Parse(source io.Reader) (*Ast, error) {
+	tokens, err := lex(source)
+	if err != nil {
+		return nil, err
+	}
+
+	a := Ast{}
+	cursor := uint(0)
+	for cursor < uint(len(tokens)) {
+		stmt, newCursor, ok := parseStatement(tokens, cursor, tokenFromSymbol(semicolonSymbol))
+		if !ok {
+			helpMessage(tokens, cursor, "Expected statement")
+			return nil, errors.New("Failed to parse, expected statement")
+		}
+		cursor = newCursor
+
+		a.Statements = append(a.Statements, stmt)
+
+		atLeastOneSemicolon := false
+		for expectToken(tokens, cursor, tokenFromSymbol(semicolonSymbol)) {
+			cursor++
+			atLeastOneSemicolon = true
+		}
+
+		if !atLeastOneSemicolon {
+			helpMessage(tokens, cursor, "Expected semi-colon delimiter between statements")
+			return nil, errors.New("Missing semi-colon between statements")
+		}
+	}
+
+	return &a, nil
+}
+```
+
+#### Parsing statements
+
+Each statement will be one of <code>INSERT</code>,
+<code>CREATE</code>, or <code>SELECT</code>. The
+<code>parseStatement</code> helper will call a helper on each of these
+statement types and return <code>true</code> if one of them succeeds
+in parsing.
+
+```go
+func parseStatement(tokens []*token, initialCursor uint, delimiter token) (*Statement, uint, bool) {
+	cursor := initialCursor
+
+	// Look for a SELECT statement
+	semicolonToken := tokenFromSymbol(semicolonSymbol)
+	slct, newCursor, ok := parseSelectStatement(tokens, cursor, semicolonToken)
+	if ok {
+		return &Statement{
+			Kind:            SelectKind,
+			SelectStatement: slct,
+		}, newCursor, true
+	}
+
+	// Look for a INSERT statement
+	inst, newCursor, ok := parseInsertStatement(tokens, cursor, semicolonToken)
+	if ok {
+		return &Statement{
+			Kind:            InsertKind,
+			InsertStatement: inst,
+		}, newCursor, true
+	}
+
+	// Look for a CREATE statement
+	crtTbl, newCursor, ok := parseCreateTableStatement(tokens, cursor, semicolonToken)
+	if ok {
+		return &Statement{
+			Kind:                 CreateTableKind,
+			CreateTableStatement: crtTbl,
+		}, newCursor, true
+	}
+
+	return nil, initialCursor, false
+}
+```
+
+#### Parsing select statements
+
+Parsing <code>SELECT</code> statements is easy. We'll look for the
+following token pattern:
+
+1. <code>SELECT</code>
+2. <code>$expression [, ...]</code>
+3. <code>FROM</code>
+4. <code>$table-name</code>
+
+Sketching that out we get:
+
+```go
+func parseSelectStatement(tokens []*token, initialCursor uint, delimiter token) (*SelectStatement, uint, bool) {
+	cursor := initialCursor
+	if !expectToken(tokens, cursor, tokenFromKeyword(selectKeyword)) {
+		return nil, initialCursor, false
+	}
+	cursor++
+
+	slct := SelectStatement{}
+
+	exps, newCursor, ok := parseExpressions(tokens, cursor, []token{tokenFromKeyword(fromKeyword), delimiter})
+	if !ok {
+		return nil, initialCursor, false
+	}
+
+	slct.item = *exps
+	cursor = newCursor
+
+	if expectToken(tokens, cursor, tokenFromKeyword(fromKeyword)) {
+		cursor++
+
+		from, newCursor, ok := parseToken(tokens, cursor, identifierKind)
+		if !ok {
+			helpMessage(tokens, cursor, "Expected FROM token")
+			return nil, initialCursor, false
+		}
+
+		slct.from = *from
+		cursor = newCursor
+	}
+
+	return &slct, cursor, true
+}
+```
+
+The <code>parseToken</code> helper will look for a token of a
+particular token kind.
+
+```go
+func parseToken(tokens []*token, initialCursor uint, kind tokenKind) (*token, uint, bool) {
+	cursor := initialCursor
+
+	if cursor >= uint(len(tokens)) {
+		return nil, initialCursor, false
+	}
+
+	current := tokens[cursor]
+	if current.kind == kind {
+		return current, cursor + 1, true
+	}
+
+	return nil, initialCursor, false
+}
+```
+
+The <code>parseExpressions</code> helper will look for tokens
+separated by a comma until a delimiter is found. It will use existing
+helpers plus <code>parseExpression</code>.
+
+```go
+func parseExpressions(tokens []*token, initialCursor uint, delimiters []token) (*[]*expression, uint, bool) {
+	cursor := initialCursor
+
+	exps := []*expression{}
+outer:
+	for {
+		if cursor >= uint(len(tokens)) {
+			return nil, initialCursor, false
+		}
+
+		// Look for delimiter
+		current := tokens[cursor]
+		for _, delimiter := range delimiters {
+			if delimiter.equals(current) {
+				break outer
+			}
+		}
+
+		// Look for comma
+		if len(exps) > 0 {
+			if !expectToken(tokens, cursor, tokenFromSymbol(commaSymbol)) {
+				helpMessage(tokens, cursor, "Expected comma")
+				return nil, initialCursor, false
+			}
+
+			cursor++
+		}
+
+		// Look for expression
+		exp, newCursor, ok := parseExpression(tokens, cursor, tokenFromSymbol(commaSymbol))
+		if !ok {
+			helpMessage(tokens, cursor, "Expected expression")
+			return nil, initialCursor, false
+		}
+		cursor = newCursor
+
+		exps = append(exps, exp)
+	}
+
+	return &exps, cursor, true
+}
+```
+
+The <code>parseExpression</code> helper (for now) will look for a
+numeric, string, or identifier token.
+
+```go
+func parseExpression(tokens []*token, initialCursor uint, _ token) (*expression, uint, bool) {
+	cursor := initialCursor
+
+	kinds := []tokenKind{identifierKind, numericKind, stringKind}
+	for _, kind := range kinds {
+		t, newCursor, ok := parseToken(tokens, cursor, kind)
+		if ok {
+			return &expression{
+				literal: t,
+				kind:    literalKind,
+			}, newCursor, true
+		}
+	}
+
+	return nil, initialCursor, false
+}
+```
+
+And that's it for parsing a <code>SELECT</code> statement!
+
+#### Parsing insert statements
+
+We'll look for the following token pattern:
+
+1. <code>INSERT</code>
+2. <code>INTO</code>
+3. <code>$table-name</code>
+4. <code>VALUES</code>
+5. <code>(</code>
+6. <code>$expression [, ...]</code>
+7. <code>)</code>
+
+With the existing helpers, this is straightforward to sketch out:
+
+```go
+func parseInsertStatement(tokens []*token, initialCursor uint, delimiter token) (*InsertStatement, uint, bool) {
+	cursor := initialCursor
+
+	// Look for INSERT
+	if !expectToken(tokens, cursor, tokenFromKeyword(insertKeyword)) {
+		return nil, initialCursor, false
+	}
+	cursor++
+
+	// Look for INTO
+	if !expectToken(tokens, cursor, tokenFromKeyword(intoKeyword)) {
+		helpMessage(tokens, cursor, "Expected into")
+		return nil, initialCursor, false
+	}
+	cursor++
+
+	// Look for table name
+	table, newCursor, ok := parseToken(tokens, cursor, identifierKind)
+	if !ok {
+		helpMessage(tokens, cursor, "Expected table name")
+		return nil, initialCursor, false
+	}
+	cursor = newCursor
+
+	// Look for VALUES
+	if !expectToken(tokens, cursor, tokenFromKeyword(valuesKeyword)) {
+		helpMessage(tokens, cursor, "Expected VALUES")
+		return nil, initialCursor, false
+	}
+	cursor++
+
+	// Look for left paren
+	if !expectToken(tokens, cursor, tokenFromSymbol(leftparenSymbol)) {
+		helpMessage(tokens, cursor, "Expected left paren")
+		return nil, initialCursor, false
+	}
+	cursor++
+
+	// Look for expression list
+	values, newCursor, ok := parseExpressions(tokens, cursor, []token{tokenFromSymbol(rightparenSymbol)})
+	if !ok {
+		return nil, initialCursor, false
+	}
+	cursor = newCursor
+
+	// Look for right paren
+	if !expectToken(tokens, cursor, tokenFromSymbol(rightparenSymbol)) {
+		helpMessage(tokens, cursor, "Expected right paren")
+		return nil, initialCursor, false
+	}
+	cursor++
+
+	return &InsertStatement{
+		table:  *table,
+		values: values,
+	}, cursor, true
+}
+```
+
+And that's it for parsing an <code>INSERT</code> statement!
+
+#### Parsing create statements
+
+Finally, for create statements we'll look for the following token
+pattern:
+
+1. <code>CREATE</code>
+2. <code>$table-name</code>
+3. <code>(</code>
+4. <code>[$column-name $column-type [, ...]]</code>
+6. <code>)</code>
+
+Sketching that out with a new <code>parseColumnDefinitions</code>
+helper we get:
+
+```go
+func parseCreateTableStatement(tokens []*token, initialCursor uint, delimiter token) (*CreateTableStatement, uint, bool) {
+	cursor := initialCursor
+
+	if !expectToken(tokens, cursor, tokenFromKeyword(createKeyword)) {
+		return nil, initialCursor, false
+	}
+	cursor++
+
+	if !expectToken(tokens, cursor, tokenFromKeyword(tableKeyword)) {
+		return nil, initialCursor, false
+	}
+	cursor++
+
+	name, newCursor, ok := parseToken(tokens, cursor, identifierKind)
+	if !ok {
+		helpMessage(tokens, cursor, "Expected table name")
+		return nil, initialCursor, false
+	}
+	cursor = newCursor
+
+	if !expectToken(tokens, cursor, tokenFromSymbol(leftparenSymbol)) {
+		helpMessage(tokens, cursor, "Expected left parenthesis")
+		return nil, initialCursor, false
+	}
+	cursor++
+
+	cols, newCursor, ok := parseColumnDefinitions(tokens, cursor, tokenFromSymbol(rightparenSymbol))
+	if !ok {
+		return nil, initialCursor, false
+	}
+	cursor = newCursor
+
+	if !expectToken(tokens, cursor, tokenFromSymbol(rightparenSymbol)) {
+		helpMessage(tokens, cursor, "Expected right parenthesis")
+		return nil, initialCursor, false
+	}
+	cursor++
+
+	return &CreateTableStatement{
+		name: *name,
+		cols: cols,
+	}, cursor, true
+}
+```
+
+The <code>parseColumnDefinitions</code> helper will look column names
+followed by column types separated by a comma and ending with some
+delimiter:
+
+
+```go
+func parseColumnDefinitions(tokens []*token, initialCursor uint, delimiter token) (*[]*columnDefinition, uint, bool) {
+	cursor := initialCursor
+
+	cds := []*columnDefinition{}
+	for {
+		if cursor >= uint(len(tokens)) {
+			return nil, initialCursor, false
+		}
+
+		// Look for a delimiter
+		current := tokens[cursor]
+		if delimiter.equals(current) {
+			break
+		}
+
+		// Look for a comma
+		if len(cds) > 0 {
+			if !expectToken(tokens, cursor, tokenFromSymbol(commaSymbol)) {
+				helpMessage(tokens, cursor, "Expected comma")
+				return nil, initialCursor, false
+			}
+
+			cursor++
+		}
+
+		// Look for a column name
+		id, newCursor, ok := parseToken(tokens, cursor, identifierKind)
+		if !ok {
+			helpMessage(tokens, cursor, "Expected column name")
+			return nil, initialCursor, false
+		}
+		cursor = newCursor
+
+		// Look for a column type
+		ty, newCursor, ok := parseToken(tokens, cursor, keywordKind)
+		if !ok {
+			helpMessage(tokens, cursor, "Expected column type")
+			return nil, initialCursor, false
+		}
+		cursor = newCursor
+
+		cds = append(cds, &columnDefinition{
+			name:     *id,
+			datatype: *ty,
+		})
+	}
+
+	return &cds, cursor, true
+}
+```
+
+And that's it for parsing! If you copy
+[parser_test.go](https://github.com/eatonphil/gosql/blob/master/parser_test.go)
+from the main project, the tests should now pass.
+
+### An in-memory backend
+
+Our in-memory backend should conform to a general backend interface
+that allows a user to create, select, and insert data:
+
+```go
+package main
+
+import "errors"
+
+type ColumnType uint
+
+const (
+	TextType ColumnType = iota
+	IntType
+)
+
+type Cell interface {
+	AsText() string
+	AsInt() int32
+}
+
+type Results struct {
+	Columns []struct {
+		Type ColumnType
+		Name string
+	}
+	Rows [][]Cell
+}
+
+var (
+	ErrTableDoesNotExist  = errors.New("Table does not exist")
+	ErrColumnDoesNotExist = errors.New("Column does not exist")
+	ErrInvalidSelectItem  = errors.New("Select item is not valid")
+	ErrInvalidDatatype    = errors.New("Invalid datatype")
+	ErrMissingValues      = errors.New("Missing values")
+)
+
+type Backend interface {
+	CreateTable(*CreateTableStatement) error
+	Insert(*InsertStatement) error
+	Select(*SelectStatement) (*Results, error)
+}
+```
+
+This leaves us room in the future for a disk-backed backend.
+
+#### Memory layout
+
+Our in-memory backend should store a list of tables. Each table
+will have a list of columns and rows. Each column will have a name and
+type. Each row will have a list of byte arrays.
+
+```go
+package main
+
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"strconv"
+)
+
+type MemoryCell []byte
+
+func (mc MemoryCell) AsInt() int32 {
+	var i int32
+	err := binary.Read(bytes.NewBuffer(mc), binary.BigEndian, &i)
+	if err != nil {
+		panic(err)
+	}
+
+	return i
+}
+
+func (mc MemoryCell) AsText() string {
+	return string(mc)
+}
+
+type table struct {
+	columns     []string
+	columnTypes []ColumnType
+	rows        [][]MemoryCell
+}
+
+type MemoryBackend struct {
+	tables map[string]*table
+}
+
+func NewMemoryBackend() *MemoryBackend {
+	return &MemoryBackend{
+		tables: map[string]*table{},
+	}
+}
+```
+
+#### Implementing create table support
+
+When creating a table, we'll make a new entry in the backend tables
+map. Then we'll create columns as specified by the AST.
+
+```go
+func (mb *MemoryBackend) CreateTable(crt *CreateTableStatement) error {
+	t := table{}
+	mb.tables[crt.name.value] = &t
+	if crt.cols == nil {
+
+		return nil
+	}
+
+	for _, col := range *crt.cols {
+		t.columns = append(t.columns, col.name.value)
+
+		var dt ColumnType
+		switch col.datatype.value {
+		case "int":
+			dt = IntType
+		case "text":
+			dt = TextType
+		default:
+			return ErrInvalidDatatype
+		}
+
+		t.columnTypes = append(t.columnTypes, dt)
+	}
+
+	return nil
+}
+```
+
+#### Implementing insert support
+
+Keeping things simple, we'll assume the value passed can be correctly
+mapped to the type of the column specified.
+
+We'll reference a helper for mapper values to internal storage,
+<code>tokenToCell</code>.
+
+```go
+func (mb *MemoryBackend) Insert(inst *InsertStatement) error {
+	table, ok := mb.tables[inst.table.value]
+	if !ok {
+		return ErrTableDoesNotExist
+	}
+
+	if inst.values == nil {
+		return nil
+	}
+
+	row := []MemoryCell{}
+
+	if len(*inst.values) != len(table.columns) {
+		return ErrMissingValues
+	}
+
+	for _, value := range *inst.values {
+		if value.kind != literalKind {
+			fmt.Println("Skipping non-literal.")
+			continue
+		}
+
+		row = append(row, mb.tokenToCell(value.literal))
+	}
+
+	table.rows = append(table.rows, row)
+	return nil
+}
+```
+
+The <code>tokenToCell</code> helper will write numbers as binary bytes
+and will write strings as bytes:
+
+```go
+
+func (mb *MemoryBackend) tokenToCell(t *token) MemoryCell {
+	if t.kind == numericKind {
+		buf := new(bytes.Buffer)
+		i, err := strconv.Atoi(t.value)
+		if err != nil {
+			panic(err)
+		}
+
+		err = binary.Write(buf, binary.BigEndian, int32(i))
+		if err != nil {
+			panic(err)
+		}
+		return MemoryCell(buf.Bytes())
+	}
+
+	if t.kind == stringKind {
+		return MemoryCell(t.value)
+	}
+
+	return nil
+}
+```
+
+#### Implementing select support
+
+Finally, for select we'll iterate over each row in the table and
+return the cells according to the columns specified by the AST.
+
+```go
+func (mb *MemoryBackend) Select(slct *SelectStatement) (*Results, error) {
+	table, ok := mb.tables[slct.from.table]
+	if !ok {
+		return nil, ErrTableDoesNotExist
+	}
+
+	results := [][]Cell{}
+	columns := []struct {
+		Type ColumnType
+		Name string
+	}{}
+
+	for i, row := range table.rows {
+		result := []Cell{}
+		isFirstRow := i == 0
+
+		for _, exp := range slct.item {
+			if exp.kind != literalKind {
+				// Unsupported, doesn't currently exist, ignore.
+				fmt.Println("Skipping non-literal expression.")
+				continue
+			}
+
+			lit := exp.literal
+			if lit.kind == identifierKind {
+				found := false
+				for i, tableCol := range table.columns {
+					if tableCol == lit.value {
+						if isFirstRow {
+							columns = append(columns, struct {
+								Type ColumnType
+								Name string
+							}{
+								Type: table.columnTypes[i],
+								Name: lit.value,
+							})
+						}
+
+						result = append(result, row[i])
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					return nil, ErrColumnDoesNotExist
+				}
+
+				continue
+			}
+
+			return nil, ErrColumnDoesNotExist
+		}
+
+		results = append(results, result)
+	}
+
+	return &Results{
+		Columns: columns,
+		Rows:    results,
+	}, nil
+}
+```
+
+### The REPL
+
+At last, we're ready to wrap the parser and in-memory backend in a
+REPL. The most complex part is displaying the table of results from a
+select query.
+
+```go
+package main
+
+import (
+	"bufio"
+	"bytes"
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/eatonphil/gosql"
+)
+
+func main() {
+	mb := gosql.NewMemoryBackend()
+
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("Welcome to gosql.")
+	for {
+		fmt.Print("# ")
+		text, err := reader.ReadString('\n')
+		text = strings.Replace(text, "\n", "", -1)
+
+		source := bytes.NewBufferString(text)
+
+		ast, err := gosql.Parse(source)
+		if err != nil {
+			panic(err)
+		}
+
+		for _, stmt := range ast.Statements {
+			switch stmt.Kind {
+			case gosql.CreateTableKind:
+				err = mb.CreateTable(ast.Statements[0].CreateTableStatement)
+				if err != nil {
+					panic(err)
+				}
+				fmt.Println("ok")
+			case gosql.InsertKind:
+				err = mb.Insert(stmt.InsertStatement)
+				if err != nil {
+					panic(err)
+				}
+
+				fmt.Println("ok")
+			case gosql.SelectKind:
+				results, err := mb.Select(stmt.SelectStatement)
+				if err != nil {
+					panic(err)
+				}
+
+				for _, col := range results.Columns {
+					fmt.Printf("| %s ", col.Name)
+				}
+				fmt.Println("|")
+
+				for i := 0; i < 20; i++ {
+					fmt.Printf("=")
+				}
+				fmt.Println()
+
+				for _, result := range results.Rows {
+					fmt.Printf("|")
+
+					for i, cell := range result {
+						typ := results.Columns[i].Type
+						s := ""
+						switch typ {
+						case gosql.IntType:
+							s = fmt.Sprintf("%d", cell.AsInt())
+						case gosql.TextType:
+							s = cell.AsText()
+						}
+
+						fmt.Printf(" %s | ", s)
+					}
+
+					fmt.Println()
+				}
+
+				fmt.Println("ok")
+			}
+		}
+	}
+}
+```
+
+Putting it all together:
+
+```bash
+$ go run *.go
+Welcome to gosql.
+# CREATE TABLE users (id INT, name TEXT);
+ok
+# INSERT INTO users VALUES (1, 'Phil');
+ok
+# SELECT id, name FROM users;
+| id | name |
+====================
+| 1 |  Phil |
+ok
+# INSERT INTO users VALUES (2, 'Kate');
+ok
+# SELECT name, id FROM users;
+| name | id |
+====================
+| Phil |  1 |
+| Kate |  2 |
+ok
+```
+
+And we've got a very simple SQL database!
+
+Next up we'll get into filtering, sorting, and indexing.
+
+#### Comments
+
+With comments, please reply on Twitter.
