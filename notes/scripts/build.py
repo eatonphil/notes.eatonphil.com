@@ -77,6 +77,10 @@ HOME_PAGE = """
     <div>x86e</div>
     <p>An x86 emulator and graphical debugger in JavaScript.</p>
   </a>
+  <a href="https://github.com/eatonphil/gosql" class="fp-project">
+    <div>gosql</div>
+    <p>An PostgreSQL implementation in Go.</p>
+  </a>
 </div>
 <div class="fp-section fp-section--talks">
   <h2 class="fp-h2">Talks</h2>
