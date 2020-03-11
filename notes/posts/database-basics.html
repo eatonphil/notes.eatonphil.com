@@ -47,6 +47,16 @@ Then, we'll write an in-memory backend to do operations based on an
 AST. Finally, we'll write a REPL to accept SQL from a CLI and pass it
 to the in-memory backend.
 
+<p class="note">
+  This post assumes a basic understanding of parsing concepts. We
+  won't skip any code, but also won't go into great detail on why we
+  structure the way we do.
+  <br />
+  For a simpler introduction to parsing and parsing concepts,
+  see <a href="/writing-a-simple-json-parser.html">this post on
+  parsing JSON</a>.
+</p>
+
 ### Lexing
 
 The lexer is responsible for finding every distinct group of
@@ -1345,6 +1355,6 @@ Next up we'll get into filtering, sorting, and indexing.
 
 #### Comments
 
-With comments, please reply on Twitter.
+Please reply on Twitter with questions or comments.
 
 <blockquote class="twitter-tweet" data-conversation="none"><p lang="en" dir="ltr">Latest blog post: writing a simple SQL database from scratch in Go <a href="https://t.co/csQmNhWIEf">https://t.co/csQmNhWIEf</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1237522975143776256?ref_src=twsrc%5Etfw">March 10, 2020</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
