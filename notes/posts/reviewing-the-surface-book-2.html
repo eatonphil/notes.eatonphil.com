@@ -1,0 +1,179 @@
+# Reviewing the Surface Book 2
+## March 18, 2020
+###### windows,review,hardware
+
+The first few paragraphs cover what I was looking for and what I
+considered. Then the review.
+
+### Why the Surface Book 2
+
+I used a Macbook throughout my professional career until I had the
+choice a few years ago when I started my current job. Here, I ran
+Gentoo, then FreeBSD, then Arch, and now Windows 10 on the Dell XPS
+15.
+
+I enjoy Windows and I think Microsoft is doing a better job on
+hardware and software these days. At least, compared to Apple, they
+appear to be trying. So when my personal 2015 Macbook Pro died this
+year I decided to buy and run Windows at home.
+
+On my Mac, I dealt with bad battery life for a while: running VMs,
+running Docker, compiling Go, running Node.js kills any battery. So I
+moved my development into the cloud and gained on battery life and
+network speeds at the cost of memory (I am paying for 4GB of RAM).
+
+My ideal replacement was a cheaper machine that felt as good as a 2015
+Macbook Pro. (The build quality has not been good since.) I was
+hoping not to pay more than $1000. My shortlist included the Surface
+Book 2, the Surface Pro X, the Surface Laptop 3, the Lenovo Yoga 14,
+and the LG Gram. So I went to Best Buy to try them out.
+
+I was impressed by every Surface device. At first sight, I mistook the
+Surface Book and Surface Laptop for an old Macbook Pro. They both have
+a brushed aluminum body with a large trackpad and great
+keyboards. Even the Surface Pro X, which is a tablet, has an addon
+keyboard that is easy to type (that is, program) on.
+
+I tried out the Lenovo Yoga 14 and it was solid, but I preferred the
+brushed aluminum body of the Surface devices. I did not get a chance
+to feel out the LG Gram.
+
+I eliminated the Surface Laptop 3 because I like tablet mode. While
+the Surface Laptop 3 is a touchscreen, it is not a 2-in-1 device and
+does not have tablet mode.
+
+And I eliminated the Surface Pro X because it is one of the first
+mainstream Windows ARM devices. While Windows on ARM is now the same
+operating system as Windows on a desktop, most consumer software ships
+x86_64 (not ARM) binaries. Windows on ARM can emulate x86 but not yet
+x86_64. I didn't feel like working around this on my primary personal
+device.
+
+I bought the 13.5", 7th generation i5 Surface Book 2 for $999. It
+comes with 8GB DDR4 RAM and a 128GB SSD. I have had the device for two
+weeks now and I use it at least 10 hours a day.
+
+### Keyboard
+
+The keyboard layout is standard, easy to use. The control, shift,
+caps, function, and alt keys are big enough that it is easy to program
+without staring at the keyboard. The up and down arrow keys are
+smaller than would be nice. But they are easier for me to find than on
+a 2019 Macbook Pro.
+
+The function key is modal by default (like a Caps key) and indicates
+if function is enabled with a small LED. I have never seen a function
+key like this. I find it annoying when I turn it on.
+
+And while there is builtin volume controls and a play/pause button,
+there is no media forward/back button. I assigned
+Ctrl+Windows+Alt+Left/Right to be media forward/back.
+
+There is also no right Ctrl key. Instead there is a "media key" which is
+the equivalent of right-clicking... I guess. This is useless so I
+mapped it back to another Ctrl key.
+
+Unlike macOS, which needs an app like Spectacle, Windows default
+window control shortcuts are great. Windows+Left to send to the left
+half, Windows+Right to send to the right half, Windows+Up to make full
+screen.
+
+But macOS default swipe gestures are more intuitive: swipe left to go
+backwards, swipe right to go forwards. So I mapped this back myself.
+
+[Here is my autohotkey
+script.](https://gist.github.com/eatonphil/0a684561d599fcd94128ff462a5253b7)
+
+### Screen
+
+The 13.5" screen feels top-heavy but may not actually weigh more than
+the keyboard/body. The bevel is larger than it feels like it should
+be. But the camera is in the right location: top and center.
+
+Additionally, the default behavior when attaching/detaching the screen
+is to prompt you to enter/exit tablet mode rather than doing it for
+you. This prompt is easy to click out of and after doing so the option
+to switch between disappears until you reattach and detach again.
+
+The screen isn't flush with the body when you close it. Few marketing
+pictures show you this, but here's
+[one](https://assets.pcmag.com/media/images/563021-microsoft-surface-book-2-15-inch.jpg?thumb=y). This
+makes me worry something may snap if the laptop is ever slammed
+against a wall for some reason.
+
+And fully open, it only goes back 120 degrees. This makes it hard to
+look at if it is on your legs and your legs are up higher than 90
+degrees.
+
+Finally, the headphone jack is not on the body but on the screen. This
+makes sense since the screen is detachable. But the jack is on the
+top-right corner, further away than usual. This requires me to be
+closer to the screen to feel like I am not pulling the screen when I
+am wearing headphones.
+
+#### Pen
+
+The Surface Pen is awesome and the screen's palm detection is too. I
+have had a lot of fun drawing on it in Paint 3. And it has been useful
+in annotating mockups for work too.
+
+It costs $100 and comes with a AAAA battery. It is magnetized and
+sticks to the left side of the screen.
+
+### Body
+
+As mentioned, the body is a brushed aluminum. It feels great. The
+power input is magnetic, which is helpful. But it uses a novel
+Surface-specific input rather than USB-C, so that sucks. A new charger
+from Microsoft costs $100.
+
+The speakers are as good as Macbook speakers were 5 years ago.
+They don't have much bass. Additionally, these speakers get a little
+distorted at top volume.
+
+The battery lasts 7-8 hours without charging. While this is as
+advertised, it is still disappointing of a new laptop in 2020 that is
+only running Chrome, Spotify, and Windows Terminal.
+
+#### Tablet
+
+To release the screen from the body, there is a key on the function
+row. However, it is not a hardware release. So when I accidentally
+killed the battery while the screen was flipped, I couldn't detach the
+screen after booting (to turn it back into a laptop) until after 10-20
+minutes of charging.
+
+The screen isn't easy to detach. It requires both hands lifting up
+from the base of the screen to get enough leverage. You cannot pull up
+from the top of the screen.
+
+Aside from drawing apps, tablet mode apps on Windows aren't
+great. Kindle for Windows on tablet is terrible. I got stuck in
+Kindle's full screen mode and couldn't adjust the page size or exit
+full screen mode without reverting back to laptop mode first.
+
+Tablet mode also throws away the standard Windows menu and shortcuts
+to give you a desktop of application cards. However, these cards don't
+adapt to recent or frequent applications. After I deleted Candy Crush
+and other built in apps I will never use, this desktop is blank except
+for Edge and Groove Music. It is incredible how bad the tablet desktop
+is. You have to use the full application list view every time you want
+to open a new program.
+
+### In summary
+
+It's not a bad Windows machine for $1000. The body is great quality
+and the pen/screen interaction is solid. But I'd like to see Windows
+invest more in a useful tablet experience. And the detachable screen
+comes at the cost of being a awkward. So I'd go with the Surface Pro X
+or Surface Laptop 3 next time.
+
+But above all I can't shake the expectation that a laptop built in
+2020 running GMail and Slack in Chrome, Spotify, and a terminal
+application should last at least 10 hours.
+
+#### Comments
+
+Please reply on Twitter with questions or comments.
+
+<blockquote class="twitter-tweet"><p lang="en" dir="ltr">Wrote a short post reviewing Microsoft&#39;s Surface Book 2<a href="https://t.co/0n6K3y6FBC">https://t.co/0n6K3y6FBC</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1241503107806384133?ref_src=twsrc%5Etfw">March 21, 2020</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
