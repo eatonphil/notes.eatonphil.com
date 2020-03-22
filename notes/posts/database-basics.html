@@ -64,22 +64,30 @@ The lexer is responsible for finding every distinct group of
 characters in source code: tokens. This will consist primarily of
 identifiers, numbers, strings, and symbols.
 
-The gist of the logic will be to iterate over the source string and
-collect characters until we find a delimiting character such as a
-space or comma. In this first pass, we'll pretend users don't insert
-delimiting characters into strings. Once we've reached a delimiting
-character, we'll "finalize" the token and decide whether it is valid
-or not.
+<p class="note">
+  What follows is a second, more orthodox pass at lexing. The first
+  pass took a number of shortcuts and couldn't handle spaces in
+  strings, for example.
+  <br />
+  <br />
+  <a href="https://github.com/eatonphil/gosql/pull/2">Here is the
+  relevant pull request in gosql if you are curious.</a>
+</p>
+
+The gist of the logic will be to pass control to a helper function for
+each kind of token. If the helper function succeeds in finding a
+token, it will return true and the location for the lexer to start at
+next. It will continue doing this until it reaches the end of the
+source.
 
 First off, we'll define a few types and constants for use
 in <code>lexer.go</code>:
 
 ```go
-package main
+package gosql
 
 import (
 	"fmt"
-	"io"
 	"strings"
 )
 
@@ -129,89 +137,55 @@ type token struct {
 	loc   location
 }
 
+type cursor struct {
+	pointer uint
+	loc     location
+}
+
 func (t *token) equals(other *token) bool {
 	return t.value == other.value && t.kind == other.kind
 }
 
-func (t *token) finalize() bool {
-	return true
-}
+type lexer func(string, cursor) (*token, cursor, bool)
 ```
 
 Next we'll write out the main loop:
 
 ```go
-func lex(source io.Reader) ([]*token, error) {
-	buf := make([]byte, 1)
+func lex(source string) ([]*token, error) {
 	tokens := []*token{}
-	current := token{}
-	var line uint = 0
-	var col uint = 0
+	cur := cursor{}
 
-	for {
-		_, err := source.Read(buf)
-		if err != nil && err != io.EOF {
-			return nil, err
-		}
+lex:
+	for cur.pointer < uint(len(source)) {
+		lexers := []lexer{lexKeyword, lexSymbol, lexString, lexNumeric, lexIdentifier}
+		for _, l := range lexers {
+			if token, newCursor, ok := l(source, cur); ok {
+				cur = newCursor
 
-		// Add semi-colon for EOF
-		var c byte = ';'
-		if err == nil {
-			c = buf[0]
-		}
+				// Omit nil tokens for valid, but empty syntax like newlines
+				if token != nil {
+					tokens = append(tokens, token)
+				}
 
-		switch c {
-		case '\n':
-			line++
-			col = 0
-			continue
-		case ' ':
-			fallthrough
-		case ',':
-			fallthrough
-		case '(':
-			fallthrough
-		case ')':
-			fallthrough
-		case ';':
-			if !current.finalize() {
-				return nil, fmt.Errorf("Unexpected token '%s' at %d:%d", current.value, current.loc.line, current.loc.col)
+				continue lex
 			}
-
-			if current.value != "" {
-				copy := current
-				tokens = append(tokens, &copy)
-			}
-
-			if c == ';' || c == ',' || c == '(' || c == ')' {
-				tokens = append(tokens, &token{
-					loc:   location{col: col, line: line},
-					value: string(c),
-					kind:  symbolKind,
-				})
-			}
-
-			current = token{}
-			current.loc.col = col
-			current.loc.line = line
-		default:
-			current.value += string(c)
 		}
 
-		if err == io.EOF {
-			break
+		hint := ""
+		if len(tokens) > 0 {
+			hint = " after " + tokens[len(tokens)-1].value
 		}
-		col++
+		return nil, fmt.Errorf("Unable to lex token%s, at %d:%d", hint, cur.loc.line, cur.loc.col)
 	}
 
 	return tokens, nil
 }
 ```
 
-Last, we'll write a finalizer helper for each kind of fundemental
-token and check on each in a reasonable order.
+Then we'll write a helper for each kind of fundemental token.
 
-#### Validating numbers
+#### Analyzing numbers
 
 Numbers are the most complex. So we'll refer to the [PostgreSQL
 documentation (section
@@ -219,46 +193,42 @@ documentation (section
 for what constitutes a valid number.
 
 ```go
-func (t *token) finalizeNumeric() bool {
-	if len(t.value) == 0 {
-		return false
-	}
+func lexNumeric(source string, ic cursor) (*token, cursor, bool) {
+	cur := ic
 
 	periodFound := false
 	expMarkerFound := false
 
-	i := 0
-	for i < len(t.value) {
-		c := t.value[i]
+	for ; cur.pointer < uint(len(source)); cur.pointer++ {
+		c := source[cur.pointer]
+		cur.loc.col++
 
 		isDigit := c >= '0' && c <= '9'
 		isPeriod := c == '.'
 		isExpMarker := c == 'e'
 
 		// Must start with a digit or period
-		if i == 0 {
+		if cur.pointer == ic.pointer {
 			if !isDigit && !isPeriod {
-				return false
+				return nil, ic, false
 			}
 
 			periodFound = isPeriod
-			i++
 			continue
 		}
 
 		if isPeriod {
 			if periodFound {
-				return false
+				return nil, ic, false
 			}
 
 			periodFound = true
-			i++
 			continue
 		}
 
 		if isExpMarker {
 			if expMarkerFound {
-				return false
+				return nil, ic, false
 			}
 
 			// No periods allowed after expMarker
@@ -266,142 +236,189 @@ func (t *token) finalizeNumeric() bool {
 			expMarkerFound = true
 
 			// expMarker must be followed by digits
-			if i == len(t.value)-1 {
-				return false
+			if cur.pointer == uint(len(source)-1) {
+				return nil, ic, false
 			}
 
-			cNext := t.value[i+1]
+			cNext := source[cur.pointer+1]
 			if cNext == '-' || cNext == '+' {
-				i++
+				cur.pointer++
+				cur.loc.col++
 			}
 
-			i++
 			continue
 		}
 
 		if !isDigit {
-			return false
+			break
+		}
+	}
+
+	// No characters accumulated
+	if cur.pointer == ic.pointer {
+		return nil, ic, false
+	}
+
+	return &token{
+		value: source[ic.pointer:cur.pointer],
+		loc:   ic.loc,
+		kind:  numericKind,
+	}, cur, true
+}
+```
+
+#### Analyzing strings
+
+Strings must start and end with a single apostrophe. They can contain
+a single apostophe if it is followed by another single
+apostrophe. We'll put this kind of character delimited lexing logic
+into a helper function so we can use it again when analyzing
+identifiers.
+
+```go
+func lexCharacterDelimited(source string, ic cursor, delimiter byte) (*token, cursor, bool) {
+	cur := ic
+
+	if len(source[cur.pointer:]) == 0 {
+		return nil, ic, false
+	}
+
+	if source[cur.pointer] != delimiter {
+		return nil, ic, false
+	}
+
+	cur.loc.col++
+	cur.pointer++
+
+	var value []byte
+	for ; cur.pointer < uint(len(source)); cur.pointer++ {
+		c := source[cur.pointer]
+
+		if c == delimiter {
+			// SQL escapes are via double characters, not backslash.
+			if cur.pointer+1 >= uint(len(source)) || source[cur.pointer+1] != delimiter {
+				return &token{
+					value: string(value),
+					loc:   ic.loc,
+					kind:  stringKind,
+				}, cur, true
+			} else {
+				value = append(value, delimiter)
+				cur.pointer++
+				cur.loc.col++
+			}
 		}
 
-		i++
+		value = append(value, c)
+		cur.loc.col++
 	}
 
-	t.kind = numericKind
-	return true
+	return nil, ic, false
+}
+
+func lexString(source string, ic cursor) (*token, cursor, bool) {
+	return lexCharacterDelimited(source, ic, '\'')
 }
 ```
 
-#### Validating strings
-					    
-Strings must start and end with a single apostrophe. But once we
-identify this is a string, we'll rewrite the value dropping these for
-easier use by the rest of the project.
-
-```go
-func (t *token) finalizeString() bool {
-	if len(t.value) == 0 {
-		return false
-	}
-
-	if t.value[0] == '\'' && t.value[len(t.value)-1] == '\'' {
-		t.kind = stringKind
-		t.value = t.value[1 : len(t.value)-1]
-		return true
-	}
-
-	return false
-}
-```
-
-#### Validating symbols and keywords
+#### Analyzing symbols and keywords
 
 Symbols and keywords come from a fixed set of strings, so they're easy
-to compare against.
+to compare against. Whitespace should be thrown away.
 
 ```go
-func (t *token) finalizeSymbol() bool {
-	switch t.value {
-	case "*":
+func lexSymbol(source string, ic cursor) (*token, cursor, bool) {
+	c := source[ic.pointer]
+	cur := ic
+	cur.loc.col++
+	cur.pointer++
+
+	switch c {
+	// Syntax that should be thrown away
+	case '\n':
+		cur.loc.line++
+		cur.loc.col = 0
+		fallthrough
+	case '\t':
+		fallthrough
+	case ' ':
+		return nil, cur, true
+
+	// Syntax that should be kept
+	case ',':
+		fallthrough
+	case '(':
+		fallthrough
+	case ')':
+		fallthrough
+	case ';':
+		fallthrough
+	case '*':
 		break
-	case ";":
-		break
-	case "(":
-		break
-	case ")":
-		break
+
+	// Unknown character
 	default:
-		return false
+		return nil, ic, false
 	}
 
-	t.kind = symbolKind
-	return true
-}
-
-func (t *token) finalizeKeyword() bool {
-	switch strings.ToLower(t.value) {
-	case "select":
-		break
-	case "from":
-		break
-	case "as":
-		break
-	case "table":
-		break
-	case "create":
-		break
-	case "insert":
-		break
-	case "into":
-		break
-	case "values":
-		break
-	case "int":
-		break
-	case "text":
-		break
-	default:
-		return false
-	}
-
-	t.value = strings.ToLower(t.value)
-	t.kind = keywordKind
-	return true
+	return &token{
+		value: string(c),
+		loc:   ic.loc,
+		kind:  symbolKind,
+	}, cur, true
 }
 ```
 
-#### Validating identifiers
+#### Analyzing identifiers
 
-Now we can finish up the original <code>finalize</code> function and
-assume any token not matching one of these is a valid identifier.
+An identifier is either a double-quoted string or a group of
+characters starting with an alphabetical character and possibly
+containing numbers and underscores.
 
 ```go
-func (t *token) finalizeIdentifier() bool {
-	t.kind = identifierKind
-	return true
-}
-
-func (t *token) finalize() bool {
-	if t.finalizeSymbol() {
-		return true
+func lexIdentifier(source string, ic cursor) (*token, cursor, bool) {
+	// Handle separately if is a double-quoted identifier
+	if token, newCursor, ok := lexCharacterDelimited(source, ic, '"'); ok {
+		return token, newCursor, true
 	}
 
-	if t.finalizeKeyword() {
-		return true
+	cur := ic
+
+	c := source[cur.pointer]
+	// Other characters count too, big ignoring non-ascii for now
+	isAlphabetical := (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+	if !isAlphabetical {
+		return nil, ic, false
+	}
+	cur.pointer++
+	cur.loc.col++
+
+	value := []byte{c}
+	for ; cur.pointer < uint(len(source)); cur.pointer++ {
+		c = source[cur.pointer]
+
+		// Other characters count too, big ignoring non-ascii for now
+		isAlphabetical := (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+		isNumeric := c >= '0' && c <= '9'
+		if isAlphabetical || isNumeric || c == '$' || c == '_' {
+			value = append(value, c)
+			cur.loc.col++
+			continue
+		}
+
+		break
 	}
 
-	if t.finalizeNumeric() {
-		return true
+	if len(value) == 0 {
+		return nil, ic, false
 	}
 
-	if t.finalizeString() {
-		return true
-	}
-
-	if t.finalizeIdentifier() {
-		return true
-	}
-
-	return false
+	return &token{
+		// Unquoted dentifiers are case-insensitive
+		value: strings.ToLower(string(value)),
+		loc:   ic.loc,
+		kind:  identifierKind,
+	}, cur, true
 }
 ```
 
@@ -516,7 +533,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io"
 )
 
 func tokenFromKeyword(k keyword) token {
@@ -552,7 +568,7 @@ func helpMessage(tokens []*token, cursor uint, msg string) {
 	fmt.Printf("[%d,%d]: %s, got: %s\n", c.loc.line, c.loc.col, msg, c.value)
 }
 
-func Parse(source io.Reader) (*Ast, error) {
+func Parse(source string) (*Ast, error) {
 	tokens, err := lex(source)
 	if err != nil {
 		return nil, err
@@ -1244,7 +1260,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"os"
 	"strings"
@@ -1262,9 +1277,7 @@ func main() {
 		text, err := reader.ReadString('\n')
 		text = strings.Replace(text, "\n", "", -1)
 
-		source := bytes.NewBufferString(text)
-
-		ast, err := gosql.Parse(source)
+		ast, err := gosql.Parse(text)
 		if err != nil {
 			panic(err)
 		}
