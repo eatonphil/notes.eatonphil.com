@@ -64,6 +64,16 @@ The lexer is responsible for finding every distinct group of
 characters in source code: tokens. This will consist primarily of
 identifiers, numbers, strings, and symbols.
 
+<p class="note">
+  What follows is a second, more orthodox pass at lexing. The first
+  pass took a number of shortcuts and couldn't handle spaces in
+  strings, for example.
+  <br />
+  <br />
+  <a href="https://github.com/eatonphil/gosql/pull/2">Here is the
+  relevant pull request in gosql if you are curious.</a>
+</p>
+
 The gist of the logic will be to pass control to a helper function for
 each kind of token. If the helper function succeeds in finding a
 token, it will return true and the location for the lexer to start at
