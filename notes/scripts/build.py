@@ -8,6 +8,13 @@ from feedgen.feed import FeedGenerator
 POST_SUMMARY = """
 <div class="summary">
   <a href="/{}">{}</a>
+  {}
+  <div class="summary-subtitle">{}</div>
+</div>
+"""
+TAG_SUMMARY = """
+<div class="summary">
+  <a href="/{}">{}</a>
   <div class="summary-subtitle">{}</div>
 </div>
 """
@@ -84,27 +91,27 @@ HOME_PAGE = """
 </div>
 <div class="fp-section fp-section--talks">
   <h2 class="fp-h2">Talks</h2>
-  <a href="https://www.meetup.com/TypeScriptNYC/events/260291994/" class="fp-project">
+  <div class="fp-project">
+    <a href="https://www.meetup.com/TypeScriptNYC/events/260291994/">Interpreting TypeScript</a>
     <div>
-      Interpreting TypeScript
       <a href="https://docs.google.com/presentation/d/e/2PACX-1vQOSorW7HGPvt1qURVK4d82bTxUVzlDUyCtFtbSgvA8CXhg2yw2FLpBD9cCBNvplSUmj-KezR1X1DBt/pub">Slides</a>
     </div>
     <p>April 17, 2019</p>
-  </a>
-  <a href="https://www.meetup.com/nodejs/events/258732362/" class="fp-project">
+  </div>
+  <div class="fp-project">
+    <a href="https://www.meetup.com/nodejs/events/258732362/">AOT-compilation of Javascript with V8</a>
     <div>
-      AOT-compilation of Javascript with V8
       <a href="https://docs.google.com/presentation/d/e/2PACX-1vQRIjLOcxdbZEDWI8LH2iPtzo4YVTueg1JTlFgJRRjcRDKMOYZ_XS1C-Q9DLpER3AoivyHFzzWT8HQK/pub">Slides</a>
     </div>
     <p>February 20, 2019</p>
-  </a>
-  <a href="https://www.meetup.com/JS-NYC/events/mwwrjqyxqbqb/" class="fp-project">
+  </div>
+  <div class="fp-project">
+    <a href="https://www.meetup.com/JS-NYC/events/mwwrjqyxqbqb/">Compiler basics: Lisp to Assembly</a>
     <div>
-      Compiler basics: Lisp to Assembly
       <a href="https://docs.google.com/presentation/d/e/2PACX-1vQE2HWfQwFzmFkvfGssqp-93dN5no0ozzNwqO6nNF7-yUm_Kv_TOhbBqoIhy1y8imUj6AwPmF1UZaqG/pub">Slides</a>
     </div>
     <p>December 20, 2018</p>
-  </a>
+  </div>
 </div>
 <div class="fp-section fp-section--notes">
   <h2 class="fp-h2">Notes</h2>
@@ -178,7 +185,7 @@ def main():
         tags = tags_raw.split(",")
         tags_html = get_html_tags(tags)
 
-        post_data.append((out_file, title[1], title[2], post, output))
+        post_data.append((out_file, title[1], title[2], post, output, tags_html))
         for tag in tags:
             if tag not in all_tags:
                 all_tags[tag] = []
@@ -192,7 +199,7 @@ def main():
     post_data.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
     post_data.reverse()
     home_page = HOME_PAGE
-    home_page += "\n".join([POST_SUMMARY.format(*args) for args in post_data])
+    home_page += "\n".join([POST_SUMMARY.format(*args[:2], args[5], *args[2:3]) for args in post_data])
     with open('dist/index.html', 'w') as f:
         f.write(TEMPLATE.format(post=home_page, title="", tag=TAG, subtitle="", tags=""))
 
@@ -201,7 +208,7 @@ def main():
             fw.write(fr.read())
 
     fg = FeedGenerator()
-    for url, title, date, post, content in reversed(post_data):
+    for url, title, date, post, content, _ in reversed(post_data):
         fe = fg.add_entry()
         fe.id('http://notes.eatonphil.com/' + url)
         fe.title(title)
@@ -225,7 +232,7 @@ def main():
             posts.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
             posts.reverse()
             tag_page = TAG_PAGE.format(tag)
-            tag_page += "\n".join([POST_SUMMARY.format(*args) for args in posts])
+            tag_page += "\n".join([TAG_SUMMARY.format(*args) for args in posts])
             f.write(TEMPLATE.format(post=tag_page, title="", tag=TAG, subtitle="", tags=""))
 
 

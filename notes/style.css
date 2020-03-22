@@ -35,7 +35,7 @@ h2 {
 h2.fp-h2 {
     color: #333;
     font-size: 1.5rem;
-    margin: 1rem 0;
+    margin-bottom: 2.5rem;
 }
 
 h3 {
@@ -60,7 +60,7 @@ p:last-child, li:last-child {
 }
 
 a {
-    color: rgb(34, 102, 216);
+    color: rgb(0, 95, 255);
     text-decoration: none;
 }
 
@@ -161,12 +161,24 @@ footer p {
     font-size: .9rem;
 }
 
-.summary {
-    margin-top: 15px;
+.summary .tags {
+    padding: 5px 0;
+}
+
+.summary .tag {
+    background: #ffd4d4;
+    font-size: .9rem;
+}
+
+.fp-project, .summary {
+    margin: 0 -32px 0 -32px;
+    padding: 15px 32px;
+    border-top: 2px solid white;
 }
 
 .summary-subtitle {
     color: #333;
+    font-size: .9rem;
 }
 
 .sm-link:not(:last-of-type) {
@@ -229,14 +241,22 @@ footer p {
     background: #ffe8e8;
 }
 
-.fp-project:not(:last-of-type) {
+.fp-project {
     display: block;
-    margin-bottom: 1rem;
+}
+
+.fp-project div {
+    padding: 5px 0;
+}
+
+.fp-project div a {
+    font-size: .9rem;
 }
 
 .fp-project p {
     color: #333;
     margin: 0;
+    font-size: .9rem;
 }
 
 @media (max-width: 800px) {
@@ -252,6 +272,10 @@ footer p {
         padding: 1rem;
     }
 
+    .fp-h2 {
+	margin-bottom: 1rem;
+    }
+
     .fp-section:last-of-type {
         margin-bottom: 0;
     }
@@ -261,7 +285,7 @@ footer p {
     }
 
     .fp-section:not(:last-of-type) {
-        border-bottom: 1px solid white;
+        border-bottom: 2px solid white;
     }
 
     .col-6 {
