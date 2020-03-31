@@ -78,6 +78,8 @@ img {
     max-width: 100%;
     margin: 0 auto;
     padding: 0 15px;
+    display: flex;
+    justify-content: space-between;
 }
 
 header .notes {
@@ -125,6 +127,17 @@ footer p {
 .col-6 {
     width: 70%;
     max-width: 100%;
+}
+
+.col-3 {
+    position: relative;
+    width: 20%;
+}
+
+aside {
+    position: fixed;
+    margin-left: 0;
+    margin: 15px;
 }
 
 .hljs {
@@ -264,6 +277,10 @@ footer p {
         width: 100%;
         margin-left: 0;
     }
+
+    .col-3 {
+	width: 30%;
+    }
 }
 
 @media only screen and (min-device-width : 320px) and (max-device-width : 480px) {
@@ -288,7 +305,15 @@ footer p {
         border-bottom: 2px solid white;
     }
 
+    .container {
+	display: block;
+    }
+
     .col-6 {
+	width: 100%;
+    }
+
+    .col-3 {
 	width: 100%;
     }
 }

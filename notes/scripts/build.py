@@ -29,22 +29,26 @@ HOME_PAGE = """
 <div class="fp-section fp-section--about">
 <h2 class="fp-h2">Bio</h2>
   <p>
-    Hello! I'm Phil, an engineering manager in New York City. I lead a
-    fantastic group building web tooling at a <a
-    href="https://capsule8.com">kick-ass Linux security
-    startup</a>. Come <a href="https://capsule8.com/careers">work with
-    me!</a>
+    Hello! I'm Phil, an engineer and manager in New York City.
   </p>
   <p>
-    Before this, I led the frontend group at a <a
+    <a href="mailto:phil@eatonphil.com">Contact me about Go, Python,
+    or JavaScript contract software development.</a>
+  </p>
+  <p>
+    Before this, I led the web group at a <a
+    href="https://capsule8.com">Linux security startup</a>. Before
+    that, I led the frontend group at a <a
     href="https://linode.com">Linux hosting company in Philly</a>.
+    And before that, I contracted as a software developer and system
+    administrator for a few years.
   </p>
   <p>
-    I'm interested in compilers, networks, and operating systems. At
-    some point I'd like to work in banking, shipping, Internet
-    services, manufacturing, hardware, and graphics. Having studied
-    Chinese and Japanese in school, and with family in Korea, I'd also
-    like to spend some years working in East Asia.
+    I'm interested in compilers, databases networks, and operating
+    systems. At some point I'd like to work in banking, shipping,
+    Internet services, manufacturing, hardware, and graphics. Having
+    studied Chinese and Japanese in school, and with family in Korea,
+    I'd also like to spend some years working in East Asia.
   </p>
   <p>
     You can find me elsewhere on <a
