@@ -1,0 +1,52 @@
+# Database basics: expressions and WHERE filters
+## April 5, 2020
+###### database,golang,parsing
+
+<p class="note">
+  Previously in database basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/database-basics.html">Database basics (1): writing a SQL database from scratch in Go</a>
+</p>
+
+In this post, we'll extend [gosql](https://github.com/eatonphil/gosql)
+to support binary expressions and very simple filtering on SELECT
+results via WHERE. We'll introduce a general mechanism for
+interpreting an expression on a row in a table. The expression may be
+an identifier (where the result is the value of the cell corresponding
+to that column in the row), a numeric literal, a combination via a
+binary expression, etc.
+
+The following interactions will be possible:
+
+```sql
+# CREATE TABLE users (name TEXT, age INT);
+ok
+#  INSERT INTO users VALUES ('Stephen', 16);
+ok
+# SELECT name, age FROM users;
+name   | age
+----------+------
+Stephen |  16
+(1 result)
+ok
+# INSERT INTO users VALUES ('Adrienne', 23);
+ok
+# SELECT age + 2, name FROM users WHERE age = 23;
+age |   name
+------+-----------
+25 | Adrienne
+(1 result)
+ok
+# SELECT name FROM users;
+name
+------------
+Stephen
+Adrienne
+(2 results)
+ok
+```
+
+The changes we'll make in this post are roughly a walk through of
+[this
+commit](https://github.com/eatonphil/gosql/commit/bd6a5d0d4a7410699b0d01beaabf91923df34b28).
