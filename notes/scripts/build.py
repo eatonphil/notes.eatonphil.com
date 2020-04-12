@@ -29,11 +29,8 @@ HOME_PAGE = """
 <div class="fp-section fp-section--about">
 <h2 class="fp-h2">Bio</h2>
   <p>
-    Hello! I'm Phil, an engineer and manager in New York City.
-  </p>
-  <p>
-    <a href="mailto:phil@eatonphil.com">Contact me about Go, Python,
-    or JavaScript contract software development.</a>
+    Hello! I'm Phil, an Engineering Manager at a <a
+    href="https://oracle.com">software company</a> in New York City.
   </p>
   <p>
     Before this, I led the web group at a <a
