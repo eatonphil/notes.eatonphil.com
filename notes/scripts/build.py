@@ -41,11 +41,13 @@ HOME_PAGE = """
     administrator for a few years.
   </p>
   <p>
-    I'm interested in compilers, databases networks, and operating
+    I'm interested in compilers, databases, networks, and operating
     systems. At some point I'd like to work in banking, shipping,
-    Internet services, manufacturing, hardware, and graphics. Having
-    studied Chinese and Japanese in school, and with family in Korea,
-    I'd also like to spend some years working in East Asia.
+    Internet services, manufacturing, hardware, and graphics.
+  </p>
+  <p>
+    Having studied Chinese and Japanese in school, and with family in
+    Korea, I'd also like to spend some years working in East Asia.
   </p>
   <p>
     You can find me elsewhere on <a
@@ -56,7 +58,7 @@ HOME_PAGE = """
   <p>
     <a class="subscribe"
     href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">Subscribe
-    to updates</a>
+    to updates.</a>
   </p>
 </div>
 <div class="fp-section fp-section--projects">
