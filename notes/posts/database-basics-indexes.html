@@ -1,0 +1,729 @@
+# Database basics: indexes
+## May 1, 2020
+###### database,golang,parsing
+
+<p class="note">
+  Previously in database basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/database-basics.html">Database basics (1): writing a SQL database from scratch in Go</a>
+  <br />
+  <a href="/database-basics-expressions-and-where.html">Database basics (2): binary expressions and WHERE filters</a>
+</p>
+
+In this post, we'll extend [gosql](https://github.com/eatonphil/gosql)
+to support indexes. We'll focus on the addition of <code>PRIMARY
+KEY</code> constraints on table creation and some easy optimizations
+during <code>SELECT</code> statements.
+
+```sql
+$ go run cmd/main.go
+Welcome to gosql.
+# CREATE TABLE users (id INT PRIMARY KEY, name TEXT, age INT);
+ok
+# \d users
+Table "users"
+Column |  Type   | Nullable
+---------+---------+-----------
+id     | integer | not null
+name   | text    |
+age    | integer |
+Indexes:
+        "users_pkey" PRIMARY KEY, rbtree ("id")
+```
+
+This post will broadly be a discussion of [this
+commit](https://github.com/eatonphil/gosql/commit/9608511d9888ce3842ec7d1bfa8f77499e8123b2).
+To keep this post focused, we'll skip the parts in that commit about
+adding an index to a table after the table has been created. Those
+parts should be easy enough to follow with this post for context.
+
+### What is an index?
+
+An index is a mapping of a value to a row in a table. The value is
+often a column, but it can be many kinds of expressions. Databases
+typically store indexes in tree structures that provide O(log(n))
+access. When SELECT-ing and filtering on a column that is indexed, a
+database can greatly speed access time by filtering first on this
+index. Without an index, a database must do a linear search through
+all rows to prove the condition can not be met.
+
+While it may make initial sense to map a value to a row using a hash
+table to constant access, hash tables don't provide ordering. So this
+would prevent an index from being applicable on anything but equality
+checks (e.g. <code>SELECT x FROM y WHERE x > 2</code>).
+
+To reiterate then, indexes in [many SQL
+databases](https://en.wikipedia.org/wiki/Comparison_of_relational_database_management_systems#Indexes)
+are not constant-time lookups even if filtering on a unique column for
+a single item. Some databases, [like
+PostgreSQL](https://www.postgresql.org/docs/current/indexes-types.html),
+allow you to use a hash-based index instead of a tree. Here the
+previously listed restrictions on applicability apply.
+
+### Upgrading table creation
+
+We will allow the specification of a single column as the primary key
+when creating a table. In this case we'll add a new index to a list of
+indexes on the table.
+
+While most databases use a
+[b-tree](https://www.cs.cornell.edu/courses/cs3110/2012sp/recitations/rec25-B-trees/rec25.html),
+we'll use a red-black tree instead. Like a b-tree it is self-balancing.
+So we don't need to worry about the worst-case behavior of binary
+search trees.
+
+And since there are numerous other books and tutorials out there for
+implementing either algorithm, we're just going to use [an existing
+open-source library](https://github.com/petar/GoLLRB).
+
+#### Lexing/parsing
+
+Since we've covered this process a few times already suffice it so say
+we'll make the following key additions:
+
+* [Add <code>PRIMARY KEY</code> as a new keyword token to the lexer](https://github.com/eatonphil/gosql/blob/9608511d9888ce3842ec7d1bfa8f77499e8123b2/lexer.go#L36)
+* [Add a check for this token to the parsing of column definitions](https://github.com/eatonphil/gosql/blob/9608511d9888ce3842ec7d1bfa8f77499e8123b2/parser.go#L425)
+* [Modify the AST to store boolean value whether a column is a primary key](https://github.com/eatonphil/gosql/blob/9608511d9888ce3842ec7d1bfa8f77499e8123b2/ast.go#L98)
+
+#### In-memory backend
+
+First let's start with the definition of an index. An index has a
+name, an expression (for a primary key it will just be a column name),
+a unique flag, a type name (it will always be `rbtree` for now), a
+primary key flag (so we know to apply null checks among other things),
+and the actual tree itself.
+
+```go
+type index struct {
+	name       string
+	exp        expression
+	unique     bool
+	primaryKey bool
+	tree       *llrb.LLRB
+	typ        string
+}
+```
+
+When we create a table, we'll add an index if one of the columns is a
+primary key. The code will be mostly identical to the last pass. We'll
+call out to a new public method, <code>CreateIndex</code>, that will
+handle actually setting things up.
+
+```go
+func (mb *MemoryBackend) CreateTable(crt *CreateTableStatement) error {
+	if _, ok := mb.tables[crt.name.value]; ok {
+		return ErrTableAlreadyExists
+	}
+
+	t := createTable()
+	t.name = crt.name.value
+	mb.tables[t.name] = t
+	if crt.cols == nil {
+		return nil
+	}
+
+	var primaryKey *expression = nil
+	for _, col := range *crt.cols {
+		t.columns = append(t.columns, col.name.value)
+
+		var dt ColumnType
+		switch col.datatype.value {
+		case "int":
+			dt = IntType
+		case "text":
+			dt = TextType
+		case "boolean":
+			dt = BoolType
+		default:
+			delete(mb.tables, t.name)
+			return ErrInvalidDatatype
+		}
+
+		if col.primaryKey {
+			if primaryKey != nil {
+				delete(mb.tables, t.name)
+				return ErrPrimaryKeyAlreadyExists
+			}
+
+			primaryKey = &expression{
+				literal: &col.name,
+				kind:    literalKind,
+			}
+		}
+
+		t.columnTypes = append(t.columnTypes, dt)
+	}
+
+	if primaryKey != nil {
+		err := mb.CreateIndex(&CreateIndexStatement{
+			table:      crt.name,
+			name:       token{value: t.name + "_pkey"},
+			unique:     true,
+			primaryKey: true,
+			exp:        *primaryKey,
+		})
+		if err != nil {
+			delete(mb.tables, t.name)
+			return err
+		}
+	}
+
+	return nil
+}
+```
+
+Implementing <code>CreateIndex</code> is just a matter of adding a new
+index to the table.
+
+```go
+func (mb *MemoryBackend) CreateIndex(ci *CreateIndexStatement) error {
+	table, ok := mb.tables[ci.table.value]
+	if !ok {
+		return ErrTableDoesNotExist
+	}
+
+	for _, index := range table.indexes {
+		if index.name == ci.name.value {
+			return ErrIndexAlreadyExists
+		}
+	}
+
+	index := &index{
+		exp:        ci.exp,
+		unique:     ci.unique,
+		primaryKey: ci.primaryKey,
+		name:       ci.name.value,
+		tree:       llrb.New(),
+		typ:        "rbtree",
+	}
+	table.indexes = append(table.indexes, index)
+	return nil
+}
+```
+
+And that's it for creation of tables and indexes! Table creation is
+also the last time we'll need to make changes to the gosql
+frontend. The rest of the changes just wrap existing insertion and
+selection.
+
+### Upgrading INSERT
+
+When a row is inserted into a table, each index on that table needs to
+process the row so it can add whatever mappings it needs.
+
+<p class="note">
+  In the project code, you'll notice logic in <code>CreateIndex</code>
+  to go back over all existing rows to add them to the new index.
+</p>
+
+Adding a row to an index is a matter of evaluting the index expression
+against that row and storing the resulting value in the tree, mapped
+to the row's index (in the array of rows on the table).
+
+If the index is required to be unique, we check first that the value
+does not yet exist.
+
+```go
+func (i *index) addRow(t *table, rowIndex uint) error {
+	indexValue, _, _, err := t.evaluateCell(rowIndex, i.exp)
+	if err != nil {
+		return err
+	}
+
+	if indexValue == nil {
+		return ErrViolatesNotNullConstraint
+	}
+
+	if i.unique && i.tree.Has(treeItem{value: indexValue}) {
+		return ErrViolatesUniqueConstraint
+	}
+
+	i.tree.InsertNoReplace(treeItem{
+		value: indexValue,
+		index: rowIndex,
+	})
+	return nil
+}
+```
+
+And that's it for insertion!
+
+### Upgrading SELECT
+
+To date, the logic for selecting rows from a table is to load the
+table and iterate over all rows. If the row does not match
+the <code>WHERE</code> filter, we pass the row.
+
+If the table has an index and we are using the index in a recognized
+pattern in the <code>WHERE</code> filter, we can pre-filter the table
+based on the index before iterating over each row. We can do this for
+each index and for each time a recognized pattern shows up.
+
+```go
+func (mb *MemoryBackend) Select(slct *SelectStatement) (*Results, error) {
+	t := createTable()
+
+	if slct.from != nil {
+		var ok bool
+		t, ok = mb.tables[slct.from.value]
+		if !ok {
+			return nil, ErrTableDoesNotExist
+		}
+	}
+
+	if slct.item == nil || len(*slct.item) == 0 {
+		return &Results{}, nil
+	}
+
+	results := [][]Cell{}
+	columns := []ResultColumn{}
+
+	if slct.from == nil {
+		t = createTable()
+		t.rows = [][]memoryCell{{}}
+	}
+
+	for _, iAndE := range t.getApplicableIndexes(slct.where) {
+		index := iAndE.i
+		exp := iAndE.e
+		t = index.newTableFromSubset(t, exp)
+	}
+	
+	for i := range t.rows {
+		result := []Cell{}
+		isFirstRow := len(results) == 0
+
+		if slct.where != nil {
+			val, _, _, err := t.evaluateCell(uint(i), *slct.where)
+			if err != nil {
+				return nil, err
+			}
+
+			if !*val.AsBool() {
+				continue
+			}
+		}
+
+		for _, col := range finalItems {
+			value, columnName, columnType, err := t.evaluateCell(uint(i), *col.exp)
+			if err != nil {
+				return nil, err
+			}
+
+			if isFirstRow {
+				columns = append(columns, ResultColumn{
+					Type: columnType,
+					Name: columnName,
+				})
+			}
+
+			result = append(result, value)
+		}
+
+		results = append(results, result)
+	}
+
+	return &Results{
+		Columns: columns,
+		Rows:    results,
+	}, nil
+}
+```
+
+It's very simple and easy to miss, here is the change called out:
+
+```go
+	for _, iAndE := range t.getApplicableIndexes(slct.where) {
+		index := iAndE.i
+		exp := iAndE.e
+		t = index.newTableFromSubset(t, exp)
+	}
+```
+
+#### getApplicableIndexes
+
+There are probably a few very simple patterns we could look for, but
+for now we'll look for binary expressions joined by <code>AND</code>
+that contain an index expression.
+
+```go
+func (t *table) getApplicableIndexes(where *expression) []indexAndExpression {
+	var linearizeExpressions func(where *expression, exps []expression) []expression
+	linearizeExpressions = func(where *expression, exps []expression) []expression {
+		if where == nil || where.kind != binaryKind {
+			return exps
+		}
+
+		if where.binary.op.value == string(orKeyword) {
+			return exps
+		}
+
+		if where.binary.op.value == string(andKeyword) {
+			exps := linearizeExpressions(&where.binary.a, exps)
+			return linearizeExpressions(&where.binary.b, exps)
+		}
+
+		return append(exps, *where)
+	}
+
+	exps := linearizeExpressions(where, []expression{})
+
+	iAndE := []indexAndExpression{}
+	for _, exp := range exps {
+		for _, index := range t.indexes {
+			if index.applicableValue(exp) != nil {
+				iAndE = append(iAndE, indexAndExpression{
+					i: index,
+					e: exp,
+				})
+			}
+		}
+	}
+
+	return iAndE
+}
+```
+
+More specifically though, within binary operations we'll only support
+matching on an index if the operator is one of <code>=</code>,
+<code><></code>, <code>></code>, <code><</code>, <code>>=</code>, or
+<code><=</code>; one of the operands is an identifier literal matching
+the index; and the other operand is another literal.
+
+<p class="note">
+	This is a simpler, stricter matching of an index than PostgreSQL
+    where you can index expressions more generally, not just identifer
+    literals.
+</p>
+
+```go
+func (i *index) applicableValue(exp expression) *expression {
+	if exp.kind != binaryKind {
+		return nil
+	}
+
+	be := exp.binary
+	// Find the column and the value in the binary expression
+	columnExp := be.a
+	valueExp := be.b
+	if columnExp.generateCode() != i.exp.generateCode() {
+		columnExp = be.b
+		valueExp = be.a
+	}
+
+	// Neither side is applicable, return nil
+	if columnExp.generateCode() != i.exp.generateCode() {
+		return nil
+	}
+
+	supportedChecks := []symbol{eqSymbol, neqSymbol, gtSymbol, gteSymbol, ltSymbol, lteSymbol}
+	supported := false
+	for _, sym := range supportedChecks {
+		if string(sym) == be.op.value {
+			supported = true
+			break
+		}
+	}
+	if !supported {
+		return nil
+	}
+
+	if valueExp.kind != literalKind {
+		fmt.Println("Only index checks on literals supported")
+		return nil
+	}
+
+	return &valueExp
+}
+```
+
+And that's it for finding applicable indexes.
+
+#### newTableFromSubset
+
+That last remaining piece is to go from a binary expression in a WHERE
+clause (where an index is applicable) to a subset of rows in a table.
+
+Since we are only working with patterns of the type
+<code>indexed-column OP literal</code, we'll grab the literal using
+the previous <code>applicableValue</code> helper. Then we'll look up
+that value in the index and return a new table with ever row in the
+index that meets the condition of the operator for the value.
+
+```go
+func (i *index) newTableFromSubset(t *table, exp expression) *table {
+	valueExp := i.applicableValue(exp)
+	if valueExp == nil {
+		return t
+	}
+
+	value, _, _, err := createTable().evaluateCell(0, *valueExp)
+	if err != nil {
+		fmt.Println(err)
+		return t
+	}
+
+	tiValue := treeItem{value: value}
+
+	indexes := []uint{}
+	switch symbol(exp.binary.op.value) {
+	case eqSymbol:
+		i.tree.AscendGreaterOrEqual(tiValue, func(i llrb.Item) bool {
+			ti := i.(treeItem)
+
+			if !bytes.Equal(ti.value, value) {
+				return false
+			}
+
+			indexes = append(indexes, ti.index)
+			return true
+		})
+	case neqSymbol:
+		i.tree.AscendGreaterOrEqual(llrb.Inf(-1), func(i llrb.Item) bool {
+			ti := i.(treeItem)
+			if bytes.Equal(ti.value, value) {
+				indexes = append(indexes, ti.index)
+			}
+
+			return true
+		})
+	case ltSymbol:
+		i.tree.DescendLessOrEqual(tiValue, func(i llrb.Item) bool {
+			ti := i.(treeItem)
+			if bytes.Compare(ti.value, value) < 0 {
+				indexes = append(indexes, ti.index)
+			}
+
+			return true
+		})
+	case lteSymbol:
+		i.tree.DescendLessOrEqual(tiValue, func(i llrb.Item) bool {
+			ti := i.(treeItem)
+			if bytes.Compare(ti.value, value) <= 0 {
+				indexes = append(indexes, ti.index)
+			}
+
+			return true
+		})
+	case gtSymbol:
+		i.tree.AscendGreaterOrEqual(tiValue, func(i llrb.Item) bool {
+			ti := i.(treeItem)
+			if bytes.Compare(ti.value, value) > 0 {
+				indexes = append(indexes, ti.index)
+			}
+
+			return true
+		})
+	case gteSymbol:
+		i.tree.AscendGreaterOrEqual(tiValue, func(i llrb.Item) bool {
+			ti := i.(treeItem)
+			if bytes.Compare(ti.value, value) >= 0 {
+				indexes = append(indexes, ti.index)
+			}
+
+			return true
+		})
+	}
+
+	newT := createTable()
+	newT.columns = t.columns
+	newT.columnTypes = t.columnTypes
+	newT.indexes = t.indexes
+	newT.rows = [][]memoryCell{}
+
+	for _, index := range indexes {
+		newT.rows = append(newT.rows, t.rows[index])
+	}
+
+	return newT
+}
+```
+
+As you can see, an index may not necessarily improve on a linear
+search in some conditions. Imagine a table of 1 million rows indexed
+on an autoincrementing column. Imagine filtering on <code>col >
+10</code>. The index may be able to eliminate 10 items but still
+return a pre-filtered table of around 1 million rows that still must
+be passed through the <code>WHERE</code> filter.
+
+Additionally since we process each binary expression here one at a
+time, we can't take advantage of knowledge that might seem obvious to
+a human for to binary expressions that together bound a range. For
+example in <code>x > 10 AND x < 20</code> we can see that only
+integers within 10 are applicable. But the current logic would go
+through each expression separately and find all rows that match either
+before the final linear search through all pre-filtered rows would
+eliminate the bulk.
+
+Thankfully real databases have decades of optimizations.
+
+But that's it for changes needed to support basic indexes end-to-end!
+
+### Trialing an index
+
+Since the addition of indexes is so seamless, it is difficult to tell
+without trial that the index is effective. So we'll write a simple
+program that inserts N rows with and without an index. Finally it will
+query for the first and last items inserted. We'll time and show
+memory used during insertion and selection.
+
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+	"runtime"
+	"strconv"
+	"time"
+
+	"github.com/eatonphil/gosql"
+)
+
+var inserts = 0
+var lastId = 0
+var firstId = 0
+
+func doInsert(mb gosql.Backend) {
+	parser := gosql.Parser{}
+	for i := 0; i < inserts; i++ {
+		lastId = i
+		if i == 0 {
+			firstId = lastId
+		}
+		ast, err := parser.Parse(fmt.Sprintf("INSERT INTO users VALUES (%d)", lastId))
+		if err != nil {
+			panic(err)
+		}
+
+		err = mb.Insert(ast.Statements[0].InsertStatement)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+func doSelect(mb gosql.Backend) {
+	parser := gosql.Parser{}
+	ast, err := parser.Parse(fmt.Sprintf("SELECT id FROM users WHERE id = %d", lastId))
+	if err != nil {
+		panic(err)
+	}
+
+	r, err := mb.Select(ast.Statements[0].SelectStatement)
+	if err != nil {
+		panic(err)
+	}
+
+	if len(r.Rows) != 1 {
+		panic("Expected 1 row")
+	}
+
+	if int(*r.Rows[0][1].AsInt()) != inserts-1 {
+		panic(fmt.Sprintf("Bad row, got: %d", r.Rows[0][1].AsInt()))
+	}
+
+	ast, err = parser.Parse(fmt.Sprintf("SELECT id FROM users WHERE id = %d", firstId))
+	if err != nil {
+		panic(err)
+	}
+
+	r, err = mb.Select(ast.Statements[0].SelectStatement)
+	if err != nil {
+		panic(err)
+	}
+
+	if len(r.Rows) != 1 {
+		panic("Expected 1 row")
+	}
+
+	if int(*r.Rows[0][1].AsInt()) != 0 {
+		panic(fmt.Sprintf("Bad row, got: %d", r.Rows[0][1].AsInt()))
+	}
+}
+
+func perf(name string, b gosql.Backend, cb func(b gosql.Backend)) {
+	start := time.Now()
+	fmt.Println("Starting", name)
+	cb(b)
+	fmt.Printf("Finished %s: %f seconds\n", name, time.Since(start).Seconds())
+
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	fmt.Printf("Alloc = %d MiB\n\n", m.Alloc/1024/1024)
+}
+
+func main() {
+	mb := gosql.NewMemoryBackend()
+
+	index := false
+	for i, arg := range os.Args {
+		if arg == "--with-index" {
+			index = true
+		}
+
+		if arg == "--inserts" {
+			inserts, _ = strconv.Atoi(os.Args[i+1])
+		}
+	}
+
+	primaryKey := ""
+	if index {
+		primaryKey = " PRIMARY KEY"
+	}
+
+	parser := gosql.Parser{}
+	ast, err := parser.Parse(fmt.Sprintf("CREATE TABLE users (id INT%s)", primaryKey))
+	if err != nil {
+		panic(err)
+	}
+
+	err = mb.CreateTable(ast.Statements[0].CreateTableStatement)
+	if err != nil {
+		panic(err)
+	}
+
+	indexingString := " with indexing enabled"
+	if !index {
+		indexingString = ""
+	}
+	fmt.Printf("Inserting %d rows%s\n", inserts, indexingString)
+
+	perf("INSERT", mb, doInsert)
+
+	perf("SELECT", mb, doSelect)
+}
+```
+
+Build and run once without an index:
+
+```bash
+$ go build cmd/indextest/main.go
+./main --inserts 1000000
+Inserting 1000000 rows
+Starting INSERT
+Finished INSERT: 76.175133 seconds
+Alloc = 239 MiB
+
+Starting SELECT
+Finished SELECT: 1.301556 seconds
+Alloc = 238 MiB
+```
+
+And run again with an index:
+
+```bash
+./main --inserts 1000000 --with-index
+Inserting 1000000 rows with indexing enabled
+Starting INSERT
+Finished INSERT: 89.108121 seconds
+Alloc = 341 MiB
+
+Starting SELECT
+Finished SELECT: 0.000137 seconds
+Alloc = 341 MiB
+```
+
+The basic tradeoff that you can see is that for more memory and longer
+insertion, you get a significantly faster lookup.
