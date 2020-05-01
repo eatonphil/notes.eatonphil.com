@@ -34,30 +34,29 @@ Indexes:
 
 This post will broadly be a discussion of [this
 commit](https://github.com/eatonphil/gosql/commit/9608511d9888ce3842ec7d1bfa8f77499e8123b2).
-To keep this post focused, we'll skip the parts in that commit about
-adding an index to a table after the table has been created. Those
-parts should be easy enough to follow with this post for context.
 
 ### What is an index?
 
 An index is a mapping of a value to a row in a table. The value is
 often a column, but it can be many kinds of expressions. Databases
 typically store indexes in tree structures that provide O(log(n))
-lookup time. When SELECT-ing and filtering on a column that is
-indexed, a database can greatly speed lookup time by filtering first
-on this index. Without an index, a database must do a linear scan for
-matching rows. Though sometimes if a condition is broad enough, even
-with an index, a database may still end up doing a linear scan.
+lookup time. When <code>SELECT</code>ing and filtering on a column
+that is indexed, a database can greatly speed lookup time by filtering
+first on this index. Without an index, a database must do a linear
+scan for matching rows. Though sometimes if a condition is broad
+enough, even with an index, a database may still end up doing a linear
+scan.
 
 While it may make sense initially to map a value to a row using a hash
 table for constant lookup times, hash tables don't provide
 ordering. So this would prevent an index from being applicable on
-anything but equality checks (e.g. <code>SELECT x FROM y WHERE x >
-2</code>).
+anything but equality checks. For example, <code>SELECT x FROM y WHERE
+x > 2</code> couldn't use a hash index on <code>x</code>.
 
-Indexes in many SQL databases default to a B-Tree which offers
-efficient ordering of elements. These indexes are thus not
-constant-time lookups even if filtering on a unique column for a
+Indexes in many SQL databases default to a
+[B-Tree](https://www.cs.cornell.edu/courses/cs3110/2012sp/recitations/rec25-B-trees/rec25.html),
+which offers efficient ordering of elements. These indexes are thus
+not constant-time lookups even if filtering on a unique column for a
 single item. Some databases, [like
 PostgreSQL](https://www.postgresql.org/docs/current/indexes-types.html),
 allow you to use a hash-based index instead of a tree. Here the
@@ -66,10 +65,10 @@ use the index).
 
 ### Upgrading gosql
 
-We'll proceed in the following manner:
+We'll process as follows:
 * Upgrade table creation to support specifying a primary key
   * Pick a tree data structure and attach an index using it to the table
-* Upgrade <code>INSERT</code>s to add to any indexes on the table
+* Upgrade <code>INSERT</code>s to let any indexes on the table process the new row
 * Upgrade <code>SELECT</code>s to make use of any indexes, if possible
 
 ### Upgrading table creation
@@ -84,28 +83,28 @@ we'll make the following key additions:
 
 * [Add <code>PRIMARY KEY</code> as a new keyword token to the lexer](https://github.com/eatonphil/gosql/blob/9608511d9888ce3842ec7d1bfa8f77499e8123b2/lexer.go#L36)
 * [Add a check for this token to the parsing of column definitions](https://github.com/eatonphil/gosql/blob/9608511d9888ce3842ec7d1bfa8f77499e8123b2/parser.go#L425)
-* [Modify the AST to store boolean value whether a column is a primary key](https://github.com/eatonphil/gosql/blob/9608511d9888ce3842ec7d1bfa8f77499e8123b2/ast.go#L98)
+* [Modify the AST to store a boolean value whether a column is a primary key](https://github.com/eatonphil/gosql/blob/9608511d9888ce3842ec7d1bfa8f77499e8123b2/ast.go#L98)
 
 #### In-memory backend
 
-Next we move into how a primary key during table creation is actually
+Next we move on to how a primary key during table creation is actually
 handled.
 
-Since there is no real benefit with implementing a tree data structure
-in this post, we'll go with an existing open-source
-implementation. And while most databases use a
-[B-Tree](https://www.cs.cornell.edu/courses/cs3110/2012sp/recitations/rec25-B-trees/rec25.html),
-the most important properties are 1) efficient ordering and 2)
-optionally duplicate keys.
+Since there are many existing works on implementing tree data
+structures, we'll instead import an existing open-source
+implementation. And while most databases use a B-Tree the most
+important properties of the tree for our purposes are 1) efficient
+ordering and 2) optionally duplicate keys. We'll go with a Red-Black
+Tree implementation, [GoLLRB](https://github.com/petar/GoLLRB).
 
-We go with a Red-Black Tree implementation,
-[GoLLRB](https://github.com/petar/GoLLRB).
-
-The full definition of an index now includes: a name, an expression
-(at first we'll only support this being an identifier referring to a
-column), a unique flag, a type name (it will always be `rbtree` for
-now), a primary key flag (so we know to apply null checks among other
-things), and the actual tree itself.
+The full definition of an index now includes:
+* A name
+* An expression (at first we'll only support this being an identifier referring to a
+column)
+* A unique flag
+* A type name (it will just be `rbtree` for now)
+* A primary key flag (so we know to apply null checks among other things)
+* And the actual tree itself
 
 ```go
 type index struct {
@@ -227,14 +226,18 @@ process the row so it can add whatever mappings it needs.
 
 <p class="note">
   In the project code, you'll notice logic in <code>CreateIndex</code>
-  to go back over all existing rows to add them to the new index.
+  to also go back over all existing rows to add them to the new index.
+  This post omits further discussing the case where an index is
+  created after a table is created. After reading this post, that case
+  should be easy to follow.
 </p>
 
 Adding a row to an index is a matter of evaluting the index expression
-against that row and storing the resulting value (and the integer
-index of the row in the array of rows) in the tree.
+against that row and storing the resulting value in the tree. Along
+with the value, we store the integer index of the row in the
+table. This value to integer index is the core mapping.
 
-If the index is required to be unique, we check first that the value
+If the index is required to be unique, we first check that the value
 does not yet exist.
 
 ```go
@@ -269,16 +272,19 @@ table and iterate over all rows. If the row does not match
 the <code>WHERE</code> filter, we pass the row.
 
 If the table has an index and we are using the index in a recognized
-pattern in the <code>WHERE</code> AST, we can pre-filter the table
-based on the index before iterating over each row. We can do this for
-each index and for each time a recognized pattern shows up.
+pattern in the <code>WHERE</code> AST (more on that later), we can
+pre-filter the table based on the index before iterating over each
+row. We can do this for each index and for each time a recognized
+pattern shows up.
 
-This process is called query planning. We'll build a simplified
-version of what you may see in SQL databases, specifically focusing on
-index usage since we don't yet support <code>JOIN</code>s. [For
-further reading, SQLite has a great document on their query planner
-for index
-usage.](https://www.sqlite.org/queryplanner.html#_lookup_by_index)
+<p class="note">
+  This process is called query planning. We'll build a simplified
+  version of what you may see in SQL databases, specifically focusing
+  on index usage since we don't yet support <code>JOIN</code>s. For
+  further reading, SQLite has
+  an <a href="https://www.sqlite.org/queryplanner.html#_lookup_by_index">excellent
+  document</a> on their query planner for index usage.
+</p>
 
 ```go
 func (mb *MemoryBackend) Select(slct *SelectStatement) (*Results, error) {
@@ -406,10 +412,12 @@ func (t *table) getApplicableIndexes(where *expression) []indexAndExpression {
 ```
 
 More specifically though, within binary operations we'll only support
-matching on an index if the operator is one of <code>=</code>,
+matching on an index if the following three conditions are met:
+* the operator is one of <code>=</code>,
 <code><></code>, <code>></code>, <code><</code>, <code>>=</code>, or
-<code><=</code>; one of the operands is an identifier literal matching
-the index; and the other operand is another literal.
+<code><=</code>
+* one of the operands is an identifier literal that matches the index's <code>exp</code> value
+* the other operand is a literal value
 
 <p class="note">
   This is a simpler, stricter matching of an index than PostgreSQL
@@ -470,7 +478,7 @@ Since we are only working with patterns of the type
 <code>indexed-column OP literal-value</code>, we'll grab the literal
 using the previous <code>applicableValue</code> helper. Then we'll
 look up that literal value in the index and return a new table with
-ever row in the index that meets the condition of the operator for the
+every row in the index that meets the condition of the operator for the
 literal value.
 
 ```go
@@ -566,10 +574,10 @@ As you can see, an index may not necessarily improve on a linear
 search in some conditions. Imagine a table of 1 million rows indexed
 on an autoincrementing column. Imagine filtering on <code>col >
 10</code>. The index may be able to eliminate 10 items but still
-return a pre-filtered table of around 1 million rows that still must
+return a pre-filtered table of around 1 million rows that must
 be passed through the <code>WHERE</code> filter.
 
-Additionally since we process each binary expression here one at a
+Additionally since we process each binary expression one at a
 time, we can't take advantage of knowledge that might seem obvious to
 a human for two binary expressions that together bound a range. For
 example in <code>x > 10 AND x < 20</code> we can see that only
@@ -578,7 +586,12 @@ through each expression separately and find all rows that match either
 before the final linear search through all pre-filtered rows would
 eliminate the bulk.
 
-Thankfully real databases have decades of optimizations.
+<p class="note">
+  Thankfully real databases have decades of optimizations. But even
+  then it can be difficult to know what index usages are being
+  optimized without reading documentation, benchmarking, using
+  <code>EXPLAIN ANALYSE</code>, or reading the source.
+</p>
 
 But that's it for changes needed to support basic indexes end-to-end!
 
@@ -587,8 +600,8 @@ But that's it for changes needed to support basic indexes end-to-end!
 Since the addition of indexes is so seamless, it is difficult to tell
 without trial that the index is effective. So we'll write a simple
 program that inserts N rows with and without an index. Finally it will
-query for the first and last items inserted. We'll time and show
-memory used during insertion and selection.
+query for the first and last items inserted. We'll show time and
+memory used during both insertion and selection.
 
 ```go
 package main
@@ -748,4 +761,4 @@ Alloc = 341 MiB
 ```
 
 The basic tradeoff that you can see is that for more memory and longer
-insertion, you get a significantly faster lookup.
+insertion times, you get a significantly faster lookup.
