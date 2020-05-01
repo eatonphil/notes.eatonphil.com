@@ -43,39 +43,39 @@ parts should be easy enough to follow with this post for context.
 An index is a mapping of a value to a row in a table. The value is
 often a column, but it can be many kinds of expressions. Databases
 typically store indexes in tree structures that provide O(log(n))
-access. When SELECT-ing and filtering on a column that is indexed, a
-database can greatly speed access time by filtering first on this
-index. Without an index, a database must do a linear search through
-all rows to prove the condition can not be met.
+lookup time. When SELECT-ing and filtering on a column that is
+indexed, a database can greatly speed lookup time by filtering first
+on this index. Without an index, a database must do a linear scan for
+matching rows. Though sometimes if a condition is broad enough, even
+with an index, a database may still end up doing a linear scan.
 
-While it may make initial sense to map a value to a row using a hash
-table to constant access, hash tables don't provide ordering. So this
-would prevent an index from being applicable on anything but equality
-checks (e.g. <code>SELECT x FROM y WHERE x > 2</code>).
+While it may make sense initially to map a value to a row using a hash
+table for constant lookup times, hash tables don't provide
+ordering. So this would prevent an index from being applicable on
+anything but equality checks (e.g. <code>SELECT x FROM y WHERE x >
+2</code>).
 
-To reiterate then, indexes in [many SQL
-databases](https://en.wikipedia.org/wiki/Comparison_of_relational_database_management_systems#Indexes)
-are not constant-time lookups even if filtering on a unique column for
-a single item. Some databases, [like
+Indexes in many SQL databases default to a B-Tree which offers
+efficient ordering of elements. These indexes are thus not
+constant-time lookups even if filtering on a unique column for a
+single item. Some databases, [like
 PostgreSQL](https://www.postgresql.org/docs/current/indexes-types.html),
 allow you to use a hash-based index instead of a tree. Here the
-previously listed restrictions on applicability apply.
+previously listed restrictions apply (i.e. only equality checks will
+use the index).
+
+### Upgrading gosql
+
+We'll proceed in the following manner:
+* Upgrade table creation to support specifying a primary key
+  * Pick a tree data structure and attach an index using it to the table
+* Upgrade <code>INSERT</code>s to add to any indexes on the table
+* Upgrade <code>SELECT</code>s to make use of any indexes, if possible
 
 ### Upgrading table creation
 
-We will allow the specification of a single column as the primary key
-when creating a table. In this case we'll add a new index to a list of
-indexes on the table.
-
-While most databases use a
-[b-tree](https://www.cs.cornell.edu/courses/cs3110/2012sp/recitations/rec25-B-trees/rec25.html),
-we'll use a red-black tree instead. Like a b-tree it is self-balancing.
-So we don't need to worry about the worst-case behavior of binary
-search trees.
-
-And since there are numerous other books and tutorials out there for
-implementing either algorithm, we're just going to use [an existing
-open-source library](https://github.com/petar/GoLLRB).
+To allow the specification of a single column as the primary key when
+creating a table, we'll have to first modify the lexer and parser.
 
 #### Lexing/parsing
 
@@ -88,11 +88,24 @@ we'll make the following key additions:
 
 #### In-memory backend
 
-First let's start with the definition of an index. An index has a
-name, an expression (for a primary key it will just be a column name),
-a unique flag, a type name (it will always be `rbtree` for now), a
-primary key flag (so we know to apply null checks among other things),
-and the actual tree itself.
+Next we move into how a primary key during table creation is actually
+handled.
+
+Since there is no real benefit with implementing a tree data structure
+in this post, we'll go with an existing open-source
+implementation. And while most databases use a
+[B-Tree](https://www.cs.cornell.edu/courses/cs3110/2012sp/recitations/rec25-B-trees/rec25.html),
+the most important properties are 1) efficient ordering and 2)
+optionally duplicate keys.
+
+We go with a Red-Black Tree implementation,
+[GoLLRB](https://github.com/petar/GoLLRB).
+
+The full definition of an index now includes: a name, an expression
+(at first we'll only support this being an identifier referring to a
+column), a unique flag, a type name (it will always be `rbtree` for
+now), a primary key flag (so we know to apply null checks among other
+things), and the actual tree itself.
 
 ```go
 type index struct {
@@ -218,8 +231,8 @@ process the row so it can add whatever mappings it needs.
 </p>
 
 Adding a row to an index is a matter of evaluting the index expression
-against that row and storing the resulting value in the tree, mapped
-to the row's index (in the array of rows on the table).
+against that row and storing the resulting value (and the integer
+index of the row in the array of rows) in the tree.
 
 If the index is required to be unique, we check first that the value
 does not yet exist.
@@ -251,14 +264,21 @@ And that's it for insertion!
 
 ### Upgrading SELECT
 
-To date, the logic for selecting rows from a table is to load the
+To date, the logic for selecting rows from a table is to pick the
 table and iterate over all rows. If the row does not match
 the <code>WHERE</code> filter, we pass the row.
 
 If the table has an index and we are using the index in a recognized
-pattern in the <code>WHERE</code> filter, we can pre-filter the table
+pattern in the <code>WHERE</code> AST, we can pre-filter the table
 based on the index before iterating over each row. We can do this for
 each index and for each time a recognized pattern shows up.
+
+This process is called query planning. We'll build a simplified
+version of what you may see in SQL databases, specifically focusing on
+index usage since we don't yet support <code>JOIN</code>s. [For
+further reading, SQLite has a great document on their query planner
+for index
+usage.](https://www.sqlite.org/queryplanner.html#_lookup_by_index)
 
 ```go
 func (mb *MemoryBackend) Select(slct *SelectStatement) (*Results, error) {
@@ -392,9 +412,9 @@ matching on an index if the operator is one of <code>=</code>,
 the index; and the other operand is another literal.
 
 <p class="note">
-	This is a simpler, stricter matching of an index than PostgreSQL
-    where you can index expressions more generally, not just identifer
-    literals.
+  This is a simpler, stricter matching of an index than PostgreSQL
+  where you can index expressions more generally, not just identifer
+  literals.
 </p>
 
 ```go
@@ -442,14 +462,16 @@ And that's it for finding applicable indexes.
 
 #### newTableFromSubset
 
-That last remaining piece is to go from a binary expression in a WHERE
-clause (where an index is applicable) to a subset of rows in a table.
+The last remaining piece is to go from a binary expression in
+a <code>WHERE</code> clause (where an index is applicable) to a subset
+of rows in a table.
 
 Since we are only working with patterns of the type
-<code>indexed-column OP literal</code, we'll grab the literal using
-the previous <code>applicableValue</code> helper. Then we'll look up
-that value in the index and return a new table with ever row in the
-index that meets the condition of the operator for the value.
+<code>indexed-column OP literal-value</code>, we'll grab the literal
+using the previous <code>applicableValue</code> helper. Then we'll
+look up that literal value in the index and return a new table with
+ever row in the index that meets the condition of the operator for the
+literal value.
 
 ```go
 func (i *index) newTableFromSubset(t *table, exp expression) *table {
@@ -549,9 +571,9 @@ be passed through the <code>WHERE</code> filter.
 
 Additionally since we process each binary expression here one at a
 time, we can't take advantage of knowledge that might seem obvious to
-a human for to binary expressions that together bound a range. For
+a human for two binary expressions that together bound a range. For
 example in <code>x > 10 AND x < 20</code> we can see that only
-integers within 10 are applicable. But the current logic would go
+integers from 11 to 19 are applicable. But the current logic would go
 through each expression separately and find all rows that match either
 before the final linear search through all pre-filtered rows would
 eliminate the bulk.
