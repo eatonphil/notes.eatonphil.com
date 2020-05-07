@@ -89,7 +89,7 @@ HOME_PAGE = """
   </a>
   <a href="https://github.com/eatonphil/gosql" class="fp-project">
     <div>gosql</div>
-    <p>An PostgreSQL implementation in Go.</p>
+    <p>A PostgreSQL implementation in Go.</p>
   </a>
 </div>
 <div class="fp-section fp-section--talks">

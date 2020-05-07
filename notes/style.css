@@ -159,7 +159,7 @@ aside p {
 }
 
 .subtitle {
-    color: #333;
+    color: #555;
     text-decoration: none;
     font-variant: small-caps;
     font-weight: 500;
@@ -243,7 +243,8 @@ aside p {
 
 .fp-section p,
 .fp-section a {
-    font-size: 1rem;
+    font-size: 1.2rem;
+    color: #333;
 }
 
 .fp-section--projects {
