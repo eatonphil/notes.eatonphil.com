@@ -241,10 +241,12 @@ aside p {
     background: #d5f4ff;
 }
 
-.fp-section p,
-.fp-section a {
+.fp-section p {
+    font-size: 1rem;
+}
+
+.fp-section:not(:first) a {
     font-size: 1.2rem;
-    color: #333;
 }
 
 .fp-section--projects {
