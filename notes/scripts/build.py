@@ -30,20 +30,14 @@ HOME_PAGE = """
 <h2 class="fp-h2">Bio</h2>
   <p>
     Hello! I'm Phil, an Engineering Manager at a <a
-    href="https://oracle.com">software company</a> in New York City.
-  </p>
-  <p>
-    Before this, I led the web group at a <a
-    href="https://capsule8.com">Linux security startup</a>. Before
-    that, I led the frontend group at a <a
-    href="https://linode.com">Linux hosting company in Philly</a>.
-    And before that, I contracted as a software developer and system
-    administrator for a few years.
+    href="https://www.linkedin.com/in/phil-e-97a490178/">software
+    company</a> in New York City.
   </p>
   <p>
     I'm interested in compilers, databases, networks, and operating
-    systems. At some point I'd like to work in banking, shipping,
-    Internet services, manufacturing, hardware, and graphics.
+    systems. At some point I'd like to work in agriculture, renewable
+    energy, shipping, Internet services, manufacturing, hardware, and
+    graphics.
   </p>
   <p>
     Having studied Chinese and Japanese in school, and with family in

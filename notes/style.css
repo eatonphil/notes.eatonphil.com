@@ -35,7 +35,6 @@ h2 {
 h2.fp-h2 {
     color: #333;
     font-size: 1.5rem;
-    margin-bottom: 2.5rem;
 }
 
 h3 {
@@ -65,7 +64,7 @@ a {
 }
 
 pre {
-    width: 800px;
+    width: 650px;
 }
 
 img {
@@ -74,7 +73,7 @@ img {
 }
 
 .container {
-    width: 1024px;
+    width: 650px;
     max-width: 100%;
     margin: 0 auto;
     padding: 0 15px;
@@ -100,37 +99,6 @@ header .container {
 
 header .subscribe {
     font-size: 1rem;
-}
-
-header .breaker {
-    width: 70%;
-    max-width: 100%;
-    border: 0;
-    border-top: 1px solid #ccc;
-    margin: 30px 0;
-}
-
-footer .container {
-    margin-bottom: 15px;
-}
-
-footer p {
-    width: 70%;
-    max-width: 100%;
-    border-top: 1px solid #ccc;
-    padding: 0;
-    margin: 0;
-    margin-top: 30px;
-    padding-top: 30px;
-}
-
-.col-6 {
-    width: 70%;
-    max-width: 100%;
-}
-
-.col-3 {
-    width: 30%;
 }
 
 aside {
@@ -173,7 +141,7 @@ aside p {
     display: inline-block;
     margin-right: 10px;
     padding: 3px 5px;
-    background: #f8d2ff;
+    background: #e2e9ff;
     color: #777;
     font-size: .9rem;
 }
@@ -183,7 +151,7 @@ aside p {
 }
 
 .summary .tag {
-    background: #ffd4d4;
+    background: #e2e9ff;
     font-size: .9rem;
 }
 
@@ -205,8 +173,8 @@ aside p {
 
 .note {
     line-height: 1.4rem;
-    background: #ffffe8;
-    border: #e0e0e0 1px solid;
+    background: #f0f0f0;
+    border-left: 2px solid #3661ff;
     padding: 15px;
 }
 
@@ -229,6 +197,10 @@ aside p {
     margin-top: 4rem;
 }
 
+.fp-h2 {
+    margin-bottom: 1rem;
+}
+
 .fp-section:first-of-type {
     margin-top: 2rem;
 }
@@ -237,28 +209,12 @@ aside p {
     margin-bottom: 2rem;
 }
 
-.fp-section--about {
-    background: #d5f4ff;
-}
-
 .fp-section p {
     font-size: 1rem;
 }
 
 .fp-section:not(:first) a {
     font-size: 1.2rem;
-}
-
-.fp-section--projects {
-    background: #f8e8ff;
-}
-
-.fp-section--talks {
-    background: #d9ffcc;
-}
-
-.fp-section--notes {
-    background: #eee;
 }
 
 .fp-project {
@@ -279,7 +235,7 @@ aside p {
     font-size: .9rem;
 }
 
-@media (max-width: 800px) {
+@media (max-width: 650px) {
     pre {
         width: 100%;
         margin-left: 0;
@@ -296,20 +252,12 @@ aside p {
         padding: 1rem;
     }
 
-    .fp-h2 {
-	margin-bottom: 1rem;
-    }
-
     .fp-section:last-of-type {
         margin-bottom: 0;
     }
 
     .fp-section:first-of-type {
 	margin-top: 0;
-    }
-
-    .fp-section:not(:last-of-type) {
-        border-bottom: 2px solid white;
     }
 
     .container {
