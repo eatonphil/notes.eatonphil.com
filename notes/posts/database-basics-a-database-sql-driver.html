@@ -324,9 +324,9 @@ func (r *Rows) Next(dest []driver.Value) error {
 }
 ```
 
-Finally in <code>Close</code> we'll set <code>index</code> to the end
-of rows to force <code>Next</code> to only ever return
-<code>io.EOF</code>.
+Finally in <code>Close</code> we'll set <code>index</code> higher than
+the number of rows to force <code>Next</code> to only ever
+return <code>io.EOF</code>.
 
 ```go
 func (r *Rows) Close() error {
