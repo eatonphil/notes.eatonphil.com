@@ -1,0 +1,354 @@
+# Writing a SQL database from scratch in Go: 4. implementing a database/sql driver
+## May 10, 2020
+###### golang,database,sql
+
+<p class="note">
+  Previously in database basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/database-basics.html">1. SELECT, INSERT, CREATE and a REPL</a>
+  <br />
+  <a href="/database-basics-expressions-and-where.html">2. binary expressions and WHERE filters</a>
+  <br />
+  <a href="/database-basics-indexing.html">3. indexes</a>
+</p>
+
+In this post, we'll extend [gosql](https://github.com/eatonphil/gosql)
+to implement the <code>database/sql</code> driver interface. This will
+allow us to interact with the database more transparently.
+
+Here is an example familiar program (stored in
+<code>cmd/sqlexample/main.go</code>) we'll be able to run:
+
+```go
+package main
+
+import (
+	"database/sql"
+	"fmt"
+
+	_ "github.com/eatonphil/gosql"
+)
+
+func main() {
+	db, err := sql.Open("postgres", "")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	_, err = db.Query("CREATE TABLE users (name TEXT, age INT);")
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = db.Query("INSERT INTO users VALUES ('Terry', 45);")
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = db.Query("INSERT INTO users VALUES ('Anette', 57);")
+	if err != nil {
+		panic(err)
+	}
+
+	rows, err := db.Query("SELECT name, age FROM users;")
+	if err != nil {
+		panic(err)
+	}
+
+	var name string
+	var age uint64
+	defer rows.Close()
+	for rows.Next() {
+		err := rows.Scan(&name, &age)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Printf("Name: %s, Age: %d\n", name, age)
+	}
+
+	if err = rows.Err(); err != nil {
+		panic(err)
+	}
+}
+```
+
+Our gosql driver will use a single instance of our
+<code>MemoryBackend</code> for all connections.
+
+Aside from that, it is a simple matter of wrapping our existing APIs
+in structs that implement the <code>database/sql/driver.Driver</code>
+interface.
+
+This post is largely a discussion of [this
+commit](https://github.com/eatonphil/gosql/commit/0d0aa61a74580a6aef11296741abfba4e1d4ae5c).
+
+### Implementing the driver
+
+A driver is registered by calling <code>sql.Register</code> with a
+driver instance.
+
+We'll add the registration code to an <code>init</code> function in a
+new file, <code>driver.go</code>:
+
+```go
+struct Driver {
+	bkd Backend
+}
+
+func init() {
+	sql.Register("postgres", &Driver{NewMemoryBackend()})
+}
+```
+
+According to the [Driver
+interface](https://pkg.go.dev/database/sql/driver?tab=doc#Driver), we
+need only implement <code>Open</code> to return an connection instance
+that implements the <code>database/sql/driver.Conn</code> interface.
+
+```go
+type Driver struct {
+	bkd Backend
+}
+
+func (d *Driver) Open(name string) (driver.Conn, error) {
+	return &Conn{d.bkd}, nil
+}
+
+func init() {
+	sql.Register("postgres", &Driver{NewMemoryBackend()})
+}
+```
+
+### Implementing the connection
+
+According to the [Conn
+interface](https://pkg.go.dev/database/sql/driver?tab=doc#Conn), we
+must implement:
+
+* <code>Prepare(query string) (driver.Stmt, error)</code> to handle prepared statements
+* <code>Close</code> to handle cleanup
+* and <code>Begin</code> to start a transaction
+
+The connection can also optionally implement <code>Query</code> and
+<code>Exec</code>.
+
+To simplify things we'll panic on <code>Prepare</code> and on
+<code>Begin</code> (we don't have transactions yet). There's no
+cleanup required so we'll do nothing in <code>Close</code>.
+
+```go
+type Conn struct {
+	bkd Backend
+}
+
+func (dc *Conn) Prepare(query string) (driver.Stmt, error) {
+	panic("Prepare not implemented")
+}
+
+func (dc *Conn) Begin() (driver.Tx, error) {
+	panic("Begin not implemented")
+}
+
+func (dc *Conn) Close() error {
+	return nil
+}
+```
+
+The only function we actually need is not required by the interface,
+<code>Query</code>, which must accept a query and return an instance
+implementing the <code>database/sql/driver.Rows</code> interface.
+
+<p class="note">
+  <code>database/sql/driver.Rows</code> is not the same type as
+  <code>database/sql.Rows</code>, which may sound more
+  familiar. <code>database/sql/driver.Rows</code> is a simpler,
+  lower-level interface.
+</p>
+
+To implement <code>Query</code>, we basically copy the logic we had in
+the <code>cmd/main.go</code> REPL. The only change is that when we
+return results when handling <code>SELECT</code>, we'll return a
+struct that implements the <code>database/sql/driver.Rows</code>
+interface.
+
+If we receive parameterized query arguments, we'll ignore them for
+now. And if the query involves multiple statements, we'll process only
+the first statement.
+
+```go
+func (dc *Conn) Query(query string, args []driver.Value) (driver.Rows, error) {
+	if len(args) > 0 {
+		// TODO: support parameterization
+		panic("Parameterization not supported")
+	}
+
+	parser := Parser{}
+	ast, err := parser.Parse(query)
+	if err != nil {
+		return nil, fmt.Errorf("Error while parsing: %s", err)
+	}
+
+	// NOTE: ignorning all but the first statement
+	stmt := ast.Statements[0]
+	switch stmt.Kind {
+	case CreateIndexKind:
+		err = dc.bkd.CreateIndex(stmt.CreateIndexStatement)
+		if err != nil {
+			return nil, fmt.Errorf("Error adding index on table: %s", err)
+		}
+	case CreateTableKind:
+		err = dc.bkd.CreateTable(stmt.CreateTableStatement)
+		if err != nil {
+			return nil, fmt.Errorf("Error creating table: %s", err)
+		}
+	case DropTableKind:
+		err = dc.bkd.DropTable(stmt.DropTableStatement)
+		if err != nil {
+			return nil, fmt.Errorf("Error dropping table: %s", err)
+		}
+	case InsertKind:
+		err = dc.bkd.Insert(stmt.InsertStatement)
+		if err != nil {
+			return nil, fmt.Errorf("Error inserting values: %s", err)
+		}
+	case SelectKind:
+		results, err := dc.bkd.Select(stmt.SelectStatement)
+		if err != nil {
+			return nil, err
+		}
+
+		return &Rows{
+			rows:    results.Rows,
+			columns: results.Columns,
+			index:   0,
+		}, nil
+	}
+
+	return nil, nil
+}
+```
+
+### Implementing results
+
+According to the [Rows
+interface](https://pkg.go.dev/database/sql/driver?tab=doc#Rows) we
+must implement:
+
+* <code>Columns() []string</code> to return an array of columns names
+* <code>Next(dest []Value) error</code> to populate an row array with the next row's worth of cells
+* and <code>Close() error</code>
+
+Our <code>Rows</code> struct will contain the rows and colums as
+returned from <code>Backend</code>, and will also contain an
+<code>index</code> field we can use in <code>Next</code> to populate
+the next row of cells.
+
+```go
+type Rows struct {
+	columns []ResultColumn
+	index   uint64
+	rows    [][]Cell
+}
+
+func (r *Rows) Columns() []string {}
+
+func (r *Rows) Close() error {}
+
+func (r *Rows) Next(dest []driver.Value) error {}
+```
+
+For <code>Columns</code> we simply need to extract and
+return the column names from <code>ResultColumn</code>.
+
+```go
+func (r *Rows) Columns() []string {
+	columns := []string{}
+	for _, c := range r.columns {
+		columns = append(columns, c.Name)
+	}
+
+	return columns
+}
+```
+
+For <code>Next</code> we need to iterate over each cell in the current
+row and retrieve its Go value, storing it in <code>dest</code>. The
+<code>dest</code> argument is simply a fixed-length array of
+<code>interface{}</code>, so we'll need no manual conversion.
+
+Once we've reached the last row, the <code>Next</code> contract is to
+return an <code>io.EOF</code>.
+
+```go
+func (r *Rows) Next(dest []driver.Value) error {
+	if r.index >= uint64(len(r.rows)) {
+		return io.EOF
+	}
+
+	row := r.rows[r.index]
+
+	for idx, cell := range row {
+		typ := r.columns[idx].Type
+		switch typ {
+		case IntType:
+			i := cell.AsInt()
+			if i == nil {
+				dest[idx] = i
+			} else {
+				dest[idx] = *i
+			}
+		case TextType:
+			s := cell.AsText()
+			if s == nil {
+				dest[idx] = s
+			} else {
+				dest[idx] = *s
+			}
+		case BoolType:
+			b := cell.AsBool()
+			if b == nil {
+				dest[idx] = b
+			} else {
+				dest[idx] = b
+			}
+		}
+	}
+
+	r.index++
+	return nil
+}
+```
+
+Finally in <code>Close</code> we'll set <code>index</code> to the end
+of rows to force <code>Next</code> to only ever return
+<code>io.EOF</code>.
+
+```go
+func (r *Rows) Close() error {
+	r.index = uint64(len(r.rows))
+	return nil
+}
+```
+
+And that's all the changes needed to implement a
+<code>database/sql</code> driver! See
+[here](https://github.com/eatonphil/gosql/commit/0d0aa61a74580a6aef11296741abfba4e1d4ae5c#diff-749da71b40f8ff06fc9e78ce917b0cce)
+for <code>driver.go</code> in full.
+
+### Running the example
+
+With the driver in place we can try out the example:
+
+```bash
+$ go build ./cmd/sqlexample/main.go
+$ ./main
+Name: Terry, Age: 45
+Name: Anette, Age: 57
+```
+
+#### Comments
+
+Please reply on Twitter with questions or comments.
