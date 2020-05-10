@@ -15,7 +15,8 @@
 
 In this post, we'll extend [gosql](https://github.com/eatonphil/gosql)
 to implement the <code>database/sql</code> driver interface. This will
-allow us to interact with the database more transparently.
+allow us to interact with gosql the same way we would interact with
+any other database.
 
 Here is an example familiar program (stored in
 <code>cmd/sqlexample/main.go</code>) we'll be able to run:
@@ -75,8 +76,8 @@ func main() {
 }
 ```
 
-Our gosql driver will use a single instance of our
-<code>MemoryBackend</code> for all connections.
+Our gosql driver will use a single instance of the
+<code>Backend</code> for all connections.
 
 Aside from that, it is a simple matter of wrapping our existing APIs
 in structs that implement the <code>database/sql/driver.Driver</code>
@@ -157,9 +158,16 @@ func (dc *Conn) Close() error {
 }
 ```
 
-The only function we actually need is not required by the interface,
-<code>Query</code>, which must accept a query and return an instance
-implementing the <code>database/sql/driver.Rows</code> interface.
+The only method we actually need, <code>Query</code>, is not required
+by the interface. It takes a query string and array of query
+parameters, returning an instance implementing
+the <code>database/sql/driver.Rows</code> interface.
+
+To implement <code>Query</code>, we basically copy the logic we had in
+the <code>cmd/main.go</code> REPL. The only change is that when we
+return results when handling <code>SELECT</code>, we'll return a
+struct that implements the <code>database/sql/driver.Rows</code>
+interface.
 
 <p class="note">
   <code>database/sql/driver.Rows</code> is not the same type as
@@ -167,12 +175,6 @@ implementing the <code>database/sql/driver.Rows</code> interface.
   familiar. <code>database/sql/driver.Rows</code> is a simpler,
   lower-level interface.
 </p>
-
-To implement <code>Query</code>, we basically copy the logic we had in
-the <code>cmd/main.go</code> REPL. The only change is that when we
-return results when handling <code>SELECT</code>, we'll return a
-struct that implements the <code>database/sql/driver.Rows</code>
-interface.
 
 If we receive parameterized query arguments, we'll ignore them for
 now. And if the query involves multiple statements, we'll process only
