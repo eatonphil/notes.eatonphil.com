@@ -18,9 +18,7 @@ h1, h2, h3, h4, h5, h6 {
 
 h1 {
     color: #333;
-    font-size: 1.5rem;
-    line-height: 3rem;
-    margin: 0;
+    margin: 1rem 0 .5rem 0;
 }
 
 h2 {
