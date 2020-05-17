@@ -16,8 +16,8 @@
   <a href="/database-basics-a-database-sql-driver.html">4. a database/sql driver</a>
 </p>
 
-In this post, we'll extend [gosql](https://github.com/eatonphil/gosql)
-to support indexes. We'll focus on the addition of <code>PRIMARY
+In this post, we extend [gosql](https://github.com/eatonphil/gosql)
+to support indexes. We focus on the addition of <code>PRIMARY
 KEY</code> constraints on table creation and some easy optimizations
 during <code>SELECT</code> statements.
 
@@ -46,11 +46,11 @@ An index is a mapping of a value to a row in a table. The value is
 often a column, but it can be many kinds of expressions. Databases
 typically store indexes in tree structures that provide O(log(n))
 lookup time. When <code>SELECT</code>ing and filtering on a column
-that is indexed, a database can greatly speed lookup time by filtering
-first on this index. Without an index, a database must do a linear
-scan for matching rows. Though sometimes if a condition is broad
-enough, even with an index, a database may still end up doing a linear
-scan.
+that is indexed, a database can greatly improve lookup time by
+filtering first on this index. Without an index, a database must do a
+linear scan for matching rows. Though sometimes if a condition is
+broad enough, even with an index, a database may still end up doing a
+linear scan.
 
 While it may make sense initially to map a value to a row using a hash
 table for constant lookup times, hash tables don't provide
@@ -70,21 +70,21 @@ use the index).
 
 ### Upgrading gosql
 
-We'll process as follows:
+We proceed as follows:
 * Upgrade table creation to support specifying a primary key
-  * Pick a tree data structure and attach an index using it to the table
+  * Pick a tree data structure for the index, adding it to the table
 * Upgrade <code>INSERT</code>s to let any indexes on the table process the new row
 * Upgrade <code>SELECT</code>s to make use of any indexes, if possible
 
 ### Upgrading table creation
 
 To allow the specification of a single column as the primary key when
-creating a table, we'll have to first modify the lexer and parser.
+creating a table, we have to first modify the lexer and parser.
 
 #### Lexing/parsing
 
 Since we've covered this process a few times already suffice it so say
-we'll make the following key additions:
+we make the following key additions:
 
 * [Add <code>PRIMARY KEY</code> as a new keyword token to the lexer](https://github.com/eatonphil/gosql/blob/9608511d9888ce3842ec7d1bfa8f77499e8123b2/lexer.go#L36)
 * [Add a check for this token to the parsing of column definitions](https://github.com/eatonphil/gosql/blob/9608511d9888ce3842ec7d1bfa8f77499e8123b2/parser.go#L425)
@@ -92,19 +92,18 @@ we'll make the following key additions:
 
 #### In-memory backend
 
-Next we move on to how a primary key during table creation is actually
-handled.
+Next we move on to handling a primary key during table creation.
 
-Since there are many existing works on implementing tree data
-structures, we'll instead import an existing open-source
-implementation. And while most databases use a B-Tree the most
-important properties of the tree for our purposes are 1) efficient
-ordering and 2) optionally duplicate keys. We'll go with a Red-Black
-Tree implementation, [GoLLRB](https://github.com/petar/GoLLRB).
+Since there are many existing papers and blogs on implementing tree
+data structures, we will import an open-source implementation. And
+while most databases use a B-Tree, the most important properties of
+the tree for our purposes are 1) efficient ordering and 2) optionally
+duplicate keys. We go with a Red-Black Tree,
+[GoLLRB](https://github.com/petar/GoLLRB).
 
 The full definition of an index now includes:
 * A name
-* An expression (at first we'll only support this being an identifier referring to a
+* An expression (at first we only support this being an identifier referring to a
 column)
 * A unique flag
 * A type name (it will just be `rbtree` for now)
@@ -122,10 +121,10 @@ type index struct {
 }
 ```
 
-When we create a table, we'll add an index if one of the columns is a
-primary key. The code will be mostly identical to the last pass. We'll
-call out to a new public method, <code>CreateIndex</code>, that will
-handle actually setting things up.
+When we create a table, we add an index if one of the columns is a
+primary key. We call out to a new public
+method, <code>CreateIndex</code>, that will handle actually setting
+things up.
 
 ```go
 func (mb *MemoryBackend) CreateTable(crt *CreateTableStatement) error {
@@ -220,14 +219,14 @@ func (mb *MemoryBackend) CreateIndex(ci *CreateIndexStatement) error {
 ```
 
 And that's it for creation of tables and indexes! Table creation is
-also the last time we'll need to make changes to the gosql
-frontend. The rest of the changes just wrap existing insertion and
+also the last time we need to make changes to the gosql
+frontend. The rest of the changes simply wrap existing insertion and
 selection.
 
 ### Upgrading INSERT
 
 When a row is inserted into a table, each index on that table needs to
-process the row so it can add whatever mappings it needs.
+process the row so it can add value-to-row mappings to the index.
 
 <p class="note">
   In the project code, you'll notice logic in <code>CreateIndex</code>
@@ -240,7 +239,7 @@ process the row so it can add whatever mappings it needs.
 Adding a row to an index is a matter of evaluting the index expression
 against that row and storing the resulting value in the tree. Along
 with the value, we store the integer index of the row in the
-table. This value to integer index is the core mapping.
+table.
 
 If the index is required to be unique, we first check that the value
 does not yet exist.
@@ -272,7 +271,7 @@ And that's it for insertion!
 
 ### Upgrading SELECT
 
-To date, the logic for selecting rows from a table is to pick the
+Until now, the logic for selecting rows from a table is to pick the
 table and iterate over all rows. If the row does not match
 the <code>WHERE</code> filter, we pass the row.
 
@@ -283,7 +282,7 @@ row. We can do this for each index and for each time a recognized
 pattern shows up.
 
 <p class="note">
-  This process is called query planning. We'll build a simplified
+  This process is called query planning. We build a simplified
   version of what you may see in SQL databases, specifically focusing
   on index usage since we don't yet support <code>JOIN</code>s. For
   further reading, SQLite has
@@ -375,7 +374,7 @@ It's very simple and easy to miss, here is the change called out:
 #### getApplicableIndexes
 
 There are probably a few very simple patterns we could look for, but
-for now we'll look for binary expressions joined by <code>AND</code>
+for now we look for boolean expressions joined by <code>AND</code>
 that contain an index expression.
 
 ```go
@@ -416,7 +415,7 @@ func (t *table) getApplicableIndexes(where *expression) []indexAndExpression {
 }
 ```
 
-More specifically though, within binary operations we'll only support
+More specifically though, within binary operations we only support
 matching on an index if the following three conditions are met:
 * the operator is one of <code>=</code>,
 <code><></code>, <code>></code>, <code><</code>, <code>>=</code>, or
@@ -437,7 +436,7 @@ func (i *index) applicableValue(exp expression) *expression {
 	}
 
 	be := exp.binary
-	// Find the column and the value in the binary expression
+	// Find the column and the value in the boolean expression
 	columnExp := be.a
 	valueExp := be.b
 	if columnExp.generateCode() != i.exp.generateCode() {
@@ -475,13 +474,13 @@ And that's it for finding applicable indexes.
 
 #### newTableFromSubset
 
-The last remaining piece is to go from a binary expression in
+The last remaining piece is to go from a boolean expression in
 a <code>WHERE</code> clause (where an index is applicable) to a subset
 of rows in a table.
 
 Since we are only working with patterns of the type
-<code>indexed-column OP literal-value</code>, we'll grab the literal
-using the previous <code>applicableValue</code> helper. Then we'll
+<code>indexed-column OP literal-value</code>, we grab the literal
+using the previous <code>applicableValue</code> helper. Then we
 look up that literal value in the index and return a new table with
 every row in the index that meets the condition of the operator for the
 literal value.
@@ -582,9 +581,9 @@ on an autoincrementing column. Imagine filtering on <code>col >
 return a pre-filtered table of around 1 million rows that must
 be passed through the <code>WHERE</code> filter.
 
-Additionally since we process each binary expression one at a
-time, we can't take advantage of knowledge that might seem obvious to
-a human for two binary expressions that together bound a range. For
+Additionally since we process each boolean expression one at a time,
+we can't take advantage of knowledge that might seem obvious to a
+human for two boolean expressions that together bound a range. For
 example in <code>x > 10 AND x < 20</code> we can see that only
 integers from 11 to 19 are applicable. But the current logic would go
 through each expression separately and find all rows that match either
@@ -603,9 +602,9 @@ But that's it for changes needed to support basic indexes end-to-end!
 ### Trialing an index
 
 Since the addition of indexes is so seamless, it is difficult to tell
-without trial that the index is effective. So we'll write a simple
+without trial that the index is effective. So we write a simple
 program that inserts N rows with and without an index. Finally it will
-query for the first and last items inserted. We'll show time and
+query for the first and last items inserted. We show time and
 memory used during both insertion and selection.
 
 ```go

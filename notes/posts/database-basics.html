@@ -334,15 +334,16 @@ func lexString(source string, ic cursor) (*token, cursor, bool) {
 
 #### Analyzing symbols and keywords
 
-Symbols and keywords come from a fixed set of strings, so they're easy
+Symbols come from a fixed set of strings, so they're easy
 to compare against. Whitespace should be thrown away.
 
 ```go
 func lexSymbol(source string, ic cursor) (*token, cursor, bool) {
 	c := source[ic.pointer]
 	cur := ic
-	cur.loc.col++
+	// Will get overwritten later if not an ignored syntax
 	cur.pointer++
+	cur.loc.col++
 
 	switch c {
 	// Syntax that should be thrown away
@@ -354,29 +355,128 @@ func lexSymbol(source string, ic cursor) (*token, cursor, bool) {
 		fallthrough
 	case ' ':
 		return nil, cur, true
+	}
 
 	// Syntax that should be kept
-	case ',':
-		fallthrough
-	case '(':
-		fallthrough
-	case ')':
-		fallthrough
-	case ';':
-		fallthrough
-	case '*':
-		break
+	symbols := []symbol{
+		commaSymbol,
+		leftParenSymbol,
+		rightParenSymbol,
+		semicolonSymbol,
+		asteriskSymbol,
+	}
 
+	var options []string
+	for _, s := range symbols {
+		options = append(options, string(s))
+	}
+
+	// Use `ic`, not `cur`
+	match := longestMatch(source, ic, options)
 	// Unknown character
-	default:
+	if match == "" {
 		return nil, ic, false
 	}
 
+	cur.pointer = ic.pointer + uint(len(match))
+	cur.loc.col = ic.loc.col + uint(len(match))
+
 	return &token{
-		value: string(c),
+		value: match,
 		loc:   ic.loc,
 		kind:  symbolKind,
 	}, cur, true
+}
+```
+
+Keywords are even simpler, and use the same <code>longestMatch</code>
+helper.
+
+```go
+func lexKeyword(source string, ic cursor) (*token, cursor, bool) {
+	cur := ic
+	keywords := []keyword{
+		selectKeyword,
+		insertKeyword,
+		valuesKeyword,
+		tableKeyword,
+		createKeyword,
+		whereKeyword,
+		fromKeyword,
+		intoKeyword,
+		textKeyword,
+	}
+
+	var options []string
+	for _, k := range keywords {
+		options = append(options, string(k))
+	}
+
+	match := longestMatch(source, ic, options)
+	if match == "" {
+		return nil, ic, false
+	}
+
+	cur.pointer = ic.pointer + uint(len(match))
+	cur.loc.col = ic.loc.col + uint(len(match))
+
+	return &token{
+		value: match,
+		kind:  kind,
+		loc:   ic.loc,
+	}, cur, true
+}
+```
+
+And finally we implement the <code>longestMatch</code> helper:
+
+```go
+// longestMatch iterates through a source string starting at the given
+// cursor to find the longest matching substring among the provided
+// options
+func longestMatch(source string, ic cursor, options []string) string {
+	var value []byte
+	var skipList []int
+	var match string
+
+	cur := ic
+
+	for cur.pointer < uint(len(source)) {
+
+		value = append(value, strings.ToLower(string(source[cur.pointer]))...)
+		cur.pointer++
+
+	match:
+		for i, option := range options {
+			for _, skip := range skipList {
+				if i == skip {
+					continue match
+				}
+			}
+
+			// Deal with cases like INT vs INTO
+			if option == string(value) {
+				skipList = append(skipList, i)
+				if len(option) > len(match) {
+					match = option
+				}
+
+				continue
+			}
+
+			sharesPrefix := string(value) == option[:cur.pointer-ic.pointer]
+			tooLong := len(value) > len(option)
+			if tooLong || !sharesPrefix {
+				skipList = append(skipList, i)
+			}
+		}
+
+		if len(skipList) == len(options) {
+			break
+		}
+	}
+
+	return match
 }
 ```
 
