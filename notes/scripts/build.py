@@ -31,7 +31,8 @@ HOME_PAGE = """
   <p>
     Hello! I'm Phil, an Engineering Manager at a <a
     href="https://www.linkedin.com/in/phil-e-97a490178/">software
-    company</a> in New York City.
+    company</a> in New York City. The next career challenge will be in
+    senior engineering management or cofounding.
   </p>
   <p>
     I'm interested in compilers, databases, networks, and operating
@@ -52,7 +53,7 @@ HOME_PAGE = """
   <p>
     <a class="subscribe"
     href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">Subscribe
-    to updates.</a>
+    to blog updates and a weekly-ish newsletter.</a>
   </p>
 </div>
 <div class="fp-section fp-section--projects">

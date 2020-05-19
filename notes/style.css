@@ -164,7 +164,7 @@ aside p {
     font-size: .9rem;
 }
 
-.sm-link:not(:last-of-type) {
+.sm-link {
     padding-right: 5px;
     color: #333;
 }
