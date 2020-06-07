@@ -1,0 +1,48 @@
+# Generating a REST API from a database
+## June 6, 2020
+###### dbcore,go,postgres,mysql,sql,f-sharp
+
+I recently published an [alpha version of a code generation tool,
+DBCore,](https://eatonphil.github.io/dbcore/) that reads a database
+schema from PostgreSQL or MySQL and generates an entire Go API with
+CRUD operations, pagination, filtering, and authentication.
+
+But more than just generating code like
+[xo/xo](https://github.com/xo/xo) or [gnorm](https://gnorm.org/),
+DBCore defines a standard REST API that can be implemented in any
+language -- and includes a reference implementation in Go. I'm eager
+to add Java and Ruby implementations as well. And I'd be more than
+happy to accept community contributions.
+
+### Boilerplate & code generation
+
+Web application boilerplate is boring. You should do it once from
+scratch (preferably down to the socket layer) and never do it again. I
+struggled for the last few years to find the right system to reduce
+boilerplate. If I were building a new line-of-business application as
+an employee I'd pick one of Rails, ASP.NET, Spring, Django, or
+similar.
+
+But I've never worked on one of those frameworks professionally and
+I've never been able to force myself to learn any of them in my free
+time.
+
+Over the last few years though I've relied heavily on code generation
+for Go projects. Code generation is basically the only way to conserve
+type-safe code in Go. But it's similarly
+[popular](https://www.jooq.org/doc/3.13/manual/code-generation/) in
+more powerful languages like Java.
+
+### DBCore
+
+DBCore is written in F# and can be distributed as a static
+binary on all systems .NET now supports (read: not just Windows!).
+
+As mentioned, currently DBCore only provides a Go REST API
+template. But the next big step is to provide a template for
+generating a browser application that can integrate according to the
+DBCore API specification.
+
+Finally, while the tool only currently has a concept of "browser" and
+"api" templates, the project should be able to accept any kind of
+template and generate any text based on any database schema.
