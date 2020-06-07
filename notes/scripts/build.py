@@ -86,6 +86,10 @@ HOME_PAGE = """
     <div>gosql</div>
     <p>A PostgreSQL implementation in Go.</p>
   </a>
+  <a href="https://github.com/eatonphil/dbcore" class="fp-project">
+    <div>dbcore</div>
+    <p>A code generation tool and API specification powered by your database</p>
+  </a>
 </div>
 <div class="fp-section fp-section--talks">
   <h2 class="fp-h2">Talks</h2>
