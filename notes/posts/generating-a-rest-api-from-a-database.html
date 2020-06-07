@@ -37,15 +37,25 @@ type-safe code in Go. But it's similarly
 [popular](https://www.jooq.org/doc/3.13/manual/code-generation/) in
 more powerful languages like Java.
 
+However none of the existing projects give you much flexibility or
+provide you with enough templates to be useful.
+
 ### DBCore
 
 DBCore is written in F# and can be distributed as a static
 binary on all systems .NET now supports (read: not just Windows!).
 
+Reading from MySQL or PostgreSQL is supported but I'd like to see that
+extended to include SQLite, Oracle, and MS SQL at least.
+
 As mentioned, currently DBCore only provides a Go REST API
-template. But the next big step is to provide a template for
-generating a browser application that can integrate according to the
-DBCore API specification.
+template. That only solves half the problem of building an application
+though. And while there are some projects that can generate an admin
+CRUD interface for you, I want to see that more tightly integrated
+into DBCore. So I'll be introducing a new template for a browser
+application as well. For each table in the database it will generate a
+page showing paginated entries and allow you to create, update, and
+delete.
 
 Finally, while the tool only currently has a concept of "browser" and
 "api" templates, the project should be able to accept any kind of
