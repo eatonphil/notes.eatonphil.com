@@ -28,33 +28,27 @@ HOME_PAGE = """
 <style>header, footer { display: none !important; }</style>
 <div class="fp-section fp-section--about">
 <h2 class="fp-h2">Bio</h2>
-  <p>
+<p>
     Hello! I'm Phil, an Engineering Manager at a <a
     href="https://www.linkedin.com/in/phil-e-97a490178/">software
-    company</a> in New York City. The next career challenge will be in
-    senior engineering management or cofounding.
+    company</a> in New York City.
   </p>
   <p>
-    I'm interested in compilers, databases, networks, and operating
-    systems. At some point I'd like to work in agriculture, renewable
-    energy, shipping, Internet services, manufacturing, hardware, and
-    graphics.
+    As an engineer I'm big on compilers, databases, networks, and
+    operating systems. As an engineering leader I value market-driven
+    decisions and an aggressive, but patient and pragmatic approach to
+    finding and solving business problems.
   </p>
   <p>
     Having studied Chinese and Japanese in school, and with family in
-    Korea, I'd also like to spend some years working in East Asia.
+    Korea, I'd like to spend some years working in East Asia.
   </p>
   <p>
     You can find me elsewhere on <a
     href="https://github.com/eatonphil">Github</a>, <a
-    href="https://twitter.com/phil_eaton">Twitter</a>, and <a
-    href="https://www.goodreads.com/eatonphil">Goodreads</a>.
+    href="https://twitter.com/phil_eaton">Twitter</a>
   </p>
-  <p>
-    <a class="subscribe"
-    href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">Subscribe
-    to blog updates and a weekly-ish newsletter.</a>
-  </p>
+  <p><a href="mailto:me@eatonphil.com">Talk to me about engineering leadership.</a></p>
 </div>
 <div class="fp-section fp-section--projects">
   <h2 class="fp-h2">Fun</h2>
