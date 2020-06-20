@@ -195,17 +195,17 @@ def main():
             all_tags[tag].append((out_file, title[1], title[2]))
 
         title = title[1]
-        with open('dist/' + out_file, 'w') as f:
+        with open('docs/' + out_file, 'w') as f:
             f.write(TEMPLATE.format(post=output, title=title, subtitle=date, tag=title, tags=tags_html))
 
     post_data.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
     post_data.reverse()
     home_page = HOME_PAGE
     home_page += "\n".join([POST_SUMMARY.format(*args[:2], args[5], *args[2:3]) for args in post_data])
-    with open('dist/index.html', 'w') as f:
+    with open('docs/index.html', 'w') as f:
         f.write(TEMPLATE.format(post=home_page, title="", tag=TAG, subtitle="", tags=""))
 
-    with open('dist/style.css', 'w') as fw:
+    with open('docs/style.css', 'w') as fw:
         with open('style.css') as fr:
             fw.write(fr.read())
 
@@ -224,13 +224,13 @@ def main():
     fg.description(TAG)
     fg.author(name='Phil Eaton', email='me@eatonphil.com')
     fg.language('en')
-    fg.rss_file('dist/rss.xml')
+    fg.rss_file('docs/rss.xml')
 
-    if not os.path.exists('dist/tags'):
-        os.makedirs('dist/tags')
+    if not os.path.exists('docs/tags'):
+        os.makedirs('docs/tags')
     for tag in all_tags:
         posts = all_tags[tag]
-        with open('dist/tags/%s.html' % tag, 'w') as f:
+        with open('docs/tags/%s.html' % tag, 'w') as f:
             posts.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
             posts.reverse()
             tag_page = TAG_PAGE.format(tag)

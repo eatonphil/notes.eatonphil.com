@@ -1,3 +1,0 @@
-#!/bin/sh
-
-rsync -r dist/* eatonphil.com:/var/www/html

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Interpreting TypeScript | notes.eatonphil.com</title>
+    <meta name="description" content="Interpreting TypeScript" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>April 14, 2019</h2>
+          <h1>Interpreting TypeScript</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/typescript.html" class="tag">typescript</a><a href="/tags/interpreter.html" class="tag">interpreter</a><a href="/tags/ast.html" class="tag">ast</a><a href="/tags/node.html" class="tag">node</a><a href="/tags/javascript.html" class="tag">javascript</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>In addition to providing a static type system and compiler for a
+superset of JavaScript, TypeScript makes much of its functionality
+available programmatically. In this post we'll use the TypeScript
+compiler API to build an interpreter. We'll build off of a <a href="https://github.com/Microsoft/TypeScript/wiki/Using-the-Compiler-API">TypeScript
+wiki
+article</a>
+and cover a few areas that were confusing to me as I built out
+<a href="https://github.com/eatonphil/jsc">a separate project</a>.</p>
+<p>The end result we're building will look like this:</p>
+<pre><code class="hljs bash">$ cat test.ts # A program we can interpret
+print(1 + 5);
+$ tsc interpreter.ts # Build the source code for the interpreter
+$ node interpreter.js test.ts # Run the interpreter against test program
+6
+</code></pre>
+<p><a href="https://github.com/eatonphil/jsi">All code is available on Github.</a></p>
+<h3 id="setup">Setup</h3><p>To begin with, we need Node.js and some dependencies:</p>
+<pre><code class="hljs bash">$ yarn add typescript @types/node
+</code></pre>
+<p>Then we can begin the first stage of an interpreter: parsing the code.</p>
+<h3 id="parsing">Parsing</h3><p>Parsing a fixed set of files is simple enough. We pass a list of files
+to <code>createProgram</code> along with compiler options. But, as a user, we
+don't want to keep track of all files used by a program
+(i.e. everything we import). The most ideal situation is to pass a
+single-file entrypoint (something like a main.js) and have our
+interpreter figure out all the imports and handle them
+recursively. More on this later, for now we'll just parse the
+single-file entrypoint.</p>
+<pre><code class="hljs typescript">import * as ts from &#39;typescript&#39;;
+
+const TS_COMPILER_OPTIONS = {
+  allowNonTsExtensions: true,
+};
+
+function parse(fileName: string): ts.Program {
+  return ts.createProgram([fileName], TS_COMPILER_OPTIONS);
+}
+
+function interpret(program: ts.Program) { // TODO }
+
+function main(entrypoint: string) {
+  const program = parse(entrypoint);
+  interpret(program);
+}
+
+main(process.argv[2]);
+</code></pre>
+<h3 id="interpret-and-ts.program">interpret and ts.Program</h3><p>A program contains all source files as well as any implicitly needed
+TypeScript definition files (for us it will just be the TypeScript
+definitions for the Node.js standard library).</p>
+<p class="note">
+  The program also gives us access to a type checker that we can use
+  to query the type of any node in the program tree. We'll get into
+  this in another post.
+</p><p>Our interpret program will iterate over all the source files, ignoring
+the TypeScript definition files, and call interpretNode on all the
+elements of the source file.</p>
+<pre><code class="hljs typescript">function interpretNode(node: ts.Node) { // TODO }
+
+function interpret(program: ts.Program) {
+  return program.getSourceFiles().map((source) =&gt; {
+    const { fileName } = source;
+    if (fileName.endsWith(&#39;.d.ts&#39;)) {
+      return;
+    }
+
+    const results = [];
+    ts.forEachChild(source, (node) =&gt; {
+      results.push(interpretNode(node));
+    });
+    return results;
+  });
+}
+</code></pre>
+<h3 id="interpretnode-and-ts.node">interpretNode and ts.Node</h3><p>A Node is a wrapper for most elements of what we consider a program to
+be, such as a binary expression (<code>2 + 3</code>), a literal
+expression (<code>2</code>), a function call expression
+(<code>a(c)</code>), and so forth. When exploring a parser, it takes
+time to become familiar with the particular way that a parser breaks
+out a program into a tree of nodes.</p>
+<p>As a concrete example, the following program:</p>
+<pre><code class="hljs typescript">print(a);
+</code></pre>
+<p>Will be built into ts.Node tree along these lines:</p>
+<pre><code>Node: ExpressionStatement: print(a);
+  Node: CallExpression: print, a
+    Node: Identifier: print
+    Node: Identifier: a
+Node: EndOfFileToken
+</code></pre>
+<p>And another example:</p>
+<pre><code class="hljs typescript">1 + 3;
+</code></pre>
+<p>Will be built into a ts.Node tree along these lines:</p>
+<pre><code>Node: Expression: 1 + 3
+  Node: BinaryExpression: 1, 3, +
+    Node: NumericLiteral: 1
+    Node: NumericLiteral: 3
+    Node: PlusToken
+Node: EndOfFileToken
+</code></pre>
+<p>But how would one come to know this?</p>
+<h4 id="exploring-the-ts.node-tree">Exploring the ts.Node tree</h4><p>The easiest thing to do is throw an error on every Node type we don't
+yet know about and fill in support for each program we throw at the
+interpreter.</p>
+<p>For example:</p>
+<pre><code class="hljs typescript">function interpretNode(node: ts.Node) {
+  switch (node.kind) {
+    default:
+      throw new Error(&#39;Unsupported node type: &#39; + ts.SyntaxKind[node.kind]);
+  }
+}
+</code></pre>
+<p>Now let's run our interpreter against an input file,
+<code>test.ts</code>, that combines these two to make a
+semi-interesting program:</p>
+<pre><code class="hljs bash">$ cat test.ts
+print(1 + 2);
+$ tsc interpreter.ts
+$ node interpreter.js test.ts
+...
+Error: Unsupported node type: ExpressionStatement
+...
+</code></pre>
+<p>And we see an outer wrapper, an ExpressionStatement. To proceed we
+look up the definition of an ExpressionStatement in TypeScript source
+code,
+<a href="https://github.com/Microsoft/TypeScript/blob/master/src/compiler/types.ts">src/compiler/types.ts</a>
+to be specific. This file will become our best friend. Hit ctrl-f and
+look for "interface ExpressionStatement ". We see that it has only one
+child, <code>expression</code>, so we call <code>interpretNode</code>
+on this recursively:</p>
+<pre><code class="hljs typescript">function interpretNode(node: ts.Node) {
+  switch (node.kind) {
+    case ts.SyntaxKind.ExpressionStatement: {
+      const es = node as ts.ExpressionStatement;
+      return interpretNode(es.expression);
+    }
+    default:
+      throw new Error(&#39;Unsupported node type: &#39; + ts.SyntaxKind[node.kind]);
+  }
+}
+</code></pre>
+<p>Thankfully TypeScript will be very quick to call us out if we
+misunderstand this structure.</p>
+<p class="note">
+  It's pretty weird to me that the ts.Node tree is organized such that
+  I must cast at each ts.Node but that's what they do even in the
+  TypeScript source so I don't think I'm misunderstanding.
+</p><p>Now we recompile and run the interpreter against the program to
+discover the next ts.Node type.</p>
+<pre><code class="hljs bash">$ tsc interpreter.ts
+$ node interpreter.js test.ts
+...
+Error: Unsupported node type: CallExpression
+...
+</code></pre>
+<p>Cool! Back to
+<a href="https://github.com/Microsoft/TypeScript/blob/master/src/compiler/types.ts">src/compiler/types.ts</a>.
+Call expressions are complex enough that we'll break out handling them
+into a separate function.</p>
+<h3 id="interpretcall-and-ts.callexpression">interpretCall and ts.CallExpression</h3><p>From our reading of types.ts we need to handle the expression that
+evaluates to a function, and we need to handle its parameters. We'll
+just call <code>interpretNode</code> on each of these to get their
+real value. And finally we'll call the function with the arguments.</p>
+<pre><code class="hljs typescript">function interpretCall(ce: ts.CallExpression) {
+  const fn = interpretNode(ce.expression);
+  const args = ce.arguments.map(interpretNode);
+  return fn(...args);
+}
+
+function interpretNode() {
+  switch (node.kind) {
+    ...
+    case ts.SyntaxKind.CallExpression: {
+      const ce = node as ts.CallExpression;
+      return interpretCall(ce);
+    }
+    ...
+  }
+}
+</code></pre>
+<p class="node">
+  Please ignore the fact that we are not correctly setting
+  <code>this</code> here.
+</p><p>Recompile and let's see what's next!</p>
+<pre><code class="hljs bash">$ tsc interpreter.ts
+$ node interpreter.js test.ts
+...
+Error: Unsupported node type: Identifier
+...
+</code></pre>
+<p>And back to types.ts.</p>
+<h3 id="ts.identifier">ts.Identifier</h3><p>In order to support identifiers in general we'd need to have a context
+we could use to look up the value of an identifier. But we don't have
+a context like this right now so we'll add builtin support for a
+<code>print</code> function so we can get some output!</p>
+<pre><code class="hljs typescript">function interpretNode() {
+  switch (node.kind) {
+    ...
+    case ts.SyntaxKind.Identifier: {
+      const id = (node as ts.Identifier).escapedText as string;
+      if (id === &#39;print&#39;) {
+        return function (...args) { console.log(...args); };
+      }
+
+      throw new Error(&#39;Unsupported identifier: &#39; + id);
+    }
+    ...
+  }
+}
+</code></pre>
+<p>Recompile and let's see what's next!</p>
+<pre><code class="hljs bash">$ tsc interpreter.ts
+$ node interpreter.js test.ts
+...
+Error: Unsupported node type: BinaryExpression
+...
+</code></pre>
+<p>And we're finally into the parameters.</p>
+<h3 id="interpretbinaryexpression-and-ts.binaryexpression">interpretBinaryExpression and ts.BinaryExpression</h3><p>Looking into types.ts for this Node type suggests we may want to break
+this out into its own function as well; there are a ton of operator
+types. Within the <code>interpretBinaryExpression</code> helper we'll
+interpret each operand and then switch on the operator type. We'll
+throw an error on operators we don't know about -- all of them at
+first:</p>
+<pre><code class="hljs typescript">function interpretBinaryExpression(be: ts.BinaryExpression) {
+  const left = interpretNode(be.left);
+  const right = interpretNode(be.right);
+  switch (be.operatorToken.kind) {
+    default:
+      throw new Error(&#39;Unsupported operator: &#39; + ts.SyntaxKind[be.operatorToken.kind]);
+  }
+}
+
+function interpretNode() {
+  switch (node.kind) {
+    ...
+    case ts.SyntaxKind.BinaryExpression: {
+      const be = node as ts.BinaryExpression;
+      return interpretBinaryExpression(be);
+    }
+    ...
+  }
+}
+</code></pre>
+<p>We know the drill.</p>
+<pre><code class="hljs bash">$ tsc interpreter.ts
+$ node interpreter.js test.ts
+...
+Error: Unsupported node type: FirstLiteralToken
+...
+</code></pre>
+<p>At this point we're actually failing first on an unknown <strong>node type</strong>
+rather than an operator. This is because we interpret the operands
+(which are numeric literals) before we look up the operator. Time to
+revisit types.ts!</p>
+<h3 id="ts.firstliteraltoken,-ts.numericliteral">ts.FirstLiteralToken, ts.NumericLiteral</h3><p>Looking at types.ts shows us that <code>FirstLiteralToken</code> is a
+synonym for <code>NumericLiteral</code>. The latter name is more
+obvious, so let's add that to our supported Node list:</p>
+<pre><code class="hljs typescript">function interpretNode() {
+  switch (node.kind) {
+    ...
+      case ts.SyntaxKind.NumericLiteral: {
+      const nl = node as ts.NumericLiteral;
+      return Number(nl.text);
+    }
+    ...
+  }
+}
+</code></pre>
+<p>And we keep going!</p>
+<pre><code class="hljs bash">$ tsc interpreter.ts
+$ node interpreter.js test.ts
+...
+Error: Unsupported operator: PlusToken
+...
+</code></pre>
+<p>And we're into unknown operator territory!</p>
+<h3 id="interpretbinaryexpression-and-ts.plustoken">interpretBinaryExpression and ts.PlusToken</h3><p>A simple extension to our existing
+<code>interpretBinaryExpression</code>, we return the sum of the left
+and right values:</p>
+<pre><code class="hljs typescript">function interpretBinaryExpression(be: ts.BinaryExpression) {
+  const left = interpretNode(be.left);
+  const right = interpretNode(be.right);
+  switch (be.operatorToken.kind) {
+    case ts.SyntaxKind.PlusToken:
+      return left + right;
+    default:
+      throw new Error(&#39;Unsupported operator: &#39; + ts.SyntaxKind[be.operatorToken.kind]);
+  }
+}
+</code></pre>
+<p>And we give it another shot.</p>
+<pre><code class="hljs bash">$ tsc interpreter.ts
+$ node interpreter.js test.ts
+...
+Error: Unsupported node type: EndOfFileToken
+...
+</code></pre>
+<h3 id="ts.syntaxkind.endoffiletoken">ts.SyntaxKind.EndOfFileToken</h3><p>Our final Node type before a working program, we simply do nothing:</p>
+<pre><code class="hljs typescript">function interpretNode() {
+  switch (node.kind) {
+    ...
+    case ts.SyntaxKind.EndOfFileToken:
+      break;
+    ...
+  }
+}
+</code></pre>
+<p>One more time:</p>
+<pre><code class="hljs bash">$ tsc interpreter.ts
+$ node interpreter.js test.ts
+3
+</code></pre>
+<p>A working program! And if we jiggle the test?</p>
+<pre><code>$ cat test.ts
+print(1 + 5);
+$ node interpreter.js test.ts
+6
+</code></pre>
+<p>We're well on our way to interpreting TypeScript, and have gained some
+familiarity with the TypeScript Compiler API.</p>
+<p><a href="https://github.com/eatonphil/jsi">All code is available on Github.</a></p>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">Quick intro to the TypeScript Compiler API by writing an interpreter <a href="https://t.co/QKz3XtOuP9">https://t.co/QKz3XtOuP9</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1117461518801604613?ref_src=twsrc%5Etfw">April 14, 2019</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

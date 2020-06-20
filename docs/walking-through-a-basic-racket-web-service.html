@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Walking through a basic Racket web service | notes.eatonphil.com</title>
+    <meta name="description" content="Walking through a basic Racket web service" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>December 29, 2016</h2>
+          <h1>Walking through a basic Racket web service</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/racket.html" class="tag">racket</a><a href="/tags/scheme.html" class="tag">scheme</a><a href="/tags/web servers.html" class="tag">web servers</a><a href="/tags/lisp.html" class="tag">lisp</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>Racket is an impressive language and ecosystem. Compared to Python,
+Racket (an evolution of Scheme <a href="https://en.wikipedia.org/wiki/Scheme_(programming_language)">R5RS</a> is three years younger. It is
+as concise and expressive as Python but with much more reasonable
+syntax and semantics. Racket is also faster in many cases due in part
+to:</p>
+<ul>
+<li><a href="https://docs.racket-lang.org/guide/performance.html#%28part._.J.I.T%29">JIT compilation</a> on x86 platforms</li>
+<li>support for both
+<a href="https://docs.racket-lang.org/reference/threads.html">concurrency</a> and <a href="https://docs.racket-lang.org/reference/places.html">parallelism</a></li>
+<li>support for <a href="https://docs.racket-lang.org/ts-guide/optimization.html">optimizing</a> statically-typed code</li>
+</ul>
+<p>Furthermore, the built-in web server libraries <strong>and</strong> database
+drivers for MySQL and PostgreSQL are fully asynchronous. This last bit
+drove me here from <a href="https://www.playframework.com/documentation/2.6.x/ThreadPools#Knowing-when-you-are-blocking">Play / Akka</a>.  (But strong reservations about
+the complexity of Scala and the ugliness of Play in Java helped too.)</p>
+<p>With this motivation in mind, I'm going to break down the simple web
+service <a href="https://docs.racket-lang.org/web-server/stateless.html#%28part._stateless-example%29">example</a> provided in the Racket manuals. If you don't see
+the following code in the linked page immediately, scroll down a bit.</p>
+<pre><code class="hljs scheme">#lang web-server
+
+(require web-server/http)
+
+(provide interface-version stuffer start)
+
+(define interface-version &#39;stateless)
+
+(define stuffer
+  (stuffer-chain
+   serialize-stuffer
+   (md5-stuffer (build-path (find-system-path &#39;home-dir) &quot;.urls&quot;))))
+
+(define (start req)
+  (response/xexpr
+   `(html (body (h2 &quot;Look ma, no state!&quot;)))))
+</code></pre>
+<p>First we notice the #lang declaration. Racket libraries love to make
+new "languages". These languages can include some entirely new syntax
+(like the <a href="http://docs.racket-lang.org/algol60/">Algol language implementation</a>) or can simply include a
+summary collection of libraries and alternative program entrypoints
+(such as this web-server language provides). So the first thing we'll
+do to really understand this code is to throw out the custom
+language. And while we're at it, we'll throw out all typical imports
+provided by the <a href="http://docs.racket-lang.org/reference/">default racket language</a> and use the racket/base
+language instead. This will help us get a better understanding of the
+Racket libraries and the functions we're using from these libraries.</p>
+<p>While we're throwing the language away, we notice the paragraphs just
+below that <a href="https://docs.racket-lang.org/web-server/stateless.html#%28part._stateless-example%29">original example</a> in the manual. It mentions that the
+web-server language also imports a bunch of modules. We can discover
+which of these modules we actually need by searching in the Racket
+manual for functions we've used.  For instance, <a href="https://docs.racket-lang.org/search/index.html?q=response%2Fxexpr">searching</a> for
+"response/xexpr" tells us it's in the <a href="https://docs.racket-lang.org/web-server/http.html#%28part._xexpr%29">web-server/http/xexpr</a>
+module. We'll import the modules we need using the "prefix-in" form to
+make function-module connections explicit.</p>
+<pre><code class="hljs scheme">#lang racket/base
+
+(require (prefix-in xexpr: web-server/http/xexpr)
+         (prefix-in hash: web-server/stuffers/hash)
+         (prefix-in stuffer: web-server/stuffers/stuffer)
+         (prefix-in serialize: web-server/stuffers/serialize))
+
+(provide interface-version stuffer start)
+
+(define interface-version &#39;stateless)
+
+(define stuffer
+  (stuffer:stuffer-chain
+   serialize:serialize-stuffer
+   (hash:md5-stuffer (build-path (find-system-path &#39;home-dir) &quot;.urls&quot;))))
+
+(define (start req)
+  (xexpr:response/xexpr
+   `(html (body (h2 &quot;Look ma, no state!&quot;)))))
+</code></pre>
+<p>Now we've got something that is a little less magical. We can run this
+file by calling it: "racket server.rkt". But nothing happens. This is
+because the web-server language would start the service itself using
+the exported variables we provided. So we're going to have to figure
+out what underlying function calls "start" and call it
+ourselves. Unfortunately searching for "start" in the manual search
+field yields nothing relevant. So we Google "racket web server
+start". Down the page on the second <a href="https://docs.racket-lang.org/web-server/run.html">search result</a> we notice an
+<a href="https://docs.racket-lang.org/web-server/run.html#%28part._.Examples%29">example</a> using the serve/servlet function to register the start
+function.  This is our in.</p>
+<pre><code class="hljs scheme">#lang racket/base
+
+(require (prefix-in xexpr: web-server/http/xexpr)
+         (prefix-in hash: web-server/stuffers/hash)
+         (prefix-in stuffer: web-server/stuffers/stuffer)
+         (prefix-in serialize: web-server/stuffers/serialize)
+         (prefix-in servlet-env: web-server/servlet-env))
+
+(provide interface-version stuffer start)
+
+(define interface-version &#39;stateless)
+
+(define stuffer
+  (stuffer:stuffer-chain
+   serialize:serialize-stuffer
+   (hash:md5-stuffer (build-path (find-system-path &#39;home-dir) &quot;.urls&quot;))))
+
+(define (start req)
+  (xexpr:response/xexpr
+   `(html (body (h2 &quot;Look ma, no state!&quot;)))))
+
+(servlet-env:serve/servlet start)
+</code></pre>
+<p>Run this version and it works! We are directed to a browser with our
+HTML.  But we should clean this code up a bit. We no longer need to
+export anything so we'll drop the provide line. We aren't even using
+the interface-version and stuffer code. Things seem to be fine without
+them, so we'll drop those too.  Also, looking at the serve/servlet
+<a href="https://docs.racket-lang.org/web-server/run.html#%28def._%28%28lib._web-server%2Fservlet-env..rkt%29._serve%2Fservlet%29%29">documentation</a> we notice some other nice arguments we can tack
+on.</p>
+<pre><code class="hljs scheme">#lang racket/base
+
+(require (prefix-in xexpr: web-server/http/xexpr)
+         (prefix-in servlet-env: web-server/servlet-env))
+
+(define (start req)
+  (xexpr:response/xexpr
+   `(html (body (h2 &quot;Look ma, no state!&quot;)))))
+
+(servlet-env:serve/servlet
+ start
+ #:servlet-path &quot;/&quot;
+ #:servlet-regexp rx&quot;&quot;
+ #:stateless? #t)
+</code></pre>
+<p>Ah, that's much cleaner. When you run this code, you will no longer be
+directed to the /servlets/standalone.rkt path but to the site root --
+set by the #:servlet-path optional variable. Also, every other path
+you try to reach such as /foobar will successfully map to the start
+function -- set by the #:servlet-regexp optional variable. Finally, we
+also found the configuration to set the servlet stateless -- set by
+the optional variable #:stateless?.</p>
+<p>But this is missing two things we could really use out of a simple web
+service. The first is routing. We do that by looking up the
+documentation for the <a href="https://docs.racket-lang.org/web-server/dispatch.html">web-server/dispatch</a> module. We'll use this
+module to define some routes -- adding a 404 route to demonstrate the
+usage.</p>
+<pre><code class="hljs scheme">#lang racket/base
+
+(require (prefix-in dispatch: web-server/dispatch)
+         (prefix-in xexpr: web-server/http/xexpr)
+         (prefix-in servlet: web-server/servlet-env))
+
+(define (not-found-route request)
+  (xexpr:response/xexpr
+   `(html (body (h2 &quot;Uh-oh! Page not found.&quot;)))))
+
+(define (home-route request)
+  (xexpr:response/xexpr
+   `(html (body (h2 &quot;Look ma, no state!!!!!!!!!&quot;)))))
+
+(define-values (route-dispatch route-url)
+  (dispatch:dispatch-rules
+   [(&quot;&quot;) home-route]
+   [else not-found-route]))
+
+(servlet:serve/servlet
+ route-dispatch
+ #:servlet-path &quot;/&quot;
+ #:servlet-regexp #rx&quot;&quot;
+ #:stateless? #t)
+</code></pre>
+<p>Run this version and check out the server root. Then try any other
+path. Looks good.  The final missing piece to this simple web service
+is logging. Thankfully, the <a href="https://docs.racket-lang.org/web-server-internal/dispatch-log.html">web-server/dispatch-log</a> module has
+us covered with some request formatting functions. So we'll wrap the
+route-dispatch function and we'll print out the formatted request.</p>
+<pre><code class="hljs scheme">#lang racket/base
+
+(require (prefix-in dispatch: web-server/dispatch)
+         (prefix-in dispatch-log: web-server/dispatchers/dispatch-log)
+         (prefix-in xexpr: web-server/http/xexpr)
+         (prefix-in servlet: web-server/servlet-env))
+
+(define (not-found-route request)
+  (xexpr:response/xexpr
+   `(html (body (h2 &quot;Uh-oh! Page not found.&quot;)))))
+
+(define (home-route request)
+  (xexpr:response/xexpr
+   `(html (body (h2 &quot;Look ma, no state!!!!!!!!!&quot;)))))
+
+(define-values (route-dispatch route-url)
+  (dispatch:dispatch-rules
+   [(&quot;&quot;) home-route]
+   [else not-found-route]))
+
+(define (route-dispatch/log-middleware req)
+  (display (dispatch-log:apache-default-format req))
+  (flush-output)
+  (route-dispatch req))
+
+(servlet:serve/servlet
+ route-dispatch/log-middleware
+ #:servlet-path &quot;/&quot;
+ #:servlet-regexp #rx&quot;&quot;
+ #:stateless? #t)
+</code></pre>
+<p>Run this version and notice the logs displayed for each request. Now
+you've got a simple web service with routing and logging!  I hope this
+gives you a taste for how easy it is to build simple web services in
+Racket without downloading any third-party libraries. Database drivers
+and HTML template libraries are also included and similarly
+well-documented. In the future I hope to add an example of a slightly
+more advanced web service.</p>
+<p class="note">
+  I have had huge difficulty discovering the source of Racket
+  libraries.  These library sources are nearly impossible to Google
+  and search on Github is insane.  Best scenario, the official
+  racket.org docs would link directly to the source of a function when
+  the function is documented. Of course I could just download the
+  Racket source and start grepping... but I'm only so interested.
+</p><script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/languages/scheme.min.js"></script><h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">Walking through a basic Racket web service <a href="https://t.co/J3us48kzga">https://t.co/J3us48kzga</a> <a href="https://twitter.com/racketlang?ref_src=twsrc%5Etfw">@racketlang</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/814674473681121280?ref_src=twsrc%5Etfw">December 30, 2016</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

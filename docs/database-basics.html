@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Writing a SQL database from scratch in Go: 1. SELECT, INSERT, CREATE and a REPL | notes.eatonphil.com</title>
+    <meta name="description" content="Writing a SQL database from scratch in Go: 1. SELECT, INSERT, CREATE and a REPL" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>March 6, 2020</h2>
+          <h1>Writing a SQL database from scratch in Go: 1. SELECT, INSERT, CREATE and a REPL</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/database.html" class="tag">database</a><a href="/tags/golang.html" class="tag">golang</a><a href="/tags/parsing.html" class="tag">parsing</a><a href="/tags/sql.html" class="tag">sql</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p class="note">
+  Next in database basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/database-basics-expressions-and-where.html">2. binary expressions and WHERE filters</a>
+  <br />
+  <a href="/database-basics-indexes.html">3. indexes</a>
+  <br />
+  <a href="/database-basics-a-database-sql-driver.html">4. a database/sql driver</a>
+</p><p>In this series we'll write a rudimentary database from
+scratch in Go. Project source code is available on
+<a href="https://github.com/eatonphil/gosql">Github</a>.</p>
+<p>In this first post we'll build enough of a parser to run some simple
+<code>CREATE</code>, <code>INSERT</code>, and <code>SELECT</code>
+queries. Then we'll build an in-memory backend
+supporting <code>TEXT</code> and <code>INT</code> types and write a
+basic REPL.</p>
+<p>We'll be able to support the following interaction:</p>
+<pre><code class="hljs sql">$ go run *.go
+Welcome to gosql.
+# CREATE TABLE users (id INT, name TEXT);
+ok
+# INSERT INTO users VALUES (1, &#39;Phil&#39;);
+ok
+# SELECT id, name FROM users;
+| id | name |
+====================
+| 1 |  Phil |
+ok
+# INSERT INTO users VALUES (2, &#39;Kate&#39;);
+ok
+# SELECT name, id FROM users;
+| name | id |
+====================
+| Phil |  1 |
+| Kate |  2 |
+ok
+</code></pre>
+<p>The first stage will be to map a SQL source into a list of tokens
+(lexing). Then we'll call parse functions to find individual SQL
+statements (such as <code>SELECT</code>). These parse functions will
+in turn call their own helper functions to find patterns of
+recursively parseable chunks, keywords, symbols (like parenthesis),
+identifiers (like a table name), and numeric or string literals.</p>
+<p>Then, we'll write an in-memory backend to do operations based on an
+AST. Finally, we'll write a REPL to accept SQL from a CLI and pass it
+to the in-memory backend.</p>
+<p class="note">
+  This post assumes a basic understanding of parsing concepts. We
+  won't skip any code, but also won't go into great detail on why we
+  structure the way we do.
+  <br />
+  <br />
+  For a simpler introduction to parsing and parsing concepts,
+  see <a href="/writing-a-simple-json-parser.html">this post on
+  parsing JSON</a>.
+</p><h3 id="lexing">Lexing</h3><p>The lexer is responsible for finding every distinct group of
+characters in source code: tokens. This will consist primarily of
+identifiers, numbers, strings, and symbols.</p>
+<p class="note">
+  What follows is a second, more orthodox pass at lexing. The first
+  pass took a number of shortcuts and couldn't handle spaces in
+  strings, for example.
+  <br />
+  <br />
+  <a href="https://github.com/eatonphil/gosql/pull/2">Here is the
+  relevant pull request in gosql if you are curious.</a>
+</p><p>The gist of the logic will be to pass control to a helper function for
+each kind of token. If the helper function succeeds in finding a
+token, it will return true and the location for the lexer to start at
+next. It will continue doing this until it reaches the end of the
+source.</p>
+<p>First off, we'll define a few types and constants for use
+in <code>lexer.go</code>:</p>
+<pre><code class="hljs go">package gosql
+
+import (
+    &quot;fmt&quot;
+    &quot;strings&quot;
+)
+
+type location struct {
+    line uint
+    col  uint
+}
+
+type keyword string
+
+const (
+    selectKeyword keyword = &quot;select&quot;
+    fromKeyword   keyword = &quot;from&quot;
+    asKeyword     keyword = &quot;as&quot;
+    tableKeyword  keyword = &quot;table&quot;
+    createKeyword keyword = &quot;create&quot;
+    insertKeyword keyword = &quot;insert&quot;
+    intoKeyword   keyword = &quot;into&quot;
+    valuesKeyword keyword = &quot;values&quot;
+    intKeyword    keyword = &quot;int&quot;
+    textKeyword   keyword = &quot;text&quot;
+)
+
+type symbol string
+
+const (
+    semicolonSymbol  symbol = &quot;;&quot;
+    asteriskSymbol   symbol = &quot;*&quot;
+    commaSymbol      symbol = &quot;,&quot;
+    leftparenSymbol  symbol = &quot;(&quot;
+    rightparenSymbol symbol = &quot;)&quot;
+)
+
+type tokenKind uint
+
+const (
+    keywordKind tokenKind = iota
+    symbolKind
+    identifierKind
+    stringKind
+    numericKind
+)
+
+type token struct {
+    value string
+    kind  tokenKind
+    loc   location
+}
+
+type cursor struct {
+    pointer uint
+    loc     location
+}
+
+func (t *token) equals(other *token) bool {
+    return t.value == other.value &amp;&amp; t.kind == other.kind
+}
+
+type lexer func(string, cursor) (*token, cursor, bool)
+</code></pre>
+<p>Next we'll write out the main loop:</p>
+<pre><code class="hljs go">func lex(source string) ([]*token, error) {
+    tokens := []*token{}
+    cur := cursor{}
+
+lex:
+    for cur.pointer &lt; uint(len(source)) {
+        lexers := []lexer{lexKeyword, lexSymbol, lexString, lexNumeric, lexIdentifier}
+        for _, l := range lexers {
+            if token, newCursor, ok := l(source, cur); ok {
+                cur = newCursor
+
+                // Omit nil tokens for valid, but empty syntax like newlines
+                if token != nil {
+                    tokens = append(tokens, token)
+                }
+
+                continue lex
+            }
+        }
+
+        hint := &quot;&quot;
+        if len(tokens) &gt; 0 {
+            hint = &quot; after &quot; + tokens[len(tokens)-1].value
+        }
+        return nil, fmt.Errorf(&quot;Unable to lex token%s, at %d:%d&quot;, hint, cur.loc.line, cur.loc.col)
+    }
+
+    return tokens, nil
+}
+</code></pre>
+<p>Then we'll write a helper for each kind of fundemental token.</p>
+<h4 id="analyzing-numbers">Analyzing numbers</h4><p>Numbers are the most complex. So we'll refer to the <a href="https://www.postgresql.org/docs/current/sql-syntax-lexical.html">PostgreSQL
+documentation (section
+4.1.2.6)</a>
+for what constitutes a valid number.</p>
+<pre><code class="hljs go">func lexNumeric(source string, ic cursor) (*token, cursor, bool) {
+    cur := ic
+
+    periodFound := false
+    expMarkerFound := false
+
+    for ; cur.pointer &lt; uint(len(source)); cur.pointer++ {
+        c := source[cur.pointer]
+        cur.loc.col++
+
+        isDigit := c &gt;= &#39;0&#39; &amp;&amp; c &lt;= &#39;9&#39;
+        isPeriod := c == &#39;.&#39;
+        isExpMarker := c == &#39;e&#39;
+
+        // Must start with a digit or period
+        if cur.pointer == ic.pointer {
+            if !isDigit &amp;&amp; !isPeriod {
+                return nil, ic, false
+            }
+
+            periodFound = isPeriod
+            continue
+        }
+
+        if isPeriod {
+            if periodFound {
+                return nil, ic, false
+            }
+
+            periodFound = true
+            continue
+        }
+
+        if isExpMarker {
+            if expMarkerFound {
+                return nil, ic, false
+            }
+
+            // No periods allowed after expMarker
+            periodFound = true
+            expMarkerFound = true
+
+            // expMarker must be followed by digits
+            if cur.pointer == uint(len(source)-1) {
+                return nil, ic, false
+            }
+
+            cNext := source[cur.pointer+1]
+            if cNext == &#39;-&#39; || cNext == &#39;+&#39; {
+                cur.pointer++
+                cur.loc.col++
+            }
+
+            continue
+        }
+
+        if !isDigit {
+            break
+        }
+    }
+
+    // No characters accumulated
+    if cur.pointer == ic.pointer {
+        return nil, ic, false
+    }
+
+    return &amp;token{
+        value: source[ic.pointer:cur.pointer],
+        loc:   ic.loc,
+        kind:  numericKind,
+    }, cur, true
+}
+</code></pre>
+<h4 id="analyzing-strings">Analyzing strings</h4><p>Strings must start and end with a single apostrophe. They can contain
+a single apostophe if it is followed by another single
+apostrophe. We'll put this kind of character delimited lexing logic
+into a helper function so we can use it again when analyzing
+identifiers.</p>
+<pre><code class="hljs go">func lexCharacterDelimited(source string, ic cursor, delimiter byte) (*token, cursor, bool) {
+    cur := ic
+
+    if len(source[cur.pointer:]) == 0 {
+        return nil, ic, false
+    }
+
+    if source[cur.pointer] != delimiter {
+        return nil, ic, false
+    }
+
+    cur.loc.col++
+    cur.pointer++
+
+    var value []byte
+    for ; cur.pointer &lt; uint(len(source)); cur.pointer++ {
+        c := source[cur.pointer]
+
+        if c == delimiter {
+            // SQL escapes are via double characters, not backslash.
+            if cur.pointer+1 &gt;= uint(len(source)) || source[cur.pointer+1] != delimiter {
+                return &amp;token{
+                    value: string(value),
+                    loc:   ic.loc,
+                    kind:  stringKind,
+                }, cur, true
+            } else {
+                value = append(value, delimiter)
+                cur.pointer++
+                cur.loc.col++
+            }
+        }
+
+        value = append(value, c)
+        cur.loc.col++
+    }
+
+    return nil, ic, false
+}
+
+func lexString(source string, ic cursor) (*token, cursor, bool) {
+    return lexCharacterDelimited(source, ic, &#39;\&#39;&#39;)
+}
+</code></pre>
+<h4 id="analyzing-symbols-and-keywords">Analyzing symbols and keywords</h4><p>Symbols come from a fixed set of strings, so they're easy
+to compare against. Whitespace should be thrown away.</p>
+<pre><code class="hljs go">func lexSymbol(source string, ic cursor) (*token, cursor, bool) {
+    c := source[ic.pointer]
+    cur := ic
+    // Will get overwritten later if not an ignored syntax
+    cur.pointer++
+    cur.loc.col++
+
+    switch c {
+    // Syntax that should be thrown away
+    case &#39;\n&#39;:
+        cur.loc.line++
+        cur.loc.col = 0
+        fallthrough
+    case &#39;\t&#39;:
+        fallthrough
+    case &#39; &#39;:
+        return nil, cur, true
+    }
+
+    // Syntax that should be kept
+    symbols := []symbol{
+        commaSymbol,
+        leftParenSymbol,
+        rightParenSymbol,
+        semicolonSymbol,
+        asteriskSymbol,
+    }
+
+    var options []string
+    for _, s := range symbols {
+        options = append(options, string(s))
+    }
+
+    // Use `ic`, not `cur`
+    match := longestMatch(source, ic, options)
+    // Unknown character
+    if match == &quot;&quot; {
+        return nil, ic, false
+    }
+
+    cur.pointer = ic.pointer + uint(len(match))
+    cur.loc.col = ic.loc.col + uint(len(match))
+
+    return &amp;token{
+        value: match,
+        loc:   ic.loc,
+        kind:  symbolKind,
+    }, cur, true
+}
+</code></pre>
+<p>Keywords are even simpler, and use the same <code>longestMatch</code>
+helper.</p>
+<pre><code class="hljs go">func lexKeyword(source string, ic cursor) (*token, cursor, bool) {
+    cur := ic
+    keywords := []keyword{
+        selectKeyword,
+        insertKeyword,
+        valuesKeyword,
+        tableKeyword,
+        createKeyword,
+        whereKeyword,
+        fromKeyword,
+        intoKeyword,
+        textKeyword,
+    }
+
+    var options []string
+    for _, k := range keywords {
+        options = append(options, string(k))
+    }
+
+    match := longestMatch(source, ic, options)
+    if match == &quot;&quot; {
+        return nil, ic, false
+    }
+
+    cur.pointer = ic.pointer + uint(len(match))
+    cur.loc.col = ic.loc.col + uint(len(match))
+
+    return &amp;token{
+        value: match,
+        kind:  kind,
+        loc:   ic.loc,
+    }, cur, true
+}
+</code></pre>
+<p>And finally we implement the <code>longestMatch</code> helper:</p>
+<pre><code class="hljs go">// longestMatch iterates through a source string starting at the given
+// cursor to find the longest matching substring among the provided
+// options
+func longestMatch(source string, ic cursor, options []string) string {
+    var value []byte
+    var skipList []int
+    var match string
+
+    cur := ic
+
+    for cur.pointer &lt; uint(len(source)) {
+
+        value = append(value, strings.ToLower(string(source[cur.pointer]))...)
+        cur.pointer++
+
+    match:
+        for i, option := range options {
+            for _, skip := range skipList {
+                if i == skip {
+                    continue match
+                }
+            }
+
+            // Deal with cases like INT vs INTO
+            if option == string(value) {
+                skipList = append(skipList, i)
+                if len(option) &gt; len(match) {
+                    match = option
+                }
+
+                continue
+            }
+
+            sharesPrefix := string(value) == option[:cur.pointer-ic.pointer]
+            tooLong := len(value) &gt; len(option)
+            if tooLong || !sharesPrefix {
+                skipList = append(skipList, i)
+            }
+        }
+
+        if len(skipList) == len(options) {
+            break
+        }
+    }
+
+    return match
+}
+</code></pre>
+<h4 id="analyzing-identifiers">Analyzing identifiers</h4><p>An identifier is either a double-quoted string or a group of
+characters starting with an alphabetical character and possibly
+containing numbers and underscores.</p>
+<pre><code class="hljs go">func lexIdentifier(source string, ic cursor) (*token, cursor, bool) {
+    // Handle separately if is a double-quoted identifier
+    if token, newCursor, ok := lexCharacterDelimited(source, ic, &#39;&quot;&#39;); ok {
+        return token, newCursor, true
+    }
+
+    cur := ic
+
+    c := source[cur.pointer]
+    // Other characters count too, big ignoring non-ascii for now
+    isAlphabetical := (c &gt;= &#39;A&#39; &amp;&amp; c &lt;= &#39;Z&#39;) || (c &gt;= &#39;a&#39; &amp;&amp; c &lt;= &#39;z&#39;)
+    if !isAlphabetical {
+        return nil, ic, false
+    }
+    cur.pointer++
+    cur.loc.col++
+
+    value := []byte{c}
+    for ; cur.pointer &lt; uint(len(source)); cur.pointer++ {
+        c = source[cur.pointer]
+
+        // Other characters count too, big ignoring non-ascii for now
+        isAlphabetical := (c &gt;= &#39;A&#39; &amp;&amp; c &lt;= &#39;Z&#39;) || (c &gt;= &#39;a&#39; &amp;&amp; c &lt;= &#39;z&#39;)
+        isNumeric := c &gt;= &#39;0&#39; &amp;&amp; c &lt;= &#39;9&#39;
+        if isAlphabetical || isNumeric || c == &#39;$&#39; || c == &#39;_&#39; {
+            value = append(value, c)
+            cur.loc.col++
+            continue
+        }
+
+        break
+    }
+
+    if len(value) == 0 {
+        return nil, ic, false
+    }
+
+    return &amp;token{
+        // Unquoted dentifiers are case-insensitive
+        value: strings.ToLower(string(value)),
+        loc:   ic.loc,
+        kind:  identifierKind,
+    }, cur, true
+}
+</code></pre>
+<p>And that's it for the lexer! If you copy
+<a href="https://github.com/eatonphil/gosql/blob/master/lexer_test.go">lexer_test.go</a>
+from the main project, the tests should now pass.</p>
+<h3 id="ast-model">AST model</h3><p>At the highest level, an AST is a collection of statements:</p>
+<pre><code class="hljs go">package main
+
+type Ast struct {
+    Statements []*Statement
+}
+</code></pre>
+<p>A statement, for now, is one of <code>INSERT</code>,
+<code>CREATE</code>, or <code>SELECT</code>:</p>
+<pre><code class="hljs go">type AstKind uint
+
+const (
+    SelectKind AstKind = iota
+    CreateTableKind
+    InsertKind
+)
+
+type Statement struct {
+    SelectStatement      *SelectStatement
+    CreateTableStatement *CreateTableStatement
+    InsertStatement      *InsertStatement
+    Kind                 AstKind
+}
+</code></pre>
+<h4 id="insert">INSERT</h4><p>An insert statement, for now, has a table name and a list of values to
+insert:</p>
+<pre><code class="hljs go">type InsertStatement struct {
+    table  token
+    values *[]*expression
+}
+</code></pre>
+<p>An expression is a literal token or (in the future) a function call or
+inline operation:</p>
+<pre><code class="hljs go">type expressionKind uint
+
+const (
+    literalKind expressionKind = iota
+)
+
+type expression struct {
+    literal *token
+    kind    expressionKind
+}
+</code></pre>
+<h4 id="create">CREATE</h4><p>A create statement, for now, has a table name and a list of column
+names and types:</p>
+<pre><code class="hljs go">type columnDefinition struct {
+    name     token
+    datatype token
+}
+
+type CreateTableStatement struct {
+    name token
+    cols *[]*columnDefinition
+}
+</code></pre>
+<h4 id="select">SELECT</h4><p>A select statement, for now, has a table name and a list of column
+names:</p>
+<pre><code class="hljs go">type SelectStatement struct {
+    item []*expression
+    from token
+}
+</code></pre>
+<p>And that's it for the AST.</p>
+<h3 id="parsing">Parsing</h3><p>The <code>Parse</code> entrypoint will take a list of tokens and
+attempt to parse statements, separated by a semi-colon, until it
+reaches the last token.</p>
+<p>In general our strategy will be to increment and pass around a cursor
+containing the current position of unparsed tokens. Each helper will
+return the new cursor that the caller should start from.</p>
+<pre><code class="hljs go">package main
+
+import (
+    &quot;errors&quot;
+    &quot;fmt&quot;
+)
+
+func tokenFromKeyword(k keyword) token {
+    return token{
+        kind:  keywordKind,
+        value: string(k),
+    }
+}
+
+func tokenFromSymbol(s symbol) token {
+    return token{
+        kind:  symbolKind,
+        value: string(s),
+    }
+}
+
+func expectToken(tokens []*token, cursor uint, t token) bool {
+    if cursor &gt;= uint(len(tokens)) {
+        return false
+    }
+
+    return t.equals(tokens[cursor])
+}
+
+func helpMessage(tokens []*token, cursor uint, msg string) {
+    var c *token
+    if cursor &lt; uint(len(tokens)) {
+        c = tokens[cursor]
+    } else {
+        c = tokens[cursor-1]
+    }
+
+    fmt.Printf(&quot;[%d,%d]: %s, got: %s\n&quot;, c.loc.line, c.loc.col, msg, c.value)
+}
+
+func Parse(source string) (*Ast, error) {
+    tokens, err := lex(source)
+    if err != nil {
+        return nil, err
+    }
+
+    a := Ast{}
+    cursor := uint(0)
+    for cursor &lt; uint(len(tokens)) {
+        stmt, newCursor, ok := parseStatement(tokens, cursor, tokenFromSymbol(semicolonSymbol))
+        if !ok {
+            helpMessage(tokens, cursor, &quot;Expected statement&quot;)
+            return nil, errors.New(&quot;Failed to parse, expected statement&quot;)
+        }
+        cursor = newCursor
+
+        a.Statements = append(a.Statements, stmt)
+
+        atLeastOneSemicolon := false
+        for expectToken(tokens, cursor, tokenFromSymbol(semicolonSymbol)) {
+            cursor++
+            atLeastOneSemicolon = true
+        }
+
+        if !atLeastOneSemicolon {
+            helpMessage(tokens, cursor, &quot;Expected semi-colon delimiter between statements&quot;)
+            return nil, errors.New(&quot;Missing semi-colon between statements&quot;)
+        }
+    }
+
+    return &amp;a, nil
+}
+</code></pre>
+<h4 id="parsing-statements">Parsing statements</h4><p>Each statement will be one of <code>INSERT</code>,
+<code>CREATE</code>, or <code>SELECT</code>. The
+<code>parseStatement</code> helper will call a helper on each of these
+statement types and return <code>true</code> if one of them succeeds
+in parsing.</p>
+<pre><code class="hljs go">func parseStatement(tokens []*token, initialCursor uint, delimiter token) (*Statement, uint, bool) {
+    cursor := initialCursor
+
+    // Look for a SELECT statement
+    semicolonToken := tokenFromSymbol(semicolonSymbol)
+    slct, newCursor, ok := parseSelectStatement(tokens, cursor, semicolonToken)
+    if ok {
+        return &amp;Statement{
+            Kind:            SelectKind,
+            SelectStatement: slct,
+        }, newCursor, true
+    }
+
+    // Look for a INSERT statement
+    inst, newCursor, ok := parseInsertStatement(tokens, cursor, semicolonToken)
+    if ok {
+        return &amp;Statement{
+            Kind:            InsertKind,
+            InsertStatement: inst,
+        }, newCursor, true
+    }
+
+    // Look for a CREATE statement
+    crtTbl, newCursor, ok := parseCreateTableStatement(tokens, cursor, semicolonToken)
+    if ok {
+        return &amp;Statement{
+            Kind:                 CreateTableKind,
+            CreateTableStatement: crtTbl,
+        }, newCursor, true
+    }
+
+    return nil, initialCursor, false
+}
+</code></pre>
+<h4 id="parsing-select-statements">Parsing select statements</h4><p>Parsing <code>SELECT</code> statements is easy. We'll look for the
+following token pattern:</p>
+<ol>
+<li><code>SELECT</code></li>
+<li><code>$expression [, ...]</code></li>
+<li><code>FROM</code></li>
+<li><code>$table-name</code></li>
+</ol>
+<p>Sketching that out we get:</p>
+<pre><code class="hljs go">func parseSelectStatement(tokens []*token, initialCursor uint, delimiter token) (*SelectStatement, uint, bool) {
+    cursor := initialCursor
+    if !expectToken(tokens, cursor, tokenFromKeyword(selectKeyword)) {
+        return nil, initialCursor, false
+    }
+    cursor++
+
+    slct := SelectStatement{}
+
+    exps, newCursor, ok := parseExpressions(tokens, cursor, []token{tokenFromKeyword(fromKeyword), delimiter})
+    if !ok {
+        return nil, initialCursor, false
+    }
+
+    slct.item = *exps
+    cursor = newCursor
+
+    if expectToken(tokens, cursor, tokenFromKeyword(fromKeyword)) {
+        cursor++
+
+        from, newCursor, ok := parseToken(tokens, cursor, identifierKind)
+        if !ok {
+            helpMessage(tokens, cursor, &quot;Expected FROM token&quot;)
+            return nil, initialCursor, false
+        }
+
+        slct.from = *from
+        cursor = newCursor
+    }
+
+    return &amp;slct, cursor, true
+}
+</code></pre>
+<p>The <code>parseToken</code> helper will look for a token of a
+particular token kind.</p>
+<pre><code class="hljs go">func parseToken(tokens []*token, initialCursor uint, kind tokenKind) (*token, uint, bool) {
+    cursor := initialCursor
+
+    if cursor &gt;= uint(len(tokens)) {
+        return nil, initialCursor, false
+    }
+
+    current := tokens[cursor]
+    if current.kind == kind {
+        return current, cursor + 1, true
+    }
+
+    return nil, initialCursor, false
+}
+</code></pre>
+<p>The <code>parseExpressions</code> helper will look for tokens
+separated by a comma until a delimiter is found. It will use existing
+helpers plus <code>parseExpression</code>.</p>
+<pre><code class="hljs go">func parseExpressions(tokens []*token, initialCursor uint, delimiters []token) (*[]*expression, uint, bool) {
+    cursor := initialCursor
+
+    exps := []*expression{}
+outer:
+    for {
+        if cursor &gt;= uint(len(tokens)) {
+            return nil, initialCursor, false
+        }
+
+        // Look for delimiter
+        current := tokens[cursor]
+        for _, delimiter := range delimiters {
+            if delimiter.equals(current) {
+                break outer
+            }
+        }
+
+        // Look for comma
+        if len(exps) &gt; 0 {
+            if !expectToken(tokens, cursor, tokenFromSymbol(commaSymbol)) {
+                helpMessage(tokens, cursor, &quot;Expected comma&quot;)
+                return nil, initialCursor, false
+            }
+
+            cursor++
+        }
+
+        // Look for expression
+        exp, newCursor, ok := parseExpression(tokens, cursor, tokenFromSymbol(commaSymbol))
+        if !ok {
+            helpMessage(tokens, cursor, &quot;Expected expression&quot;)
+            return nil, initialCursor, false
+        }
+        cursor = newCursor
+
+        exps = append(exps, exp)
+    }
+
+    return &amp;exps, cursor, true
+}
+</code></pre>
+<p>The <code>parseExpression</code> helper (for now) will look for a
+numeric, string, or identifier token.</p>
+<pre><code class="hljs go">func parseExpression(tokens []*token, initialCursor uint, _ token) (*expression, uint, bool) {
+    cursor := initialCursor
+
+    kinds := []tokenKind{identifierKind, numericKind, stringKind}
+    for _, kind := range kinds {
+        t, newCursor, ok := parseToken(tokens, cursor, kind)
+        if ok {
+            return &amp;expression{
+                literal: t,
+                kind:    literalKind,
+            }, newCursor, true
+        }
+    }
+
+    return nil, initialCursor, false
+}
+</code></pre>
+<p>And that's it for parsing a <code>SELECT</code> statement!</p>
+<h4 id="parsing-insert-statements">Parsing insert statements</h4><p>We'll look for the following token pattern:</p>
+<ol>
+<li><code>INSERT</code></li>
+<li><code>INTO</code></li>
+<li><code>$table-name</code></li>
+<li><code>VALUES</code></li>
+<li><code>(</code></li>
+<li><code>$expression [, ...]</code></li>
+<li><code>)</code></li>
+</ol>
+<p>With the existing helpers, this is straightforward to sketch out:</p>
+<pre><code class="hljs go">func parseInsertStatement(tokens []*token, initialCursor uint, delimiter token) (*InsertStatement, uint, bool) {
+    cursor := initialCursor
+
+    // Look for INSERT
+    if !expectToken(tokens, cursor, tokenFromKeyword(insertKeyword)) {
+        return nil, initialCursor, false
+    }
+    cursor++
+
+    // Look for INTO
+    if !expectToken(tokens, cursor, tokenFromKeyword(intoKeyword)) {
+        helpMessage(tokens, cursor, &quot;Expected into&quot;)
+        return nil, initialCursor, false
+    }
+    cursor++
+
+    // Look for table name
+    table, newCursor, ok := parseToken(tokens, cursor, identifierKind)
+    if !ok {
+        helpMessage(tokens, cursor, &quot;Expected table name&quot;)
+        return nil, initialCursor, false
+    }
+    cursor = newCursor
+
+    // Look for VALUES
+    if !expectToken(tokens, cursor, tokenFromKeyword(valuesKeyword)) {
+        helpMessage(tokens, cursor, &quot;Expected VALUES&quot;)
+        return nil, initialCursor, false
+    }
+    cursor++
+
+    // Look for left paren
+    if !expectToken(tokens, cursor, tokenFromSymbol(leftparenSymbol)) {
+        helpMessage(tokens, cursor, &quot;Expected left paren&quot;)
+        return nil, initialCursor, false
+    }
+    cursor++
+
+    // Look for expression list
+    values, newCursor, ok := parseExpressions(tokens, cursor, []token{tokenFromSymbol(rightparenSymbol)})
+    if !ok {
+        return nil, initialCursor, false
+    }
+    cursor = newCursor
+
+    // Look for right paren
+    if !expectToken(tokens, cursor, tokenFromSymbol(rightparenSymbol)) {
+        helpMessage(tokens, cursor, &quot;Expected right paren&quot;)
+        return nil, initialCursor, false
+    }
+    cursor++
+
+    return &amp;InsertStatement{
+        table:  *table,
+        values: values,
+    }, cursor, true
+}
+</code></pre>
+<p>And that's it for parsing an <code>INSERT</code> statement!</p>
+<h4 id="parsing-create-statements">Parsing create statements</h4><p>Finally, for create statements we'll look for the following token
+pattern:</p>
+<ol>
+<li><code>CREATE</code></li>
+<li><code>$table-name</code></li>
+<li><code>(</code></li>
+<li><code>[$column-name $column-type [, ...]]</code></li>
+<li><code>)</code></li>
+</ol>
+<p>Sketching that out with a new <code>parseColumnDefinitions</code>
+helper we get:</p>
+<pre><code class="hljs go">func parseCreateTableStatement(tokens []*token, initialCursor uint, delimiter token) (*CreateTableStatement, uint, bool) {
+    cursor := initialCursor
+
+    if !expectToken(tokens, cursor, tokenFromKeyword(createKeyword)) {
+        return nil, initialCursor, false
+    }
+    cursor++
+
+    if !expectToken(tokens, cursor, tokenFromKeyword(tableKeyword)) {
+        return nil, initialCursor, false
+    }
+    cursor++
+
+    name, newCursor, ok := parseToken(tokens, cursor, identifierKind)
+    if !ok {
+        helpMessage(tokens, cursor, &quot;Expected table name&quot;)
+        return nil, initialCursor, false
+    }
+    cursor = newCursor
+
+    if !expectToken(tokens, cursor, tokenFromSymbol(leftparenSymbol)) {
+        helpMessage(tokens, cursor, &quot;Expected left parenthesis&quot;)
+        return nil, initialCursor, false
+    }
+    cursor++
+
+    cols, newCursor, ok := parseColumnDefinitions(tokens, cursor, tokenFromSymbol(rightparenSymbol))
+    if !ok {
+        return nil, initialCursor, false
+    }
+    cursor = newCursor
+
+    if !expectToken(tokens, cursor, tokenFromSymbol(rightparenSymbol)) {
+        helpMessage(tokens, cursor, &quot;Expected right parenthesis&quot;)
+        return nil, initialCursor, false
+    }
+    cursor++
+
+    return &amp;CreateTableStatement{
+        name: *name,
+        cols: cols,
+    }, cursor, true
+}
+</code></pre>
+<p>The <code>parseColumnDefinitions</code> helper will look column names
+followed by column types separated by a comma and ending with some
+delimiter:</p>
+<pre><code class="hljs go">func parseColumnDefinitions(tokens []*token, initialCursor uint, delimiter token) (*[]*columnDefinition, uint, bool) {
+    cursor := initialCursor
+
+    cds := []*columnDefinition{}
+    for {
+        if cursor &gt;= uint(len(tokens)) {
+            return nil, initialCursor, false
+        }
+
+        // Look for a delimiter
+        current := tokens[cursor]
+        if delimiter.equals(current) {
+            break
+        }
+
+        // Look for a comma
+        if len(cds) &gt; 0 {
+            if !expectToken(tokens, cursor, tokenFromSymbol(commaSymbol)) {
+                helpMessage(tokens, cursor, &quot;Expected comma&quot;)
+                return nil, initialCursor, false
+            }
+
+            cursor++
+        }
+
+        // Look for a column name
+        id, newCursor, ok := parseToken(tokens, cursor, identifierKind)
+        if !ok {
+            helpMessage(tokens, cursor, &quot;Expected column name&quot;)
+            return nil, initialCursor, false
+        }
+        cursor = newCursor
+
+        // Look for a column type
+        ty, newCursor, ok := parseToken(tokens, cursor, keywordKind)
+        if !ok {
+            helpMessage(tokens, cursor, &quot;Expected column type&quot;)
+            return nil, initialCursor, false
+        }
+        cursor = newCursor
+
+        cds = append(cds, &amp;columnDefinition{
+            name:     *id,
+            datatype: *ty,
+        })
+    }
+
+    return &amp;cds, cursor, true
+}
+</code></pre>
+<p>And that's it for parsing! If you copy
+<a href="https://github.com/eatonphil/gosql/blob/master/parser_test.go">parser_test.go</a>
+from the main project, the tests should now pass.</p>
+<h3 id="an-in-memory-backend">An in-memory backend</h3><p>Our in-memory backend should conform to a general backend interface
+that allows a user to create, select, and insert data:</p>
+<pre><code class="hljs go">package main
+
+import &quot;errors&quot;
+
+type ColumnType uint
+
+const (
+    TextType ColumnType = iota
+    IntType
+)
+
+type Cell interface {
+    AsText() string
+    AsInt() int32
+}
+
+type Results struct {
+    Columns []struct {
+        Type ColumnType
+        Name string
+    }
+    Rows [][]Cell
+}
+
+var (
+    ErrTableDoesNotExist  = errors.New(&quot;Table does not exist&quot;)
+    ErrColumnDoesNotExist = errors.New(&quot;Column does not exist&quot;)
+    ErrInvalidSelectItem  = errors.New(&quot;Select item is not valid&quot;)
+    ErrInvalidDatatype    = errors.New(&quot;Invalid datatype&quot;)
+    ErrMissingValues      = errors.New(&quot;Missing values&quot;)
+)
+
+type Backend interface {
+    CreateTable(*CreateTableStatement) error
+    Insert(*InsertStatement) error
+    Select(*SelectStatement) (*Results, error)
+}
+</code></pre>
+<p>This leaves us room in the future for a disk-backed backend.</p>
+<h4 id="memory-layout">Memory layout</h4><p>Our in-memory backend should store a list of tables. Each table
+will have a list of columns and rows. Each column will have a name and
+type. Each row will have a list of byte arrays.</p>
+<pre><code class="hljs go">package main
+
+import (
+    &quot;bytes&quot;
+    &quot;encoding/binary&quot;
+    &quot;fmt&quot;
+    &quot;strconv&quot;
+)
+
+type MemoryCell []byte
+
+func (mc MemoryCell) AsInt() int32 {
+    var i int32
+    err := binary.Read(bytes.NewBuffer(mc), binary.BigEndian, &amp;i)
+    if err != nil {
+        panic(err)
+    }
+
+    return i
+}
+
+func (mc MemoryCell) AsText() string {
+    return string(mc)
+}
+
+type table struct {
+    columns     []string
+    columnTypes []ColumnType
+    rows        [][]MemoryCell
+}
+
+type MemoryBackend struct {
+    tables map[string]*table
+}
+
+func NewMemoryBackend() *MemoryBackend {
+    return &amp;MemoryBackend{
+        tables: map[string]*table{},
+    }
+}
+</code></pre>
+<h4 id="implementing-create-table-support">Implementing create table support</h4><p>When creating a table, we'll make a new entry in the backend tables
+map. Then we'll create columns as specified by the AST.</p>
+<pre><code class="hljs go">func (mb *MemoryBackend) CreateTable(crt *CreateTableStatement) error {
+    t := table{}
+    mb.tables[crt.name.value] = &amp;t
+    if crt.cols == nil {
+
+        return nil
+    }
+
+    for _, col := range *crt.cols {
+        t.columns = append(t.columns, col.name.value)
+
+        var dt ColumnType
+        switch col.datatype.value {
+        case &quot;int&quot;:
+            dt = IntType
+        case &quot;text&quot;:
+            dt = TextType
+        default:
+            return ErrInvalidDatatype
+        }
+
+        t.columnTypes = append(t.columnTypes, dt)
+    }
+
+    return nil
+}
+</code></pre>
+<h4 id="implementing-insert-support">Implementing insert support</h4><p>Keeping things simple, we'll assume the value passed can be correctly
+mapped to the type of the column specified.</p>
+<p>We'll reference a helper for mapper values to internal storage,
+<code>tokenToCell</code>.</p>
+<pre><code class="hljs go">func (mb *MemoryBackend) Insert(inst *InsertStatement) error {
+    table, ok := mb.tables[inst.table.value]
+    if !ok {
+        return ErrTableDoesNotExist
+    }
+
+    if inst.values == nil {
+        return nil
+    }
+
+    row := []MemoryCell{}
+
+    if len(*inst.values) != len(table.columns) {
+        return ErrMissingValues
+    }
+
+    for _, value := range *inst.values {
+        if value.kind != literalKind {
+            fmt.Println(&quot;Skipping non-literal.&quot;)
+            continue
+        }
+
+        row = append(row, mb.tokenToCell(value.literal))
+    }
+
+    table.rows = append(table.rows, row)
+    return nil
+}
+</code></pre>
+<p>The <code>tokenToCell</code> helper will write numbers as binary bytes
+and will write strings as bytes:</p>
+<pre><code class="hljs go">
+func (mb *MemoryBackend) tokenToCell(t *token) MemoryCell {
+    if t.kind == numericKind {
+        buf := new(bytes.Buffer)
+        i, err := strconv.Atoi(t.value)
+        if err != nil {
+            panic(err)
+        }
+
+        err = binary.Write(buf, binary.BigEndian, int32(i))
+        if err != nil {
+            panic(err)
+        }
+        return MemoryCell(buf.Bytes())
+    }
+
+    if t.kind == stringKind {
+        return MemoryCell(t.value)
+    }
+
+    return nil
+}
+</code></pre>
+<h4 id="implementing-select-support">Implementing select support</h4><p>Finally, for select we'll iterate over each row in the table and
+return the cells according to the columns specified by the AST.</p>
+<pre><code class="hljs go">func (mb *MemoryBackend) Select(slct *SelectStatement) (*Results, error) {
+    table, ok := mb.tables[slct.from.table]
+    if !ok {
+        return nil, ErrTableDoesNotExist
+    }
+
+    results := [][]Cell{}
+    columns := []struct {
+        Type ColumnType
+        Name string
+    }{}
+
+    for i, row := range table.rows {
+        result := []Cell{}
+        isFirstRow := i == 0
+
+        for _, exp := range slct.item {
+            if exp.kind != literalKind {
+                // Unsupported, doesn&#39;t currently exist, ignore.
+                fmt.Println(&quot;Skipping non-literal expression.&quot;)
+                continue
+            }
+
+            lit := exp.literal
+            if lit.kind == identifierKind {
+                found := false
+                for i, tableCol := range table.columns {
+                    if tableCol == lit.value {
+                        if isFirstRow {
+                            columns = append(columns, struct {
+                                Type ColumnType
+                                Name string
+                            }{
+                                Type: table.columnTypes[i],
+                                Name: lit.value,
+                            })
+                        }
+
+                        result = append(result, row[i])
+                        found = true
+                        break
+                    }
+                }
+
+                if !found {
+                    return nil, ErrColumnDoesNotExist
+                }
+
+                continue
+            }
+
+            return nil, ErrColumnDoesNotExist
+        }
+
+        results = append(results, result)
+    }
+
+    return &amp;Results{
+        Columns: columns,
+        Rows:    results,
+    }, nil
+}
+</code></pre>
+<h3 id="the-repl">The REPL</h3><p>At last, we're ready to wrap the parser and in-memory backend in a
+REPL. The most complex part is displaying the table of results from a
+select query.</p>
+<pre><code class="hljs go">package main
+
+import (
+    &quot;bufio&quot;
+    &quot;fmt&quot;
+    &quot;os&quot;
+    &quot;strings&quot;
+
+    &quot;github.com/eatonphil/gosql&quot;
+)
+
+func main() {
+    mb := gosql.NewMemoryBackend()
+
+    reader := bufio.NewReader(os.Stdin)
+    fmt.Println(&quot;Welcome to gosql.&quot;)
+    for {
+        fmt.Print(&quot;# &quot;)
+        text, err := reader.ReadString(&#39;\n&#39;)
+        text = strings.Replace(text, &quot;\n&quot;, &quot;&quot;, -1)
+
+        ast, err := gosql.Parse(text)
+        if err != nil {
+            panic(err)
+        }
+
+        for _, stmt := range ast.Statements {
+            switch stmt.Kind {
+            case gosql.CreateTableKind:
+                err = mb.CreateTable(ast.Statements[0].CreateTableStatement)
+                if err != nil {
+                    panic(err)
+                }
+                fmt.Println(&quot;ok&quot;)
+            case gosql.InsertKind:
+                err = mb.Insert(stmt.InsertStatement)
+                if err != nil {
+                    panic(err)
+                }
+
+                fmt.Println(&quot;ok&quot;)
+            case gosql.SelectKind:
+                results, err := mb.Select(stmt.SelectStatement)
+                if err != nil {
+                    panic(err)
+                }
+
+                for _, col := range results.Columns {
+                    fmt.Printf(&quot;| %s &quot;, col.Name)
+                }
+                fmt.Println(&quot;|&quot;)
+
+                for i := 0; i &lt; 20; i++ {
+                    fmt.Printf(&quot;=&quot;)
+                }
+                fmt.Println()
+
+                for _, result := range results.Rows {
+                    fmt.Printf(&quot;|&quot;)
+
+                    for i, cell := range result {
+                        typ := results.Columns[i].Type
+                        s := &quot;&quot;
+                        switch typ {
+                        case gosql.IntType:
+                            s = fmt.Sprintf(&quot;%d&quot;, cell.AsInt())
+                        case gosql.TextType:
+                            s = cell.AsText()
+                        }
+
+                        fmt.Printf(&quot; %s | &quot;, s)
+                    }
+
+                    fmt.Println()
+                }
+
+                fmt.Println(&quot;ok&quot;)
+            }
+        }
+    }
+}
+</code></pre>
+<p>Putting it all together:</p>
+<pre><code class="hljs bash">$ go run *.go
+Welcome to gosql.
+# CREATE TABLE users (id INT, name TEXT);
+ok
+# INSERT INTO users VALUES (1, &#39;Phil&#39;);
+ok
+# SELECT id, name FROM users;
+| id | name |
+====================
+| 1 |  Phil |
+ok
+# INSERT INTO users VALUES (2, &#39;Kate&#39;);
+ok
+# SELECT name, id FROM users;
+| name | id |
+====================
+| Phil |  1 |
+| Kate |  2 |
+ok
+</code></pre>
+<p>And we've got a very simple SQL database!</p>
+<p>Next up we'll get into filtering, sorting, and indexing.</p>
+<h4 id="further-reading">Further reading</h4><ul>
+<li><a href="/writing-a-simple-json-parser.html">Writing a simple JSON parser</a><ul>
+<li>This post goes into a little more detail about the theory and basics of parsing.</li>
+</ul>
+</li>
+<li><a href="https://www.goodreads.com/book/show/617120.Database_Systems">Database Systems: A Practical Approach to Design, Implementation and Management</a><ul>
+<li>A giant book, but an excellent and very easy introduction to database theory.</li>
+</ul>
+</li>
+</ul>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet" data-conversation="none"><p lang="en" dir="ltr">Latest blog post: writing a simple SQL database from scratch in Go <a href="https://t.co/csQmNhWIEf">https://t.co/csQmNhWIEf</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1237522975143776256?ref_src=twsrc%5Etfw">March 10, 2020</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Writing a lisp compiler from scratch in JavaScript: 2. user-defined functions and variables | notes.eatonphil.com</title>
+    <meta name="description" content="Writing a lisp compiler from scratch in JavaScript: 2. user-defined functions and variables" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>January 20, 2019</h2>
+          <h1>Writing a lisp compiler from scratch in JavaScript: 2. user-defined functions and variables</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/javascript.html" class="tag">javascript</a><a href="/tags/lisp.html" class="tag">lisp</a><a href="/tags/compiler.html" class="tag">compiler</a><a href="/tags/x86.html" class="tag">x86</a><a href="/tags/amd64.html" class="tag">amd64</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p class="note">
+  Previously in compiler basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/compiler-basics-lisp-to-assembly.html">1. lisp to assembly</a>
+  <br/>
+  <br/>
+  Next in compiler basics:
+  <br/>
+  <a href="/compiler-basics-llvm.html">3. LLVM</a>
+  <br />
+  <a href="/compiler-basics-llvm-conditionals.html">4. LLVM conditionals and compiling fibonacci</a>
+  <br />
+  <a href="/compiler-basics-llvm-system-calls.html">5. LLVM system calls</a>
+  <br />
+  <a href="/compiler-basics-an-x86-upgrade.html">6. an x86 upgrade</a>
+</p><p>In this post we'll extend the compiler to support defining functions
+and variables. Additionally, we'll require the program's entrypoint to
+be within a <code>main</code> function.</p>
+<p>The resulting code can be found
+<a href="https://github.com/eatonphil/ulisp">here</a>.</p>
+<h3 id="function-definition">Function definition</h3><p>The simplest function definition we need to support is for our <code>main</code>
+function. This will look like this:</p>
+<pre><code class="hljs lisp">$ cat basic.lisp
+(def main ()
+     (+ 1 2))
+</code></pre>
+<p>Where compiling and running it should produce a return code of 3:</p>
+<pre><code class="hljs bash">$ node ulisp.js basic.lisp
+$ ./build/a.out
+$ echo $?
+3
+</code></pre>
+<h3 id="parsing-function-definitions">Parsing function definitions</h3><p>The entire language is defined in S-expressions and we already parse
+S-expressions.</p>
+<pre><code class="hljs javascript">$ node
+&gt; const { parse } = require(&#39;./parser&#39;);
+&gt; JSON.stringify(parse(&#39;(def main () (+ 1 2))&#39;));
+&#39;[[[&quot;def&quot;,&quot;main&quot;,[],[&quot;+&quot;,1,2]]],&quot;&quot;]&#39;
+</code></pre>
+<p>So we're done!</p>
+<h3 id="code-generation">Code generation</h3><p>There are two tricky parts to code generation once function
+definitions are introduced:</p>
+<ul>
+<li>Functions definitions are not expressions (in assembly)</li>
+<li>Function calling conventions for the <strong>callee</strong></li>
+<li>Variable scope</li>
+</ul>
+<h4 id="function-definitions">Function definitions</h4><p>A function definition looks like a function call. So we'll need to
+keep a list of "primitive" functions that handle what looks like
+function calls differently.</p>
+<pre><code class="hljs javascript">function compile_define() {
+  // TODO
+}
+
+const primitive_functions = {
+  def: compile_define,
+};
+</code></pre>
+<p>Then in our <code>compile_call</code> function we need to see if the function
+being "called" is in this list. If so, we allow the associated
+callback to handle compilation.</p>
+<pre><code class="hljs javascript">function compile_call(fun, args, destination) {
+  if (primitive_functions[fun]) {
+    primitive_functions[fun](args, destination);
+    return;
+  }
+
+  // Save param registers
+  args.map((_, i) =&gt; emit(1, `PUSH ${PARAM_REGISTERS[i]}`));
+
+  // Compile registers and store as params
+  args.map((arg, i) =&gt; compile_expression(arg, PARAM_REGISTERS[i], scope));
+
+  emit(1, `CALL ${BUILTIN_FUNCTIONS[fun] || scope[fun]}`);
+
+  // Restore param registers
+  args.map((_, i) =&gt; emit(1, `POP ${PARAM_REGISTERS[args.length - i - 1]}`));
+
+  if (destination &amp;&amp; destination !== &#39;RAX&#39;) {
+    emit(1, `MOV ${destination}, RAX`);
+  }
+}
+</code></pre>
+<p>Now we can begin thinking about <code>compile_define</code>. It takes <code>args</code>
+which will be a list of three elements containing the function's:</p>
+<ul>
+<li>name</li>
+<li>parameters</li>
+<li>and body</li>
+</ul>
+<p class="note">
+  It does not use destination because we're treating function
+  definitions as statements for now and not as expressions. If we were
+  treating it as an expression, we might store the address of the
+  function in the destination register.
+
+  We keep destination around to keep the primitive function signatures
+  consistent.
+</p><p>Based on how we called functions before and how we defined the
+hard-coded <code>add</code> function, we know what a function definition in
+assembly generally looks like. And we know the arguments to the
+function when called will be in RDI, RSI, and RDX.</p>
+<pre><code class="hljs javascript">function compile_define([name, parameters, body]) {
+  // Function name becomes a label we can CALL
+  emit(0, `${name}:`);
+
+  // Something to do with RDI, RSI, RDX and the parameters variable?
+
+  // We renamed compile_argument to compile_expression to be more general
+  compile_expression(body[0], &#39;RAX&#39;);
+
+  // Maybe some cleanup to do with RDI, RSI, RDX?
+
+  emit(1, &#39;RET\n&#39;);
+}
+</code></pre>
+<p>Not a bad first sketch. But how do we match up <code>RDI</code>, <code>RSI</code>, <code>RDX</code> and
+the user-defined <code>parameters</code> variable names? For example in the
+following:</p>
+<pre><code class="hljs lisp">(def plus-two (a)
+     (+ a 2))
+</code></pre>
+<p>It's clear to us that <code>a</code> must match up to <code>RDI</code>. In order to do this
+we need to track all variables in a <code>scope</code> dictionary mapping the
+variable name to the register where it's stored.</p>
+<p>Additionally, keeping track of scope can help us fail quickly in the
+following scenario:</p>
+<pre><code class="hljs lisp">(def plus-two (a)
+     (+ b 2))
+</code></pre>
+<p>The variable <code>b</code> is used but never defined. It has not been added to
+the scope dictionary. So our compiler can fail quickly saying there is
+an undefined variable being referenced.</p>
+<p>Taking this a step further, what if we want to catch the following
+too:</p>
+<pre><code class="hljs lisp">(def plus-two (a)
+     (plus a 2))
+</code></pre>
+<p>We're trying to call <code>plus</code> but it has not been defined. We should be
+able to fail quickly here too. But that means we're need to track the
+scope of function <strong>names</strong> in addition to variables. We'll choose to
+track function names and variable names in the same scope dictionary.</p>
+<p class="note">
+  This is the distinction between a lisp-1 and a lisp-2. We are a
+  lisp-1 like Scheme because we have a single scope. Common Lisp is a
+  lisp-2 because it stores function name scope separately from
+  variable name scope.
+</p><h3 id="implementing-scope">Implementing scope</h3><p>We need to revise every compile function to accept a scope dictionary
+(specifically: <code>compile</code>, <code>compile_expression</code>, <code>compile_call</code>, and
+<code>compile_define</code>). If a variable is referenced, we need to look up
+it's location in the scope dictionary. If a variable is defined
+(e.g. a function name or a function parameter) we need to add a
+mapping to the scope dictionary.</p>
+<p>Modifying <code>compile_expression</code> is easiest:</p>
+<pre><code class="hljs javascript">function compile_expression(arg, destination, scope) {
+  // Is a nested function call, compile it
+  if (Array.isArray(arg)) {
+    compile_call(arg[0], arg.slice(1), destination, scope);
+    return;
+  }
+
+  if (scope[arg] || Number.isInteger(arg)) {
+    emit(1, `MOV ${destination}, ${scope[arg] || arg}`);
+  } else {
+    throw new Error(&#39;Attempt to reference undefined variable or unsupported literal: &#39; + arg);
+  }
+}
+</code></pre>
+<p>Next we modify <code>compile_call</code>:</p>
+<pre><code class="hljs javascript">function compile_call(fun, args, destination, scope) {
+  if (primitive_functions[fun]) {
+    primitive_functions[fun](args, destination, scope);
+    return;
+  }
+
+  // Save param registers
+  args.map((_, i) =&gt; emit(1, `PUSH ${PARAM_REGISTERS[i]}`));
+
+  // Compile registers and store as params
+  args.map((arg, i) =&gt; compile_expression(arg, PARAM_REGISTERS[i], scope));
+
+  const validFunction = BUILTIN_FUNCTIONS[fun] || scope[fun];
+  if (validFunction) {
+    emit(1, `CALL ${validFunction}`);
+  } else {
+    throw new Error(&#39;Attempt to call undefined function: &#39; + fun);
+  }
+
+  // Restore param registers
+  args.map((_, i) =&gt; emit(1, `POP ${PARAM_REGISTERS[args.length - i - 1]}`));
+
+  if (destination &amp;&amp; destination !== &#39;RAX&#39;) {
+    emit(1, `MOV ${destination}, RAX`);
+  }
+}
+</code></pre>
+<p>And then <code>compile_define</code> where we modify scope for the first time:</p>
+<pre><code class="hljs javascript">function compile_define([name, params, ...body], destination, scope) {
+  // Add this function to outer scope
+  scope[name] = name.replace(&#39;-&#39;, &#39;_&#39;);
+
+  // Copy outer scope so parameter mappings aren&#39;t exposed in outer scope.
+  const childScope = { ...scope };
+
+  emit(0, `${scope[name]}:`);
+
+  params.forEach(function (param, i) {
+    const register = PARAM_REGISTERS[i];
+    // Store parameter mapped to associated register
+    childScope[param] = register;
+  });
+
+  // Pass childScope in for reference when body is compiled.
+  compile_expression(body[0], &#39;RAX&#39;, childScope);
+
+  emit(1, &#39;RET\n&#39;);
+}
+</code></pre>
+<p>And finally we need to modify the entrypoint <code>compile</code>:</p>
+<pre><code class="hljs javascript">module.exports.compile = function (ast) {
+  emit_prefix();
+  // Pass in new, empty scope mapping
+  compile_call(ast[0], ast.slice(1), &#39;RAX&#39;, {});
+  emit_postfix();
+}
+</code></pre>
+<p>And scope-wise we're pretty good!</p>
+<h3 id="function-calling-convention:-callee">Function calling convention: callee</h3><p>We currently have a problem that we're using parameters registers to
+store local variables that messes up with how we are storing
+parameters for function calls within the function itself.</p>
+<p>Ideally we could store function local variables (including the
+parameters when we get them) separately from how we store function
+call parameters within the function.</p>
+<p>Thankfully according to the calling convention we've followed, we're
+given a set of registers that are callee-preserved. Of them we'll use
+<code>RBX</code>, <code>RBP</code>, and <code>R12</code> in that order. This allows us to mess with so
+long as we store them and restore them within the function.</p>
+<p>Applying the same storing/restoring strategy to local variables as we
+did for parameters, we get:</p>
+<pre><code class="hljs javascript">const LOCAL_REGISTERS = [
+  &#39;RBX&#39;,
+  &#39;RBP&#39;,
+  &#39;R12&#39;,
+];
+
+function compile_define([name, params, ...body], destination, scope) {
+  // Add this function to outer scope
+  scope[name] = name.replace(&#39;-&#39;, &#39;_&#39;);
+
+  // Copy outer scope so parameter mappings aren&#39;t exposed in outer scope.
+  const childScope = { ...scope };
+
+  emit(0, `${scope[name]}:`);
+
+  params.forEach(function (param, i) {
+    const register = PARAM_REGISTERS[i];
+    const local = LOCAL_REGISTERS[i];
+    emit(1, `PUSH ${local}`);
+    emit(1, `MOV ${local}, ${register}`);
+    // Store parameter mapped to associated local
+    childScope[param] = local;
+  });
+
+  // Pass childScope in for reference when body is compiled.
+  compile_expression(body[0], &#39;RAX&#39;, childScope);
+
+  params.forEach(function (param, i) {
+    // Backwards first
+    const local = LOCAL_REGISTERS[params.length - i - 1];
+    emit(1, `POP ${local}`);
+  });
+
+  emit(1, &#39;RET\n&#39;);
+}
+</code></pre>
+<p>And we're set.</p>
+<h3 id="cleanup">Cleanup</h3><p>We've still got a few messes going on:</p>
+<ul>
+<li>emit_prefix wraps out entire body in <code>_main</code>, we're requiring our own <code>main</code> now</li>
+<li>emitting to stdout instead of to a file</li>
+<li>multiple function definitions is treated as nonsense</li>
+</ul>
+<p>Starting first, we rewrite <code>emit_prefix</code> and <code>emit_postfix</code> so that
+our <code>_main</code> just calls <code>main</code>.</p>
+<pre><code class="hljs javascript">function emit_prefix() {
+  emit(1, &#39;.global _main\n&#39;);
+
+  emit(1, &#39;.text\n&#39;);
+
+  emit(0, &#39;plus:&#39;);
+  emit(1, &#39;ADD RDI, RSI&#39;);
+  emit(1, &#39;MOV RAX, RDI&#39;);
+  emit(1, &#39;RET\n&#39;);
+}
+
+function emit_postfix() {
+  emit(0, &#39;_main:&#39;);
+  emit(1, &#39;CALL main&#39;);
+  emit(1, &#39;MOV RDI, RAX&#39;); // Set exit arg
+  emit(1, `MOV RAX, ${SYSCALL_MAP[&#39;exit&#39;]}`);
+  emit(1, &#39;SYSCALL&#39;);
+}
+</code></pre>
+<p>Next to deal with writing to a file instead of stdout, we need our
+<code>emit</code> function to write to a buffer. We'll let <code>ulisp.js</code> write that
+buffer to a file. Because we're incredibly lazy, we'll do this all
+globally.</p>
+<pre><code class="hljs javascript">let OUT = &#39;&#39;;
+
+function emit(depth, args) {
+  const indent = new Array(depth + 1).join(&#39;  &#39;);
+  OUT += `${indent}${args}\n`;
+}
+
+...
+
+module.exports.compile = function (ast) {
+  OUT = &#39;&#39;;
+
+  emit_prefix();
+  compile_call(ast[0], ast.slice(1), &#39;RAX&#39;, {});
+  emit_postfix();
+
+  return OUT;
+}
+</code></pre>
+<p>And modify <code>ulisp.js</code>:</p>
+<pre><code class="hljs javascript">const cp = require(&#39;child_process&#39;);
+const fs = require(&#39;fs&#39;);
+
+const { parse } = require(&#39;./parser&#39;);
+const { compile } = require(&#39;./compiler&#39;);
+
+function main (args) {
+  const input = fs.readFileSync(args[2]).toString();
+  const [ast] = parse(input);
+  const program = compile(ast);
+
+  try {
+    fs.mkdirSync(&#39;build&#39;);
+  } catch (e) {}
+  fs.writeFileSync(&#39;build/prog.s&#39;, program);
+  cp.execSync(&#39;gcc -mstackrealign -masm=intel -o build/a.out build/prog.s&#39;);
+}
+
+main(process.argv);
+</code></pre>
+<p>And we're finally ready to run a simple program.</p>
+<h3 id="a-program!">A program!</h3><pre><code class="hljs bash">$ cat test.lisp
+(def main () (+ 1 2))
+$ node ulisp.js test.lisp
+$ ./build/a.out
+$ echo $?
+3
+</code></pre>
+<p>Hurray! Now let's try defining and calling a second function
+to validate parameter behavior.</p>
+<pre><code class="hljs bash">$ cat test.lisp
+(def plus-two (a)
+     (+ a 2))
+
+(def main ()
+     (plus-two 3))
+$ node ulisp.js test.lisp
+$ ./build/a.out
+./compiler.js:106
+    throw new Error(&#39;Attempt to call undefined function: &#39; + fun);
+    ^
+
+Error: Attempt to call undefined function: p2
+
+...
+</code></pre>
+<p>We start getting some really weird errors. And the reason is because
+our compiler doesn't know how to deal with sibling S-expressions.</p>
+<p>So we'll introduce a new primitive function called <code>begin</code> that calls
+all it's sibling functions and returns the value of the last
+call. Then we'll wrap the program in an implicit <code>begin</code> so we don't
+need to.</p>
+<pre><code class="hljs javascript">function compile_begin(body, destination, scope) {
+  body.forEach((expression) =&gt; compile_expression(expression, &#39;RAX&#39;, scope));
+  if (destination &amp;&amp; destination !== &#39;RAX&#39;) {
+    emit(1, `MOV ${destination}, RAX`);
+  }
+}
+
+const primitive_functions = {
+  def: compile_define,
+  begin: compile_begin,
+};
+
+...
+
+module.exports.compile = function (ast) {
+  OUT = &#39;&#39;;
+
+  emit_prefix();
+  compile_call(&#39;begin&#39;, ast, &#39;RAX&#39;, {});
+  emit_postfix();
+
+  return OUT;
+}
+</code></pre>
+<p>And we try our test program again. :)</p>
+<pre><code class="hljs bash">$ cat test.lisp
+(def plus-two (a)
+     (+ a 2))
+
+(def main ()
+     (plus-two 3))
+$ node ulisp.js test.lisp
+$ ./build/a.out
+$ echo $?
+5
+</code></pre>
+<p>And that's all there is to it! Stay tuned for the next post on
+conditionals and tail-call optimization.</p>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">Part two on compiler basics using JavaScript: user-defined functions and variables <a href="https://t.co/XOam67HO8h">https://t.co/XOam67HO8h</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1087103061590446083?ref_src=twsrc%5Etfw">January 20, 2019</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Writing a simple JSON path parser | notes.eatonphil.com</title>
+    <meta name="description" content="Writing a simple JSON path parser" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>March 27, 2019</h2>
+          <h1>Writing a simple JSON path parser</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/json.html" class="tag">json</a><a href="/tags/parsing.html" class="tag">parsing</a><a href="/tags/javascript.html" class="tag">javascript</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>Let's say we want to implement a simple list filtering language so
+we can enter <code>a.b = 12</code> and return only results in a
+list where the <code>a</code> column is an object that contains a
+field <code>b</code> that is set to the value 12. What would a
+<code>filter(jsonPath, equals, listOfObjects)</code> function look
+like?</p>
+<p>If we only needed to support object lookup, we might
+implement <code>filter</code> by splitting the <code>jsonPath</code>
+on periods and look at each object in the <code>listOfObjects</code>
+for matching values. It might look something like this:</p>
+<pre><code class="hljs javascript">function filter(jsonPath, equals, listOfObjects) {
+  const parts = jsonPath.split(&#39;.&#39;);
+
+  function filterSingle(object) {
+    let objectAtPath = object;
+    let i = 0;
+    for (let part = parts[i]; part &amp;&amp; objectAtPath; part = parts[++i]) {
+      objectAtPath = objectAtPath[part];
+    }
+
+    return i === parts.length &amp;&amp; objectAtPath === equals;
+  }
+
+  return listOfObjects.filter(filterSingle);
+}
+
+require(&#39;assert&#39;).deepEqual(
+  filter(&#39;foo.bar&#39;, 12, [{ foo: { bar: 12 } }, { foo: null }]),
+  [{ foo: { bar: 12 } }],
+);
+</code></pre>
+<p>That doesn't work too badly. We haven't handled edge cases like a
+<code>jsonPath</code> of <code>foo..bar</code> or
+<code>bar.</code>. But those would not be difficult to handle:</p>
+<pre><code class="hljs javascript">function filter(jsonPath, equals, listOfObjects) {
+  if (jsonPath.charAt(0) === &#39;.&#39;) {
+    throw new Error(&#39;JSON path cannot begin with a dot, in: &#39; + jsonPath);
+  } else if (jsonPath.charAt(jsonPath.length - 1) === &#39;.&#39;) {
+    throw new Error(&#39;JSON path cannot end with a dot, in: &#39; + jsonPath);
+  }
+
+  const parts = jsonPath.split(&#39;.&#39;);
+  if (parts.reduce((hasEmptyPart, part) =&gt; hasEmptyPart || part.length === 0, false)) {
+    throw new Error(&#39;JSON path cannot contain an empty section, in: &#39; + jsonPath);
+  }
+
+  function filterSingle(object) {
+    let objectAtPath = object;
+    let i = 0;
+    for (let part = parts[i]; part &amp;&amp; objectAtPath; part = parts[++i]) {
+      objectAtPath = objectAtPath[part];
+    }
+
+    return i === parts.length &amp;&amp; objectAtPath === equals;
+  }
+
+  return listOfObjects.filter(filterSingle);
+}
+</code></pre>
+<p>And we now handle the most obvious invalid path cases.</p>
+<h3 id="arrays?">Arrays?</h3><p>If we want to support array path syntax, things get harder. For
+example:</p>
+<pre><code class="hljs javascript">require(&#39;assert&#39;).deepEqual(
+  filter(&#39;foo.bar[0].biz&#39;, 14, [{ foo: { bar: [ { biz: 14 }, { biz: 19 } ] } }, { foo: { bar: null } }]),
+  [{ foo: { bar: [ { biz: 14 }, { biz: 19 } ] } }],
+);
+</code></pre>
+<p>We could try to stick with the hammer that is
+<code>String.prototype.split</code> and write some really messy
+code. :) Or we could switch to an approach that gives us more
+control. Let's do that.</p>
+<p>We'll build a very simple lexer that will iterate over each character
+accumulating characters into individual tokens that represent the
+pieces of the path. Let's start by supporting the original
+<code>jsonPath</code> syntax and error-handling.</p>
+<pre><code class="hljs javascript">function getJsonPathParts(path) {
+  const parts = [];
+  let currentToken = &#39;&#39;;
+
+  for (let i = 0; i &lt; path.length; i++) {
+    const c = path[i];
+    switch (c) {
+      case &#39;.&#39;: {
+        if (!currentToken) {
+          throw new Error(&#39;JSON path cannot contain empty section, in: &#39; + path);
+        }
+        parts.push(currentToken);
+        currentToken = &#39;&#39;;
+        break;
+      }
+      default: {
+        currentToken += c;
+        break;
+      }
+    }
+  }
+
+  if (!currentToken) {
+    throw new Error(&#39;JSON path cannot end with dot, in: &#39; + path);
+  }
+
+  parts.push(currentToken);
+  return parts;
+}
+
+function filter(jsonPath, equals, listOfObjects) {
+  const parts = getJsonPathParts(jsonPath);
+
+  function filterSingle(object) {
+    let objectAtPath = object;
+    let i = 0;
+    for (let part = parts[i]; part &amp;&amp; objectAtPath; part = parts[++i]) {
+      objectAtPath = objectAtPath[part];
+    }
+
+    return i === parts.length &amp;&amp; objectAtPath === equals;
+  }
+
+  return listOfObjects.filter(filterSingle);
+}
+</code></pre>
+<p>Not too bad!</p>
+<h3 id="arrays?">Arrays?</h3><p>Right. Let's build on <code>getJsonPathParts</code> to support array
+syntax. Along with that we're going to impose some restrictions. The
+object path parts must be only alphanumeric characters plus dashes and
+underscores. The array index must only be numeric characters. Anything
+else should throw an error.</p>
+<pre><code class="hljs javascript">function getJsonPathParts(path) {
+  const parts = [];
+  let currentToken = &#39;&#39;;
+  let inArray = false;
+
+  for (let i = 0; i &lt; path.length; i++) {
+    const c = path[i];
+    switch (c) {
+      case &#39;.&#39;: {
+        if (currentToken === &#39;&#39;) {
+          throw new Error(&#39;JSON path cannot contain empty section, in: &#39; + path);
+        }
+
+        parts.push(currentToken);
+        currentToken = &#39;&#39;;
+        break;
+      }
+      case &#39;[&#39;: {
+        if (inArray) {
+          throw new Error(&#39;JSON path contains unexpected left bracket, in: &#39; + path);
+        }
+
+        if (currentToken === &#39;&#39;) {
+          throw new Error(&#39;JSON path cannot contain empty section, in: &#39; + path);
+        }
+
+        parts.push(currentToken);
+        currentToken = &#39;&#39;;
+        inArray = true;
+        break;
+      }
+      case &#39;]&#39;: {
+        if (!inArray) {
+          throw new Error(&#39;JSON path contains unexpected right bracket, in: &#39; + path);
+        }
+
+        if (currentToken === &#39;&#39;) {
+          throw new Error(&#39;JSON path array index must not be empty, in: &#39; + path);
+        }
+
+        // Array indices are recorded as numbers, not strings.
+        currentToken = parseInt(currentToken, 10);
+        inArray = false;
+        break;
+      }
+      default: {
+        const code = c.charCodeAt(0);
+
+        if (inArray) {
+          if (code &gt;= &#39;0&#39;.charCodeAt(0) &amp;&amp; code &lt;= &#39;9&#39;.charCodeAt(0)) {
+            currentToken += c;
+            continue;
+          }
+
+          throw new Error(&#39;JSON path array index must be numeric, in: &#39; + path);
+        }
+
+        if ((code &gt;= &#39;A&#39;.charCodeAt(0) &amp;&amp; code &lt;= &#39;z&#39;.charCodeAt(0)) ||
+            (code &gt;= &#39;0&#39;.charCodeAt(0) &amp;&amp; code &lt;= &#39;9&#39;.charCodeAt(0)) ||
+            [&#39;-&#39;, &#39;_&#39;].includes(c)) {
+          currentToken += c;
+          continue;
+        }
+
+        throw new Error(&#39;JSON path part must contain only alphanumeric characters, in: &#39; + path);
+      }
+    }
+  }
+
+  if (currentToken === &#39;&#39;) {
+    throw new Error(&#39;JSON path cannot end with dot, in: &#39; + path);
+  }
+
+  parts.push(currentToken);
+  return parts;
+}
+
+require(&#39;assert&#39;).deepEqual(getJsonPathParts(&#39;foo.bar[0].biz&#39;), [&#39;foo&#39;, &#39;bar&#39;, 0, &#39;biz&#39;]);
+</code></pre>
+<p>Now we've got a simple JSON path parser with decent error handling! Of
+course we wouldn't want to use this little library in production until
+we had some serious test coverage. But writing tests and calling out
+my mistakes will be left here as an exercise for the reader. :)</p>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">New (short) post on parsing JSON paths in JavaScript <a href="https://t.co/mIjOMugA7C">https://t.co/mIjOMugA7C</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1111262461074784256?ref_src=twsrc%5Etfw">March 28, 2019</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

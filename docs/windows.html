@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Windows | notes.eatonphil.com</title>
+    <meta name="description" content="Windows" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>January 20, 2019</h2>
+          <h1>Windows</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/windows.html" class="tag">windows</a><a href="/tags/desktop.html" class="tag">desktop</a><a href="/tags/linux.html" class="tag">linux</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>It has been six years since I last used Windows for any remotely
+serious software development. I've used Ubuntu, Arch, or FreeBSD
+since. But eventually I spent so much time working around common
+workplace tasks that I decided to put Windows 10 Pro on my work
+laptop.</p>
+<h3 id="windows-subsystem-for-linux">Windows Subsystem for Linux</h3><p>Introduced in 2016, this technology allows Windows to run unmodified
+Linux binaries. The core feat being <a href="https://blogs.msdn.microsoft.com/wsl/2016/06/08/wsl-system-calls/">syscall
+translation</a>.</p>
+<p>It works nearly flawlessly. This means I can do all my Go, Node,
+PostgreSQL development on Windows without a virtual machine using
+bash, tmux, git, emacs, etc.</p>
+<p>I've seen a few minor exceptions over the course of regular software
+development in WSL:</p>
+<ul>
+<li><a href="https://github.com/Microsoft/WSL/issues/2249">ss/netstat does not work</a></li>
+<li><a href="https://github.com/hashicorp/vagrant/issues/8700">vagrant does not work</a></li>
+</ul>
+<p>More generally, Linux programs are heavily file-oriented. And Windows
+I/O <a href="https://github.com/Microsoft/WSL/issues/873#issuecomment-425272829">is not designed well for
+that</a>.
+In the worst cases (installing/adding Node packages) it can take
+minutes to do operations that would take Linux seconds.</p>
+<h3 id="vagrant">Vagrant</h3><p>Vagrant-Windows interoperability is abysmal.</p>
+<p>As noted above, you cannot manage Hyper-V from vagrant within WSL. So
+you're stuck using Powershell. Even then, managing synced files from
+vagrant is a nightmare. The default sync method requires you to sign
+in using your <strong>Windows Live</strong> username and password on every
+reboot. But Node package installation attempts some file operations
+that are not supported over the default synced, network filesystem.</p>
+<p>When I switched to rsync vagrant wouldn't reliable sync when the
+virtual machine went down and came back up.</p>
+<p>After hours of trying to get some files synced with vagrant I gave up.</p>
+<h3 id="hyper-v">Hyper-V</h3><p>Hyper-V's GUI is much more complex/feature-complete than VirtualBox.
+It even provides a Ubuntu-quick-install that I used to jump right in.
+I don't recommend using this though because it gives you no option but
+an 11GB hard disk. I didn't realize this until I went through an hour
+or two of post-install customization only to run out of space. Too
+lazy to boot into a live CD to grow the root filesystem I reinstalled
+with a more suitable 64GB drive and went through the hour-long
+post-install customization process again.</p>
+<p>Networking in Hyper-V is more complex/feature-complete than VirtualBox
+as well. To access a Hyper-V machine you must create a new virtual
+network interface manually and associate it. Static IP address appear
+to be controlled at the host networking level (e.g. Control Panel)
+instead of within the Hyper-V interface. This highlights how these
+virtual interfaces are first-class, but overcomplicates the process of
+getting started.</p>
+<p>Ultimately I gave up on a static IP address and decided to reboot less
+frequently.</p>
+<p>Performance-wise Hyper-V machines are exactly as expected: excellent.</p>
+<h3 id="misc">Misc</h3><p>Docker support on Windows needs work. It took me a while to understand
+how Docker interacts with the WSL filesystem and what I needed to do
+to allow Docker to mount. The complexity is similar on macOS when you
+want to mount privileged directories like /var, but the experience is
+worse on Windows.</p>
+<p>Apparently Windows does have tiling window managers, but I have not
+tried one out yet.</p>
+<p>Powershell, a language with real types, is pretty compelling. But I
+have not spent enough time with it to be efficient. And since WSL is
+mostly good enough I don't really plan to.</p>
+<p>Windows doesn't allow you to delete any files that are "in use". This
+is kinda cool except for that the errors you get when trying to delete
+files that are in use are useless. They are even more useless when you
+get the plain "could not delete directory" when you try to delete a
+directory with some file inside it that is in use. I had to start
+deleting files within by hand until I found the one I realized was in
+use.</p>
+<h3 id="conclusion">Conclusion</h3><p>If you have never run Linux or FreeBSD, don't use this post as an
+excuse not to. You should run Linux or FreeBSD for the experience. But
+if you've reached diminishing returns in your Linux/FreeBSD use,
+Windows as a development environment has come a long way. It may be
+the best platform available for software development, the profession.</p>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">Some notes on my experience having replaced Arch Linux with Windows on my work laptop <a href="https://t.co/8asxZmspwR">https://t.co/8asxZmspwR</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1086994000182153222?ref_src=twsrc%5Etfw">January 20, 2019</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

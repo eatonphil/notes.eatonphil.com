@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Finishing up a FreeBSD experiment | notes.eatonphil.com</title>
+    <meta name="description" content="Finishing up a FreeBSD experiment" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>April 28, 2018</h2>
+          <h1>Finishing up a FreeBSD experiment</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/freebsd.html" class="tag">freebsd</a><a href="/tags/laptop.html" class="tag">laptop</a><a href="/tags/arch.html" class="tag">arch</a><a href="/tags/desktop.html" class="tag">desktop</a><a href="/tags/linux.html" class="tag">linux</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>I've been using FreeBSD as my daily driver at work since
+December. I've successfully done my job and I've learned a hell of a
+lot forcing myself on CURRENT... But there's been a number of issues
+with it that have made it difficult to keep using, so I replaced it
+with Arch Linux yesterday and I no longer have those issues. This is
+not the first time I've forced myself to run FreeBSD and it won't be
+the last.</p>
+<h3 id="the-freebsd-setup">The FreeBSD setup</h3><p>I have a Dell Developer Edition. It employs full-disk encryption with
+ZFS. Not being a "disk-jockey" I cannot comment on how exhilarating an
+experience running ZFS is. It didn't cause me any trouble.</p>
+<p>It has an Intel graphics card and the display server is X. I use the
+<a href="https://stumpwm.github.io">StumpWM</a> window manager and
+the <a href="https://github.com/iwamatsu/slim">SLiM</a> login
+manager. <a href="https://www.jwz.org/xscreensaver/">xscreensaver</a> handles
+locking the screen, <a href="https://feh.finalrewind.org/">feh</a> gives me
+background images, <a href="https://github.com/dreamer/scrot">scrot</a> gives me
+screenshots, and
+<a href="http://recordmydesktop.sourceforge.net/about.php">recordMyDesktop</a>
+gives me video screen capture. This list should feel familiar to users
+of Arch Linux or other X-supported, bring-your-own-software operating
+systems/Linux distributions.</p>
+<h4 id="software-development">Software development</h4><p>I primarily work on a web application with Node/PostgreSQL and React/SASS.
+I do all of this development locally on FreeBSD. I run other components of
+our system in a Vagrant-managed VirtualBox virtual machine.</p>
+<h4 id="upgrading-the-system">Upgrading the system</h4><p>Since I'm running CURRENT, I fetch the latest commit on Subversion and
+rebuild the FreeBSD system (kernel + user-land) each weekend to get
+the new hotness. This takes somewhere between 1-4 hours. I start the
+process Sunday morning and come back to it after lunch. After the
+system is compiled and installed, I update all the packages through
+the package manager and deal with fallout from incompatible kernel
+modules that send me in a crash/reboot loop on boot.</p>
+<p>This is actually the part about running FreeBSD (CURRENT) I love the
+most. I've gotten more familiar with the development and distribution
+of kernel modules like the WiFi, Graphics, and VirtualBox
+drivers. I've learned a lot about the organization of the FreeBSD
+source code. And I've gotten some improvements
+<a href="https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=226015">merged</a>
+into the FreeBSD Handbook on how to debug a core dump.</p>
+<h3 id="issues-with-freebsd-on-my-hardware">Issues with FreeBSD on my hardware</h3><p>I installed CURRENT in December to get support for new Intel graphics
+drivers (which have since been backported to STABLE). The built-in
+Intel WiFi card is also new enough that it hadn't been backported to
+STABLE. My WiFi ultimately never got more than 2-4Mbps down on the
+same networks my Macbook Pro would get 120-250Mbps down. I even bought
+an older Realtek USB WiFi adapter and it fared no differently. My
+understanding is that this is because CURRENT turns on enough debug
+flags that the entire system is not really meant to be used except for
+by FreeBSD developers.</p>
+<p>It would often end up taking 10-30 seconds for a <code>git push</code> to
+happen. It would take minutes to pull new Docker images, etc. This
+(like everything else) does not mean you cannot do work on FreeBSD
+CURRENT, it makes it really annoying.</p>
+<h4 id="appendix-a---headphones">Appendix A - Headphones</h4><p>I couldn't figure out the headphone jack at all. Configuring outputs
+via <code>sysctl</code> and <code>device.hints</code> is either really complicated or
+presented in documentation really complicatedly. I posted a few times
+in #freebsd on Freenode and got eager assistance but ultimately
+couldn't get the headphone jack to produce anything without incredible
+distortion.</p>
+<p>Of course Spotify has no FreeBSD client and I didn't want to try the
+Linux compatiblity layer (which may have worked). I tried spoofing
+user agents for the Spotify web app in Chrome but couldn't find one
+that worked. (I still cannot get a working one on Linux either.) So
+I'd end up listening to Spotify on my phone, which would have been
+acceptable except for that the studio headphones I decided I needed
+were immensely under-powered by my phone.</p>
+<h4 id="appendix-b---yubikey">Appendix B - Yubikey</h4><p>I couldn't figure out how to give myself non-root access to my Yubikey
+which I <em>believe</em> is the reason I ultimately wasn't able to make any
+use of it. Though admittedly I don't understand a whit of GPG/PGP or
+Yubikey itself.</p>
+<h4 id="appendix-c---bhyve">Appendix C - bhyve</h4><p>I really wanted to use
+<a href="https://www.freebsd.org/doc/handbook/virtualization-host-bhyve.html">bhyve</a>
+as the hypervisor for my CentOS virtual machines instead of
+VirtualBox. So I spent 2-3 weekends trying to get it working as a
+backend for Vagrant. Unfortunately the best "supported" way of doing
+this is to manually mutate VirtualBox-based Vagrant boxes and that
+just repeatedly didn't work for me.</p>
+<p>When I tried using bhyve directly I couldn't get networking
+right. Presumably this is because NAT doesn't work well with wireless
+interfaces... And I hadn't put in enough weekends to understand
+setting up proxy rules correctly.</p>
+<h4 id="appendix-d---synaptics">Appendix D - Synaptics</h4><p>It is my understanding that FreeBSD has its own custom Synaptics
+drivers and configuration interfaces. Whether that is the case or not,
+the documentation is a nightmare and while I would have loved to punt
+to a graphical interface to prevent from fat-palming the touchpad
+every 30 seconds, none of the graphical configuration tools seemed to
+work.</p>
+<p>A few weeks ago I think I finally got the synaptics support <em>on</em> but I
+couldn't scroll or select text anymore. I also had to disable
+synaptics, restart X, enable synaptics, and restart X on each boot for
+it to successfully register the mouse. I meant to post in #freebsd on
+Freenode where I probably would have found a solution but :shrugs:.</p>
+<h4 id="appendix-e---sleep">Appendix E - Sleep</h4><p>Well sleep doesn't really work on any modern operating system.</p>
+<h3 id="freebsd-is-awesome">FreeBSD is awesome</h3><p>I enjoy picking on my setup, but it should be impressive that you can
+do real-world work on FreeBSD. If I had a 3-4 year old laptop instead
+of a 1-2 year old laptop, most of my issues would be solved.</p>
+<p>Here are some reasons to like FreeBSD.</p>
+<h4 id="less-competition">Less competition</h4><p>This is kind of stupid. But it's easier to find work to do (e.g. docs
+to fix, bugs to report, ports to add/update, drivers to test) on
+FreeBSD. I'm really disappointed to be back on Linux because I like
+being closer to the community and knowing there are ways I can
+contribute and learn. It's difficult to find the right combination of
+fending/learning for yourself and achieving a certain level of
+productivity.</p>
+<h4 id="package-management-(culture)">Package management (culture)</h4><p>Rolling packages are really important to me as a developer. When I've
+run Ubuntu and Debian desktops in the past, I typically built 5-15
+major (to my workflow) components from source myself. This is
+annoying. Rolling package systems are both easier to use and easier to
+contribute to... The latter point may be a coincidence.</p>
+<p>In FreeBSD, packages are rolling and the base system (kernel +
+userland) is released every year or two if you run the
+recommended/supported "flavors" of FreeBSD (i.e. not CURRENT). If
+you're running CURRENT then everything is rolling.</p>
+<p>Packages are binary, but you can build them from source if needed.</p>
+<h4 id="source">Source</h4><p>FreeBSD has an older code base than Linux does but still manages to be
+much better organized. OpenBSD and Minix are even better organized but
+I don't consider them in the grouping as mainstream general-purpose
+operating systems like FreeBSD and Linux. Linux is an awful mess
+and is very intimidating, though I hope to get over that.</p>
+<h4 id="old-school-interfaces">Old-school interfaces</h4><p>There's no systemd so starting X is as simple as <code>startx</code> (but you can
+enable the login manager service to have it launch on boot). You
+configure your network interfaces via <code>ifconfig</code>, <code>wpa_supplicant</code>,
+and <code>dhclient</code>.</p>
+<h4 id="alternatives">Alternatives</h4><p><a href="https://www.trueos.org/">PCBSD or TrueOS</a> may be a good option for
+desktop users but something about the project turns me off (maybe it's
+the scroll-jacking website).</p>
+<h3 id="picking-arch-linux">Picking Arch Linux</h3><p>In any case, I decided it was time to stop waiting for <code>git push</code> to
+finish. I had run Gentoo at work for 3-4 months before I installed
+FreeBSD. But I still had nightmares of resolving dependencies during
+upgrades. I needed a binary package manager (not hard to find) and a
+rolling release system.</p>
+<h4 id="installing-arch-stinks">Installing Arch stinks</h4><p>Many of my old coworkers at Linode run Arch Linux at home so I've
+looked into it a few times. It absolutely meets my rolling release and
+binary packaging needs. But I've been through the installation once
+before (and I've been through Gentoo's) and loathed the minutes-long
+effort required to set up full-disk encryption. Also, systemd? :(</p>
+<h4 id="how-about-void-linux?">How about Void Linux?</h4><p>Void Linux looked promising and avoids systemd (which legitimately
+adds complexity and new tools to learn for desktop users with graphics
+and WiFi/DHCP networking). It has a rolling release system and binary
+packages, but overall didn't seem popular enough. I worried I'd be in
+the same boat as in Debian/Ubuntu building lots of packages myself.</p>
+<h4 id="what-about-arch-based-distros?">What about Arch-based distros?</h4><p>Eventually I realized <a href="http://antergos.com/">Antergos</a> and
+<a href="https://manjaro.org/">Manjaro</a> are two (Distrowatch-rated) popular
+distributions that are based on Arch and would provide me with the
+installer I really wanted. I read more about Manjaro and found it was
+pretty divergent from Arch. That didn't sound appealing. Divergent
+distributions like Manjaro and Mint exist to cause trouble. Antergos,
+on the other hand, seemed to be a thin layer around Arch including a
+graphical installer and its own few package repositories. It seemed
+easy enough to remove after the installation was finished.</p>
+<h3 id="antergos-linux">Antergos Linux</h3><p>I ran the Antergos installer and the first time around, my touchpad
+didn't work at all. I tried a USB mouse (that to be honest, may have
+been broken anyway) but it didn't seem to be recognized. I rebooted
+and my touchpad worked.</p>
+<p>I tried to configure WiFi using the graphical NetworkManager provided
+but it was super buggy. Menus kept expanding and contracting as I
+moused over items. And it ultimately never prompted me for a password
+to the locked networks around me. (It showed lock icons beside the
+locked networks.)</p>
+<p>I spent half an hour trying to configure the WiFi manually. After I
+got it working (and "learned" all the fun new modern tools like <code>ip</code>,
+<code>iw</code>, <code>dhcpcd</code>, <code>iwconfig</code>, and systemd networking), the Antergos
+installer would crash at the last step for some error related to not
+being able to update itself.</p>
+<p>At this point I gave up. The Antergos installer was half-baked, buggy,
+and was getting me nowhere.</p>
+<h3 id="anarchy-linux">Anarchy Linux</h3><p>Still loathe to spend a few minutes configuring disk encryption
+manually, I interneted until I found <a href="https://anarchy-linux.org/">Anarchy
+Linux</a> (which used to be Arch Anywhere).</p>
+<p>This installer seemed even more promising. It is a TUI installer so no
+need for a mouse and there are more desktop environments to pick from
+(including i3 and Sway) or avoid.</p>
+<p>It was a little concerning that Anarchy Linux also intends to be its
+own divergent Arch-based distribution, but in the meantime it still
+offers support for installing vanilla Arch.</p>
+<p>It worked.</p>
+<h3 id="life-on-arch">Life on Arch</h3><p>I copied over all my configs from my FreeBSD setup and they all
+worked. That's pretty nice (also speaks to the general compatibility
+of software between Linux and FreeBSD). StumpWM, SLiM, scrot,
+xscreensaver, feh, Emacs, Tmux, ssh, kubectl, font settings,
+keyboarding bindings, etc.</p>
+<p>Getting Powerline working was a little weird. The <code>powerline</code> and
+<code>powerline-fonts</code> packages don't seem to install patched fonts
+(e.g. <code>Noto Sans for Powerline</code>). I prefer to use these than the
+alternative of specifying multiple fonts for fallbacks because I have
+font settings in multiple places (e.g. .Xresources, .emacs, etc) and
+the syntax varies in each config. So ultimately I cloned the
+<code>github.com/powerline/fonts</code> repo and ran the <code>install.sh</code> script
+there to get the patched fonts.</p>
+<p>But hey, there's a Spotify client! It works! And the headphone jack
+just works after installing <code>alsa-utils</code> and running <code>alsamixer</code>. And
+my WiFi speed is 120Mbps-250Mbps down on all the right networks!</p>
+<p>I can live with this.</p>
+<h3 id="random-background">Random background</h3><p>Each time I join a new company, I try to use the change as an excuse
+to force myself to try different workflows and learn something new
+tangential to the work I actually do. I'd been a Vim and Ubuntu
+desktop user since highschool. In 2015, I took a break from work on
+the East Coast to live in a school bus in Silver City, New Mexico. I
+swapped out my Ubuntu and Vim dev setup for FreeBSD and Emacs. I kept
+GNOME 3 because I liked the asthetic. I spent 6 months with this setup
+forcing myself to use it as my daily-driver doing full-stack, contract
+web development gigs.</p>
+<p>In 2016, I joined Linode and took up the company Macbook Pro. I wasn't
+as comfortable at the time running Linux on my Macbook, but a
+determined coworker put Arch on his. I was still the only one
+running Emacs (everyone else used Vim or VS Code) for Python and React
+development.</p>
+<p>I joined Capsule8 in late 2017 and put Gentoo on my Dell Developer
+Edition. Most people ran Ubuntu on the Dell or macOS. I'd never used
+Gentoo on a desktop before but liked the systemd-optional design and
+similarities to FreeBSD. I ran Gentoo for 3-4 months but was
+constantly breaking it during upgrades, and the monthly, full-system
+upgrades themselves took 1-2 days. I didn't have the chops or patience
+to deal with it.</p>
+<p>So I used FreeBSD for 5 months and now I'm back on Linux.</p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

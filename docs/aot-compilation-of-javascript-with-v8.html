@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>AOT-compilation of Javascript with V8 | notes.eatonphil.com</title>
+    <meta name="description" content="AOT-compilation of Javascript with V8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>February 26, 2019</h2>
+          <h1>AOT-compilation of Javascript with V8</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/javascript.html" class="tag">javascript</a><a href="/tags/c++.html" class="tag">c++</a><a href="/tags/compiler.html" class="tag">compiler</a><a href="/tags/rust.html" class="tag">rust</a><a href="/tags/typescript.html" class="tag">typescript</a><a href="/tags/v8.html" class="tag">v8</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>tldr; I'm working on a AOT-compiled Javascript implementation called
+<a href="https://github.com/eatonphil/jsc">jsc</a>.</p>
+<p>Many dynamically typed programming languages have implementations that
+compile to native binaries:</p>
+<ul>
+<li>Python: <a href="https://cython.org/">Cython</a></li>
+<li>Common Lisp: <a href="http://www.sbcl.org/">SBCL</a></li>
+<li>Scheme: <a href="https://www.call-cc.org/">Chicken Scheme</a></li>
+</ul>
+<p>The benefits of compiling dynamically typed languages are similar to
+those of compiling statically typed languages:</p>
+<ul>
+<li>Simplified deployment via a single binary</li>
+<li>Simplified foreign-function interfaces<ul>
+<li>e.g. <a href="https://wiki.call-cc.org/An%20extended%20FFI%20example">Embedded C/C++ strings</a></li>
+</ul>
+</li>
+<li>Predictable performance compared to JIT compiling interpreters</li>
+<li>Performance gains compared to non-JIT compiling interpreters</li>
+</ul>
+<p>I (re)discovered a common technique for compiling dynamic languages
+while developing <a href="https://github.com/eatonphil/bsdscheme">BSDScheme</a>,
+an interpreter and compiler for Scheme. In this technique, you use
+core parts of the runtime code as a library that is imported and
+referenced by compiled code.</p>
+<p>You save time building object-memory representations, memory
+management, operations, interacting with existing libraries, etc. when
+an interpreter already exists. The runtime as a library (plus existing
+parser frontends) allows you to focus solely on code generation of
+control flow.</p>
+<h3 id="the-first-pass">The first pass</h3><p>I wrote the initial version of <a href="https://github.com/eatonphil/jsc">jsc</a>
+in Rust using Dave Herman's
+<a href="https://github.com/dherman/esprit">esprit</a> parser (supports a subset
+of ES6 that includes all of ES5).</p>
+<p>The interesting parts of the runtime are taken care of by V8, e.g.:</p>
+<ul>
+<li><code>V8::String</code> - a Javascript string object<ul>
+<li><code>V8::String::NewFromUtf8(isolate, "hello world!")</code> - C++ string to Javascript string object</li>
+</ul>
+</li>
+<li><code>V8::Number</code> - a Javascript number object<ul>
+<li><code>V8::Number::New(isolate, 10)</code> - C++ double to Javascript number object</li>
+</ul>
+</li>
+<li>Heap allocations</li>
+<li>Calling convention</li>
+</ul>
+<p>And so on.</p>
+<h4 id="an-example">An example</h4><p>This first version of jsc could take the following Javascript:</p>
+<pre><code class="hljs javascript">function fib(n, a, b) {
+    if (n == 0) {
+        return a;
+    }
+
+    if (n == 1) {
+        return b;
+    }
+
+    return fib(n - 1, b, a + b);
+}
+
+function main() {
+  console.log(fib(50, 0, 1));
+}
+</code></pre>
+<p>And produce the following C++:</p>
+<pre><code class="hljs cpp">#include &lt;string&gt;
+#include &lt;iostream&gt;
+
+#include &lt;node.h&gt;
+
+using v8::Array;
+using v8::Boolean;
+using v8::Context;
+using v8::Exception;
+using v8::Function;
+using v8::FunctionTemplate;
+using v8::FunctionCallbackInfo;
+using v8::Isolate;
+using v8::Local;
+using v8::Null;
+using v8::Number;
+using v8::Object;
+using v8::String;
+using v8::False;
+using v8::True;
+using v8::Value;
+
+void fib_0(const FunctionCallbackInfo&lt;Value&gt;&amp; args) {
+  Isolate* isolate = args.GetIsolate();
+  Local&lt;Value&gt; n_1 = args[0];
+  Local&lt;Value&gt; a_2 = args[1];
+  Local&lt;Value&gt; b_3 = args[2];
+tail_recurse_4:
+
+  Local&lt;Context&gt; ctx_5 = isolate-&gt;GetCurrentContext();
+  Local&lt;Object&gt; global_6 = ctx_5-&gt;Global();
+  Local&lt;Function&gt; Boolean_7 = Local&lt;Function&gt;::Cast(global_6-&gt;Get(String::NewFromUtf8(isolate, &quot;Boolean&quot;)));
+  String::Utf8Value utf8value_tmp_8(n_1);
+  std::string string_tmp_9(*utf8value_tmp_8);
+  String::Utf8Value utf8value_tmp_10(Number::New(isolate, 0));
+  std::string string_tmp_11(*utf8value_tmp_10);
+  Local&lt;Value&gt; argv_12[] = { (n_1-&gt;IsBoolean() || Number::New(isolate, 0)-&gt;IsBoolean()) ? Boolean::New(isolate, n_1-&gt;ToBoolean(isolate)-&gt;Value() == Number::New(isolate, 0)-&gt;ToBoolean(isolate)-&gt;Value()) : ((n_1-&gt;IsNumber() || Number::New(isolate, 0)-&gt;IsNumber()) ? Boolean::New(isolate, n_1-&gt;ToNumber(isolate)-&gt;Value() == Number::New(isolate, 0)-&gt;ToNumber(isolate)-&gt;Value()) : ((n_1-&gt;IsString() || Number::New(isolate, 0)-&gt;IsString()) ? Boolean::New(isolate, string_tmp_9 == string_tmp_11) : (False(isolate)))) };
+  Local&lt;Value&gt; result_13 = Boolean_7-&gt;Call(Null(isolate), 1, argv_12);
+  if (result_13-&gt;ToBoolean()-&gt;Value()) {
+    // return a;
+    args.GetReturnValue().Set(a_2);
+    return;
+
+
+  }
+
+  Local&lt;Context&gt; ctx_14 = isolate-&gt;GetCurrentContext();
+  Local&lt;Object&gt; global_15 = ctx_14-&gt;Global();
+  Local&lt;Function&gt; Boolean_16 = Local&lt;Function&gt;::Cast(global_15-&gt;Get(String::NewFromUtf8(isolate, &quot;Boolean&quot;)));
+  String::Utf8Value utf8value_tmp_17(n_1);
+  std::string string_tmp_18(*utf8value_tmp_17);
+  String::Utf8Value utf8value_tmp_19(Number::New(isolate, 1));
+  std::string string_tmp_20(*utf8value_tmp_19);
+  Local&lt;Value&gt; argv_21[] = { (n_1-&gt;IsBoolean() || Number::New(isolate, 1)-&gt;IsBoolean()) ? Boolean::New(isolate, n_1-&gt;ToBoolean(isolate)-&gt;Value() == Number::New(isolate, 1)-&gt;ToBoolean(isolate)-&gt;Value()) : ((n_1-&gt;IsNumber() || Number::New(isolate, 1)-&gt;IsNumber()) ? Boolean::New(isolate, n_1-&gt;ToNumber(isolate)-&gt;Value() == Number::New(isolate, 1)-&gt;ToNumber(isolate)-&gt;Value()) : ((n_1-&gt;IsString() || Number::New(isolate, 1)-&gt;IsString()) ? Boolean::New(isolate, string_tmp_18 == string_tmp_20) : (False(isolate)))) };
+  Local&lt;Value&gt; result_22 = Boolean_16-&gt;Call(Null(isolate), 1, argv_21);
+  if (result_22-&gt;ToBoolean()-&gt;Value()) {
+    // return b;
+    args.GetReturnValue().Set(b_3);
+    return;
+
+
+  }
+
+  // return fib(n - 1, b, a + b);
+  Local&lt;Value&gt; arg_23 = (n_1-&gt;IsNumber() || Number::New(isolate, 1)-&gt;IsNumber()) ? (Number::New(isolate, n_1-&gt;ToNumber(isolate)-&gt;Value() - Number::New(isolate, 1)-&gt;ToNumber(isolate)-&gt;Value())) : Local&lt;Number&gt;::Cast(Null(isolate));
+  Local&lt;Value&gt; arg_24 = b_3;
+  Local&lt;Value&gt; arg_25 = (a_2-&gt;IsString() || b_3-&gt;IsString()) ? Local&lt;Value&gt;::Cast(String::Concat(a_2-&gt;ToString(), b_3-&gt;ToString())) : Local&lt;Value&gt;::Cast((a_2-&gt;IsNumber() || b_3-&gt;IsNumber()) ? (Number::New(isolate, a_2-&gt;ToNumber(isolate)-&gt;Value() + b_3-&gt;ToNumber(isolate)-&gt;Value())) : Local&lt;Number&gt;::Cast(Null(isolate)));
+  Local&lt;FunctionTemplate&gt; ftpl_27 = FunctionTemplate::New(isolate, fib_0);
+  Local&lt;Function&gt; fn_26 = ftpl_27-&gt;GetFunction();
+  fn_26-&gt;SetName(String::NewFromUtf8(isolate, &quot;fib_0&quot;));
+  n_1 = arg_23;
+  a_2 = arg_24;
+  b_3 = arg_25;
+  goto tail_recurse_4;
+
+}
+
+void jsc_main(const FunctionCallbackInfo&lt;Value&gt;&amp; args) {
+  Isolate* isolate = args.GetIsolate();
+tail_recurse_5:
+
+  // console.log(fib(50, 0, 1))
+  Local&lt;Value&gt; dot_parent_7 = isolate-&gt;GetCurrentContext()-&gt;Global()-&gt;Get(String::NewFromUtf8(isolate, &quot;console&quot;));
+  Local&lt;String&gt; property_8 = String::NewFromUtf8(isolate, &quot;log&quot;);
+  while (dot_parent_7-&gt;IsObject() &amp;&amp; !dot_parent_7.As&lt;Object&gt;()-&gt;HasOwnProperty(isolate-&gt;GetCurrentContext(), property_8).ToChecked()) {
+    dot_parent_7 = dot_parent_7.As&lt;Object&gt;()-&gt;GetPrototype();
+  }
+  Local&lt;Value&gt; dot_result_6 = dot_parent_7.As&lt;Object&gt;()-&gt;Get(isolate-&gt;GetCurrentContext(), property_8).ToLocalChecked();
+  Local&lt;Value&gt; arg_9 = Number::New(isolate, 50);
+  Local&lt;Value&gt; arg_10 = Number::New(isolate, 0);
+  Local&lt;Value&gt; arg_11 = Number::New(isolate, 1);
+  Local&lt;FunctionTemplate&gt; ftpl_13 = FunctionTemplate::New(isolate, fib_0);
+  Local&lt;Function&gt; fn_12 = ftpl_13-&gt;GetFunction();
+  fn_12-&gt;SetName(String::NewFromUtf8(isolate, &quot;fib_0&quot;));
+  Local&lt;Value&gt; argv_14[] = { arg_9, arg_10, arg_11 };
+  Local&lt;Value&gt; result_15 = fn_12-&gt;Call(Null(isolate), 3, argv_14);
+  Local&lt;Value&gt; arg_16 = result_15;
+  Local&lt;Function&gt; fn_17 = Local&lt;Function&gt;::Cast(dot_result_6);
+  Local&lt;Value&gt; argv_18[] = { arg_16 };
+  Local&lt;Value&gt; result_19 = fn_17-&gt;Call(dot_parent_7, 1, argv_18);
+  result_19;
+
+}
+
+void Init(Local&lt;Object&gt; exports) {
+  NODE_SET_METHOD(exports, &quot;jsc_main&quot;, jsc_main);
+}
+
+NODE_MODULE(NODE_GYP_MODULE_NAME, Init)
+</code></pre>
+<p>This output gets compiled (by jsc) as a <a href="https://nodejs.org/api/addons.html">Node
+addon</a> using
+<a href="https://github.com/nodejs/node-gyp">node-gyp</a>.</p>
+<p>The compiled addon is loaded by a single-line Javascript file generated by jsc:</p>
+<pre><code class="hljs bash">$ rm -rf build
+$ jsc fib.js
+$ cat build/fib.js
+require(&quot;build/Release/fib.node&quot;).jsc_main()
+$ node build/fib.js
+12586269025
+</code></pre>
+<h4 id="analysis">Analysis</h4><p>The code was a mess of bad formatting, unnecessary locals, inefficient
+basic operations (e.g. huge, often unnecessary Boolean conversions),
+and so on. The unnecessary locals was partially a by-product of
+single-pass code generation. And the unnecessary conversions was
+partly due to ignoring types (even types of literals that you don't
+need Typescript/Flow to provide).</p>
+<p>After I got this proof-of-concept working for basic examples, I wanted
+to rewrite it around <a href="https://github.com/eatonphil/one-pass-code-generation-in-v8/blob/master/One-pass%20Code%20Generation%20in%20V8.pdf">destination-driven code
+generation</a>,
+a technique by Kent Dybvig used in V8's baseline compiler. And after a
+few weeks not getting far in a refactor in Rust, I rewrote the
+compiler in Typescript.</p>
+<h3 id="the-second-pass">The second pass</h3><p>Written in Typescript and using the <a href="https://github.com/Microsoft/TypeScript/wiki/Using-the-Compiler-API">Typescript compiler
+API</a>,
+this second iteration was built to do destination-driven code
+generation and leaf type propagation. Destination-driven code
+generation allows a single-pass code generator to reduce redundant
+reassignments. And leaf type propagation allows simple, obvious
+optimizations such as just calling <code>V8::Boolean::IsTrue()</code>
+on a statically-known boolean rather than calling
+<code>V8::Value::Equals()</code>.</p>
+<h4 id="example">Example</h4><p>Given the same fibonacci Javascript program from before, this
+iteration produces the following C++:</p>
+<pre><code class="hljs cpp">#include &quot;lib.cc&quot;
+
+void tco_fib(const FunctionCallbackInfo&lt;Value&gt;&amp; _args) {
+  Isolate* isolate = _args.GetIsolate();
+  std::vector&lt;Local&lt;Value&gt;&gt; args(_args.Length());;
+  for (int i = 0; i &lt; _args.Length(); i++) args[i] = _args[i];
+tail_recurse_0:
+
+  Local&lt;Number&gt; sym_rhs_4 = Number::New(isolate, 0);
+  Local&lt;Boolean&gt; sym_anon_2 = args[0]-&gt;StrictEquals(sym_rhs_4) ? True(isolate) : False(isolate);
+  if (sym_anon_2-&gt;IsTrue()) {
+    _args.GetReturnValue().Set(args[1]);
+    return;
+  }
+
+  Local&lt;Number&gt; sym_rhs_11 = Number::New(isolate, 1);
+  Local&lt;Boolean&gt; sym_anon_9 = args[0]-&gt;StrictEquals(sym_rhs_11) ? True(isolate) : False(isolate);
+  if (sym_anon_9-&gt;IsTrue()) {
+    _args.GetReturnValue().Set(args[2]);
+    return;
+  }
+
+  Local&lt;Number&gt; sym_rhs_19 = Number::New(isolate, 1);
+  Local&lt;Value&gt; sym_arg_17 = genericMinus(isolate, args[0], sym_rhs_19);
+  Local&lt;Value&gt; sym_arg_21 = genericPlus(isolate, args[1], args[2]);
+  args[0] = sym_arg_17;
+  args[1] = args[2];
+  args[2] = sym_arg_21;
+  goto tail_recurse_0;
+
+  return;
+}
+
+void jsc_main(const FunctionCallbackInfo&lt;Value&gt;&amp; _args) {
+  Isolate* isolate = _args.GetIsolate();
+  std::vector&lt;Local&lt;Value&gt;&gt; args(_args.Length());;
+  for (int i = 0; i &lt; _args.Length(); i++) args[i] = _args[i];
+tail_recurse_1:
+
+  Local&lt;Number&gt; sym_arg_29 = Number::New(isolate, 100);
+  Local&lt;Number&gt; sym_arg_30 = Number::New(isolate, 0);
+  Local&lt;Number&gt; sym_arg_31 = Number::New(isolate, 1);
+  Local&lt;Value&gt; sym_args_32[] = { sym_arg_29, sym_arg_30, sym_arg_31 };
+  Local&lt;Function&gt; sym_fn_33 = FunctionTemplate::New(isolate, tco_fib)-&gt;GetFunction();
+  sym_fn_33-&gt;SetName(String::NewFromUtf8(isolate, &quot;tco_fib&quot;));
+  Local&lt;Value&gt; sym_arg_28 = sym_fn_33-&gt;Call(sym_fn_33, 3, sym_args_32);
+
+  Local&lt;Value&gt; sym_args_34[] = { sym_arg_28 };
+  Local&lt;Value&gt; sym_parent_37 = isolate-&gt;GetCurrentContext()-&gt;Global()-&gt;Get(String::NewFromUtf8(isolate, &quot;console&quot;));
+  Local&lt;Value&gt; sym_anon_36 = sym_parent_37.As&lt;Object&gt;()-&gt;Get(String::NewFromUtf8(isolate, &quot;log&quot;));
+  Local&lt;Function&gt; sym_fn_35 = Local&lt;Function&gt;::Cast(sym_anon_36);
+  Local&lt;Value&gt; sym_anon_27 = sym_fn_35-&gt;Call(sym_fn_35, 1, sym_args_34);
+
+  return;
+}
+
+void Init(Local&lt;Object&gt; exports) {
+  NODE_SET_METHOD(exports, &quot;jsc_main&quot;, jsc_main);
+}
+
+NODE_MODULE(NODE_GYP_MODULE_NAME, Init)
+</code></pre>
+<h4 id="analysis">Analysis</h4><p>Common code (<code>genericPlus</code>, <code>genericMinus</code>) and
+all imports have been pulled into <code>lib.cc</code> for clarity. And
+the entire result is run through
+<a href="https://clang.llvm.org/docs/ClangFormat.html">clang-format</a> if it is
+present on the system.</p>
+<p>The benefit of leaf type propagation can be seen everywhere a local is
+declared that is not <code>Local<Value></code> and specifically in if
+tests on statically known booleans:</p>
+<pre><code class="hljs cpp">...
+Local&lt;Boolean&gt; sym_anon_2 = args[0]-&gt;StrictEquals(sym_rhs_4) ? True(isolate) : False(isolate);
+  if (sym_anon_2-&gt;IsTrue()) {
+...
+</code></pre>
+<p>It's obvious to a human that there is another optimization you could
+do here by not wrapping this check in a <code>V8::Boolean</code> at
+all. The only types tracked in destinations are V8 types, not yet C++
+types. But not needing to passing this through a <code>bool
+toBoolean(Value v)</code> wrapper is still an improvement.</p>
+<p>In general, unboxing has not really been explore. But the ultimate
+goal is to use Typescript types to produce function- or block-level
+unboxed versions -- perhaps using a toggle in code to specify safety à
+la Common Lisp.</p>
+<h3 id="next-steps">Next steps</h3><p>I broke tests and regressed on syntax support in the Typescript port,
+so that's the first step. The second step is enough syntax to support
+more interesting benchmarks than the fibonacci example (which has
+comparative performance to Node.js/V8 but isn't saying much).</p>
+<p>After that:</p>
+<ul>
+<li>Unboxed expressions</li>
+<li>Unboxed blocks</li>
+<li>Foreign-function interface</li>
+<li>Self-hosting</li>
+<li>Node-API compatible runtime without Node</li>
+</ul>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">Companion blog post to my talk on an AOT-compiled Javascript implementation built on Typescript <a href="https://t.co/0aHVJ9UzYh">https://t.co/0aHVJ9UzYh</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1100397733867859968?ref_src=twsrc%5Etfw">February 26, 2019</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

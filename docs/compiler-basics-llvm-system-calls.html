@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Writing a lisp compiler from scratch in JavaScript: 6. LLVM system calls | notes.eatonphil.com</title>
+    <meta name="description" content="Writing a lisp compiler from scratch in JavaScript: 6. LLVM system calls" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>June 22, 2019</h2>
+          <h1>Writing a lisp compiler from scratch in JavaScript: 6. LLVM system calls</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/javascript.html" class="tag">javascript</a><a href="/tags/compiler.html" class="tag">compiler</a><a href="/tags/llvm.html" class="tag">llvm</a><a href="/tags/syscall.html" class="tag">syscall</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p class="note">
+  Previously in compiler basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/compiler-basics-lisp-to-assembly.html">1. lisp to assembly</a>
+  <br />
+  <a href="/compiler-basics-functions.html">2. user-defined functions and variables</a>
+  <br />
+  <a href="/compiler-basics-llvm.html">3. LLVM</a>
+  <br />
+  <a href="/compiler-basics-llvm-conditionals.html">4. LLVM conditionals and compiling fibonacci</a>
+  <br />
+  Next in compiler basics:
+  <br />
+  <a href="/compiler-basics-an-x86-upgrade.html">5. an x86 upgrade</a>
+</p><p>In this post we'll extend the <a href="https://github.com/eatonphil/ulisp">ulisp
+compiler</a>'s LLVM backend to
+support printing integers to stdout.</p>
+<h3 id="exit-code-limitations">Exit code limitations</h3><p>Until now we've validated program state by setting the exit code to
+the result of the program computation. But the exit code is an eight
+bit integer. What if we want to validate a computation that produces
+a result larger than 255?</p>
+<p>To do this we need a way to print integers. This is challenging
+because printing normally deals with byte arrays. libc's
+<code>printf</code>, for example, takes a byte array as its first
+argument.</p>
+<p>The shortest path forward is to add support for system calls so we can
+print one character at a time. Here's a version of a <code>print</code>
+form that hacks around not having arrays to send each integer in a
+number to stdout.</p>
+<pre><code class="hljs lisp">(def print-char (c)
+     ; First argument is stdout
+     ; Second argument is a pointer to a char array (of length one)
+     ; Third argument is the length of the char array
+     (syscall/sys_write 1 &amp;c 1))
+
+(def print (n)
+     (if (&gt; n 9)
+         (print (/ n 10)))
+
+     ; 48 is the ASCII code for &#39;0&#39;
+     (print-char (+ 48 (% n 10))))
+</code></pre>
+<p>In order to support this we need to add the
+<code>syscall/sys_write</code>, <code>></code>, <code>%</code>,
+and <code>/</code> builtin forms. We'll also need to add support for
+taking the address of a variable.</p>
+<p>All <a href="https://github.com/eatonphil/ulisp">code is available on Github</a>
+as is the <a href="https://github.com/eatonphil/ulisp/commit/213b83b8e952c210ba408bf38e59ae677d19e643">particular commit related to this
+post</a>.</p>
+<h3 id="references">References</h3><p>The <code>sys_write</code> syscall requires us to pass the memory
+address of the byte array to write. We don't support arrays, but we
+can treat an individual variable as an array of length one by passing
+the variable's address.</p>
+<p>If we were compiling to C we could just pass the address of a local
+variable. But LLVM doesn't allow us to take the address of variables
+directly. We need to push the variable onto the LLVM stack to get an
+address.</p>
+<p class="note">
+  Under the hood LLVM will likely optimize this into a local variable
+  reference instead of first pushing to the stack.
+</p><p>Since LLVM IR is typed, the value representing the address of a local
+variable will be a pointer type. We'll need to refer to all uses of
+this value as a pointer. So we'll need to modify ulisp to track local
+types rather than hard-coding <code>i64</code> everywhere.</p>
+<h4 id="scope">Scope</h4><p>To begin we'll modify the <code>Scope</code> class to track types. We
+only need to do this on registration. Afterward, we'll have to find
+all uses of local variables to make sure they use the
+local's <code>value</code> and <code>type</code> fields appropriately.</p>
+<pre><code class="hljs javascript">class Scope {
+
+  ...
+
+  register(local) {
+    let copy = local.replace(&#39;-&#39;, &#39;_&#39;);
+    let n = 1;
+    while (this.locals[copy]) {
+      copy = local + n++;
+    }
+
+    this.locals[local] = {
+      value: copy,
+      type: &#39;i64&#39;,
+    };
+    return this.locals[local];
+  }
+
+  ...
+
+}
+</code></pre>
+<p>We won't go through every use of a <code>Scope</code> variable in this
+post, but you can find it in the related <a href="https://github.com/eatonphil/ulisp/commit/213b83b8e952c210ba408bf38e59ae677d19e643">commit to
+ulisp</a>.</p>
+<h4 id="reference">Reference</h4><p>The long-term approach for handling a reference syntactically is
+probably to rewrite <code>&x</code> to <code>(& x)</code> in the
+parser. The lazy approach we'll take for now is to handle a reference
+as a special kind of identifier in <code>compileExpression</code>.</p>
+<p>We'll use the LLVM <code>alloca</code> instruction to create space on
+the stack. This will return a pointer and will turn the destination
+variable into a pointer type. Then we'll use <code>store</code> to set
+the value at the address to the current value of the variable being
+referenced.</p>
+<pre><code class="hljs javascript">class Compiler {
+
+  ...
+
+  compileExpression(exp, destination, context) {
+
+    ...
+
+    // Is a reference, push onto the stack and return its address
+    if (exp.startsWith(&#39;&amp;&#39;)) {
+      const symbol = exp.substring(1);
+      const tmp = context.scope.symbol();
+      this.compileExpression(symbol, tmp, context);
+      this.emit(1, `%${destination.value} = alloca ${tmp.type}, align 4`);
+      destination.type = tmp.type + &#39;*&#39;;
+      this.emit(1, `store ${tmp.type} %${tmp.value}, ${destination.type} %${destination.value}, align 4`);
+      return;
+    }
+
+    ...
+
+  }
+
+  ...
+
+}
+</code></pre>
+<p>And now we're set to take the address of any code.</p>
+<h3 id="system-calls">System calls</h3><p>LLVM IR provides no high-level means for making system calls. The
+only way is to use inline assembly. This syntax is based on GCC inline
+assembly and is confusing, with few explained examples, and unhelpful
+error messages.</p>
+<p>Thankfully the assembly code needed for a syscall is only one line,
+one word: the <code>syscall</code> assembly instruction. We use inline
+assembly variable-to-register mapping functionality to line up all the
+parameters for the syscall. Here is an example:</p>
+<pre><code class="hljs llvm">%result = call i64 asm sideeffect &quot;syscall&quot;, &quot;=r,{rax},{rdi},{rsi},{rdx}&quot; (i64 %raxArg, i64 %rdiArg, i64 %rsiArg, i64 %rdxArg)
+</code></pre>
+<p>This says to execute the inline assembly string,
+"syscall". The <code>sideeffect</code> flag means that this assembly
+should always be run even if the result isn't used. <code>=r</code>
+means the inline assembly returns a value, and the rest of the string
+is the list of registers that arguments should be mapped to. Finally
+we call the function with all the LLVM variables we want to be mapped.</p>
+<p class="note">
+  Eventually we should also use the inline assembly syntax to list
+  registers that are modified so that LLVM can know to save them
+  before and after.
+</p><h4 id="code">Code</h4><p>We'll add a mapping for <code>syscall/sys_write</code> and a helper
+function for generating syscall code using the example above as a
+template. We'll suport 64-bit Darwin and Linux kernels.</p>
+<pre><code class="hljs javascript">const SYSCALL_TABLE = {
+  darwin: {
+    sys_write: 0x2000004,
+    sys_exit: 0x2000001,
+  },
+  linux: {
+    sys_write: 1,
+    sys_exit: 60,
+  },
+}[process.platform];
+
+class Compiler {
+  constructor() {
+    this.outBuffer = [];
+    this.primitiveFunctions = {
+      def: this.compileDefine.bind(this),
+      begin: this.compileBegin.bind(this),
+      &#39;if&#39;: this.compileIf.bind(this),
+      &#39;+&#39;: this.compileOp(&#39;add&#39;),
+      &#39;-&#39;: this.compileOp(&#39;sub&#39;),
+      &#39;*&#39;: this.compileOp(&#39;mul&#39;),
+      &#39;%&#39;: this.compileOp(&#39;urem&#39;),
+      &#39;&lt;&#39;: this.compileOp(&#39;icmp slt&#39;),
+      &#39;=&#39;: this.compileOp(&#39;icmp eq&#39;),
+      &#39;syscall/sys_write&#39;: this.compileSyscall(SYSCALL_TABLE.sys_write),
+    };
+  }
+
+  ...
+
+  compileSyscall(id) {
+    return (args, destination, context) =&gt; {
+      const argTmps = args.map((arg) =&gt; {
+          const tmp = context.scope.symbol();
+          this.compileExpression(arg, tmp, context);
+          return tmp.type + &#39; %&#39; + tmp.value;
+      }).join(&#39;, &#39;);
+      const regs = [&#39;rdi&#39;, &#39;rsi&#39;, &#39;rdx&#39;, &#39;r10&#39;, &#39;r8&#39;, &#39;r9&#39;];
+      const params = args.map((arg, i) =&gt; `{${regs[i]}}`).join(&#39;,&#39;);
+      const idTmp = context.scope.symbol().value;
+      this.emit(1, `%${idTmp} = add i64 ${id}, 0`)
+      this.emit(1, `%${destination.value} = call ${destination.type} asm sideeffect &quot;syscall&quot;, &quot;=r,{rax},${params},~{dirflag},~{fpsr},~{flags}&quot; (i64 %${idTmp}, ${argTmps})`);
+    }
+  }
+}
+</code></pre>
+<h3 id="<code>></code>,-<code>/</code>"><code>></code>, <code>/</code></h3><p>Finally, we have a few new operations to add support for. But they'll
+be pretty simple using the <code>compileOp</code> helper function.</p>
+<pre><code class="hljs javascript">class Compiler {
+  constructor() {
+    this.outBuffer = [];
+    this.primitiveFunctions = {
+      def: this.compileDefine.bind(this),
+      begin: this.compileBegin.bind(this),
+      &#39;if&#39;: this.compileIf.bind(this),
+      &#39;+&#39;: this.compileOp(&#39;add&#39;),
+      &#39;-&#39;: this.compileOp(&#39;sub&#39;),
+      &#39;*&#39;: this.compileOp(&#39;mul&#39;),
+      &#39;/&#39;: this.compileOp(&#39;udiv&#39;),
+      &#39;%&#39;: this.compileOp(&#39;urem&#39;),
+      &#39;&lt;&#39;: this.compileOp(&#39;icmp slt&#39;),
+      &#39;&gt;&#39;: this.compileOp(&#39;icmp sgt&#39;),
+      &#39;=&#39;: this.compileOp(&#39;icmp eq&#39;),
+      &#39;syscall/sys_write&#39;: this.compileSyscall(SYSCALL_TABLE.sys_write),
+    };
+  }
+
+  ...
+
+}
+</code></pre>
+<h3 id="print">print</h3><p>We're ready to give our print function a shot.</p>
+<pre><code class="hljs bash">$ cat test.lisp
+(def print-char (c)
+     ; First argument is stdout
+     ; Second argument is a pointer to a char array (of length one)
+     ; Third argument is the length of the char array
+     (syscall/sys_write 1 &amp;c 1))
+
+(def print (n)
+     (if (&gt; n 9)
+         (print (/ n 10)))
+
+     ; 48 is the ASCII code for &#39;0&#39;
+     (print-char (+ 48 (% n 10))))
+
+(def main ()
+     (print 1234)
+     0)
+$ node ulisp.js test.lisp
+$ ./build/a.out
+1234
+</code></pre>
+<p>Looks good! In the next post we'll talk about tail call elimination.</p>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">It&#39;s been a slow month for the blog. But new post on compiler basics is up! Printing integers to stdout and making syscalls in LLVM (all without arrays). This was a pre-req for playing with tail-call elimination (post coming soon) <a href="https://t.co/fDtblUZRI8">https://t.co/fDtblUZRI8</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1142808835700252678?ref_src=twsrc%5Etfw">June 23, 2019</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

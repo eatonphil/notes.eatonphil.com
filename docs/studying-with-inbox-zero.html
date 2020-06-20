@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Studying foreign languages with inbox zero | notes.eatonphil.com</title>
+    <meta name="description" content="Studying foreign languages with inbox zero" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>April 4, 2020</h2>
+          <h1>Studying foreign languages with inbox zero</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/learning.html" class="tag">learning</a><a href="/tags/korean.html" class="tag">korean</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>The only time I've been able to seriously, rapidly improve my ability
+to speak a foreign language was through intensive language courses in
+college. I was forced to actively speak, read, and write Chinese for
+6-8 hours a week (1-2 hours every day). Then study another 5-10 hours
+a week in preparation for the active sessions. I went three semesters
+like this before I left school.</p>
+<p>I've been trying to recreate that intensity since and mostly
+failed. After marrying a Korean, I've redirected the little effort I
+can muster to learning Korean. Aside from stints over the years
+(mostly for a month or two before or after a trip to Korea), I haven't
+been able to keep up any practice.</p>
+<p>One thing I've tried over the years to commit myself to learning a
+number of different topics is to set up recurring calendar invites:
+"Study Linux", "Study TCP/IP", "Study Korean", etc.</p>
+<p>This has mostly failed too. However, I do always <em>look</em> at the
+invites as I get notified.</p>
+<p>I keep inbox zero and I check my email many times a day, marking each
+email read dilligently when I no longer need to think about it.</p>
+<p>Tools like Quizlet, Anki, or even Duolingo let you self-learn
+vocabulary <em>when you feel like it</em>. But basically no service
+will try to keep giving you exposure to some set of topics whether you
+spend time on it or not.</p>
+<p>The most important thing I can think of is forced exposure to
+vocabulary. So I've been planning for some time to hook up a list of
+the one thousand most common Korean words to scheduled emails.</p>
+<p>This weekend I finally got around to scripting the Google Calendar API
+against the words list. I have an event for each word for the next
+1000 days. Each day I receive a summary email including all events of
+the day and the new word is part of it.</p>
+<p>This is a pretty indirect approach but it's pretty simple to set
+up. It's not very easy to reconfigure.</p>
+<p>The code for doing this is <a href="https://github.com/eatonphil/learnit">available on
+Github</a> if you're
+interested. And if you know a service that can build and manage
+scheduled notifications against a spreadsheet or database I'd rather
+be looking at that.</p>
+<p>We'll see how this works out.</p>
+<h4 id="comment">Comment</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">Daily new words in my inbox feels like the only way I can &quot;force&quot; myself to get exposed to new vocabulary. Wish there were a service for scheduling notifications from a spreadsheet. Finally got to scripting GCal&#39;s API populating daily events from 1000 most common Korean words</p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1246557948068925441?ref_src=twsrc%5Etfw">April 4, 2020</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

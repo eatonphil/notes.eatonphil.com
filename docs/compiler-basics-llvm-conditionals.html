@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Writing a lisp compiler from scratch in JavaScript: 4. LLVM conditionals and compiling fibonacci | notes.eatonphil.com</title>
+    <meta name="description" content="Writing a lisp compiler from scratch in JavaScript: 4. LLVM conditionals and compiling fibonacci" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>May 4, 2019</h2>
+          <h1>Writing a lisp compiler from scratch in JavaScript: 4. LLVM conditionals and compiling fibonacci</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/javascript.html" class="tag">javascript</a><a href="/tags/compiler.html" class="tag">compiler</a><a href="/tags/llvm.html" class="tag">llvm</a><a href="/tags/lisp.html" class="tag">lisp</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p class="note">
+  Previously in compiler basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/compiler-basics-lisp-to-assembly.html">1. lisp to assembly</a>
+  <br />
+  <a href="/compiler-basics-functions.html">2. user-defined functions and variables</a>
+  <br />
+  <a href="/compiler-basics-llvm.html">3. LLVM</a>
+  <br />
+  Next in compiler basics:
+  <br />
+  <a href="/compiler-basics-llvm-system-calls.html">5. LLVM system calls</a>
+  <br />
+  <a href="/compiler-basics-an-x86-upgrade.html">6. an x86 upgrade</a>
+</p><p>In this post we'll extend the
+<a href="https://github.com/eatonphil/ulisp">compiler</a>'s LLVM backend to
+support compiling conditionals such that we can support an
+implementation of the fibonacci algorithm.</p>
+<p>Specifically we're aiming for the following:</p>
+<pre><code class="hljs bash">$ cat tests/fib.lisp
+(def fib (n)
+     (if (&lt; n 2)
+         n
+       (+ (fib (- n 1)) (fib (- n 2)))))
+
+(def main ()
+     (fib 8))
+$ node src/ulisp.js tests/fib.lisp
+$ ./build/prog
+$ echo $?
+21
+</code></pre>
+<p>To do this we'll have to add the <code><</code>, <code>-</code> and
+<code>if</code> built-ins.</p>
+<p><a href="https://github.com/eatonphil/ulisp">All source code is available on Github</a>.</p>
+<h3 id="subtraction">Subtraction</h3><p>This is the easiest to add since we already support addition. They are
+both arithmetic operations that produce an integer. We simply add a
+mapping of <code>-</code> to the LLVM instruction <code>sub</code> so
+our LLVM backend constructor (<code>src/backends/llvm.js</code>) looks
+like this:</p>
+<pre><code class="hljs javascript">...
+
+class Compiler {
+  constructor() {
+    this.outBuffer = [];
+    this.primitiveFunctions = {
+      def: this.compileDefine.bind(this),
+      begin: this.compileBegin.bind(this),
+      &#39;if&#39;: this.compileIf.bind(this),
+      &#39;+&#39;: this.compileOp(&#39;add&#39;),
+      &#39;-&#39;: this.compileOp(&#39;sub&#39;),
+
+...
+</code></pre>
+<h3 id="less-than">Less than</h3><p>The <code><</code> builtin is a logical operation. These are handled
+differently from arithmetic operations in LLVM IR. A logical operation
+looks like this:</p>
+<pre><code class="hljs llvm">%3 = icmp slt i32 %1, %2
+</code></pre>
+<p>This says that we're doing an integer comparison, <code>icmp</code>,
+(with signed less than, <code>slt</code>) on the <code>i32</code>
+integers in variables <code>%1</code> and <code>%2</code>.</p>
+<p>We can shim this into our existing <code>compileOp</code> helper like
+so:</p>
+<pre><code class="hljs javascript">...
+
+class Compiler {
+  constructor() {
+    this.outBuffer = [];
+    this.primitiveFunctions = {
+      def: this.compileDefine.bind(this),
+      begin: this.compileBegin.bind(this),
+      &#39;if&#39;: this.compileIf.bind(this),
+      &#39;+&#39;: this.compileOp(&#39;add&#39;),
+      &#39;-&#39;: this.compileOp(&#39;sub&#39;),
+      &#39;&lt;&#39;: this.compileOp(&#39;icmp slt&#39;),
+
+...
+</code></pre>
+<h3 id="conditionals">Conditionals</h3><p>The last part we need to add is support for conditional execution of
+code at runtime. Assembly-like languages handle this with "jumps" and
+"labels". Jumping causes execution to continue at the address being
+jumped to (instead of just the line following the jump
+instruction). Labels give you a way of naming an address instead of
+having to calculate it yourself. Our code will look vaguely like this:</p>
+<pre><code class="hljs llvm">  %test = icmp slt i32 %n, %1
+  br i1 %test, label %iftrue, label %iffalse
+iftrue:
+  ; do true stuff
+iffalse:
+  ; do false stuff
+
+  ; do next stuff
+</code></pre>
+<p>The <code>br</code> instruction can jump (or branch) conditionally or
+unconditionally. This snippet demonstrates a conditional jump.</p>
+<p>But there are a few things wrong with this pseudo-code. First off if
+the condition is true, execution will just continue on into the false
+section once finished. Second, LLVM IR actually requires all labels to
+end with a branch instruction. So we'll add a new label after the true
+and false section called <code>ifresult</code> and jump to it
+unconditionally after both.</p>
+<pre><code class="hljs llvm">  %test = icmp slt i32 %n, %1
+  br i1 %test, label %iftrue, label %iffalse
+iftrue:
+  ; do true stuff
+  br label %ifresult
+iffalse:
+  ; do false stuff
+  br label %ifresult
+ifresult:
+  ; do next stuff
+</code></pre>
+<h3 id="scope">Scope</h3><p>One last thing we'll need to do before implementing the code
+generation for this is to update our <code>Scope</code> class to
+accept symbol prefixes so we can pass our labels through Scope to make
+sure they are unique but still have useful names.</p>
+<pre><code class="hljs javascript">...
+
+class Scope {
+
+  ...
+
+  symbol(prefix = &#39;sym&#39;) {
+    const nth = Object.keys(this.locals).length + 1;
+    return this.register(prefix + nth);
+  }
+
+...
+</code></pre>
+<h3 id="compileif">compileIf</h3><p>Now we can add a primitive function mapping <code>if</code> to a new
+<code>compileIf</code> helper and implement the helper.</p>
+<pre><code class="hljs javascript">...
+
+class Compiler {
+  constructor() {
+    this.outBuffer = [];
+    this.primitiveFunctions = {
+      def: this.compileDefine.bind(this),
+      begin: this.compileBegin.bind(this),
+      &#39;+&#39;: this.compileOp(&#39;add&#39;),
+      &#39;-&#39;: this.compileOp(&#39;sub&#39;),
+      &#39;&lt;&#39;: this.compileOp(&#39;icmp slt&#39;),
+      &#39;if&#39;: this.compileIf.bind(this),
+
+...
+
+  compileIf([test, thenBlock, elseBlock], destination, scope) {
+    const testVariable = scope.symbol();
+
+    // Compile expression and branch
+    this.compileExpression(test, testVariable, scope);
+    const trueLabel = scope.symbol(&#39;iftrue&#39;);
+    const falseLabel = scope.symbol(&#39;iffalse&#39;);
+    this.emit(1, `br i1 %${testVariable}, label %${trueLabel}, label %${falseLabel}`);
+
+    // Compile true section
+    this.emit(0, trueLabel + &#39;:&#39;);
+    this.compileExpression(thenBlock, destination, scope);
+    const endLabel = scope.symbol(&#39;ifend&#39;);
+    this.emit(1, &#39;br label %&#39; + endLabel);
+    this.emit(0, falseLabel + &#39;:&#39;);
+
+    // Compile false section
+    this.compileExpression(elseBlock, destination, scope);
+    this.emit(1, &#39;br label %&#39; + endLabel);
+
+    // Compile cleanup
+    this.emit(0, endLabel + &#39;:&#39;);
+  }
+...
+</code></pre>
+<p>Note that this code generation sends the <code>destination<code>
+variable into both the true and false sections. Let's try it out.</p>
+<pre><code class="hljs bash">$ node src/ulisp.js tests/fib.lisp
+llc: error: llc: build/prog.ll:19:3: error: multiple definition of local value named &#39;sym5&#39;
+  %sym5 = add i32 %sym15, %sym16
+  ^
+child_process.js:665
+    throw err;
+    ^
+
+Error: Command failed: llc -o build/prog.s build/prog.ll
+llc: error: llc: build/prog.ll:19:3: error: multiple definition of local value named &#39;sym5&#39;
+  %sym5 = add i32 %sym15, %sym16
+</code></pre>
+<p>That's annoying. An unfortunate aspect of LLVM's required
+single-static assignment form is that you cannot reuse variable names
+within a function even if it is not possible for the variable to be
+actually reused.</p>
+<p>To work around this we need to allocate memory on the stack, store the
+result in each true/false section in this location, and read from this
+location afterward to store it in the destination variable.</p>
+<h3 id="stack-memory-instructions">Stack memory instructions</h3><p>LLVM IR gives us <code>alloca</code> to allocate memory on the stack,
+<code>store</code> to store memory at a stack address, and
+<code>load</code> to read the value at a stack address into a
+variable. Here's a simple example:</p>
+<pre><code class="hljs llvm">%myvar = add i32 42, 0
+%stackaddress = alloca i32, align 4
+store i32 %myvar, i32* %stackaddress, align 4
+%newvar = load i32, i32* %stackaddress, align 4
+</code></pre>
+<p>Such that <code>newvar</code> is now 42.</p>
+<h3 id="compileif-again">compileIf again</h3><p>Applying this back to our <code>compileIf</code> helper gives us:</p>
+<pre><code class="hljs javascript">...
+
+  compileIf([test, thenBlock, elseBlock], destination, scope) {
+    const testVariable = scope.symbol();
+    const result = scope.symbol(&#39;ifresult&#39;);
+    // Space for result
+    this.emit(1, `%${result} = alloca i32, align 4`);
+
+    // Compile expression and branch
+    this.compileExpression(test, testVariable, scope);
+    const trueLabel = scope.symbol(&#39;iftrue&#39;);
+    const falseLabel = scope.symbol(&#39;iffalse&#39;);
+    this.emit(1, `br i1 %${testVariable}, label %${trueLabel}, label %${falseLabel}`);
+
+    // Compile true section
+    this.emit(0, trueLabel + &#39;:&#39;);
+    const tmp1 = scope.symbol();
+    this.compileExpression(thenBlock, tmp1, scope);
+    this.emit(1, `store i32 %${tmp1}, i32* %${result}, align 4`);
+    const endLabel = scope.symbol(&#39;ifend&#39;);
+    this.emit(1, &#39;br label %&#39; + endLabel);
+    this.emit(0, falseLabel + &#39;:&#39;);
+
+    // Compile false section
+    const tmp2 = scope.symbol();
+    this.compileExpression(elseBlock, tmp2, scope);
+    this.emit(1, `store i32 %${tmp2}, i32* %${result}, align 4`);
+    this.emit(1, &#39;br label %&#39; + endLabel);
+
+    // Compile cleanup
+    this.emit(0, endLabel + &#39;:&#39;);
+    this.emit(1, `%${destination} = load i32, i32* %${result}, align 4`);
+  }
+
+...
+</code></pre>
+<h3 id="trying-it-out">Trying it out</h3><p>We run our compiler one more time:</p>
+<pre><code class="hljs bash">$ node src/ulisp.js tests/fib.lisp
+$ ./build/prog
+$ echo $?
+21
+</code></pre>
+<p>And get what we expect!</p>
+<h3 id="next-up">Next up</h3><ul>
+<li>Tail call optimization</li>
+<li>Lists and dynamic memory</li>
+<li>Strings?</li>
+<li>Foreign function calls?</li>
+<li>Self-hosting?</li>
+</ul>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">Latest post in the compiler basics series: using LLVM conditionals in compiling a fibonacci program <a href="https://t.co/A72yEDQ8sd">https://t.co/A72yEDQ8sd</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1125072731408666624?ref_src=twsrc%5Etfw">May 5, 2019</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

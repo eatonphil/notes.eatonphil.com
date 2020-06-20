@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Writing a lisp compiler from scratch in JavaScript: 6. an x86 upgrade | notes.eatonphil.com</title>
+    <meta name="description" content="Writing a lisp compiler from scratch in JavaScript: 6. an x86 upgrade" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>December 8, 2019</h2>
+          <h1>Writing a lisp compiler from scratch in JavaScript: 6. an x86 upgrade</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/javascript.html" class="tag">javascript</a><a href="/tags/lisp.html" class="tag">lisp</a><a href="/tags/compiler.html" class="tag">compiler</a><a href="/tags/x86.html" class="tag">x86</a><a href="/tags/amd64.html" class="tag">amd64</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p class="note">
+  Previously in compiler basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/compiler-basics-lisp-to-assembly.html">1. lisp to assembly</a>
+  <br />
+  <a href="/compiler-basics-functions.html">2. user-defined functions and variables</a>
+  <br />
+  <a href="/compiler-basics-llvm.html">3. LLVM</a>
+  <br />
+  <a href="/compiler-basics-llvm-conditionals.html">4. LLVM conditionals and compiling fibonacci</a>
+  <br />
+  <a href="/compiler-basics-llvm-system-calls.html">5. LLVM system calls</a>
+</p><p>This post upgrades the ulisp x86 backend from using a limited set of
+registers (with no spilling support) to solely using the stack to pass
+values between expressions.</p>
+<p>This is a slightly longer post since we've got a lot of catchup to do
+to get to feature parity with the LLVM backend. Namely:</p>
+<ul>
+<li>"Infinite" locals, parameters</li>
+<li>Function definitions</li>
+<li>Variable references</li>
+<li>Arithmetic and logical operations</li>
+<li>If</li>
+<li>Syscalls</li>
+</ul>
+<p>We'll tackle the first four points first and finish up with the last
+two. This way we can support the same fibonacci program that prints
+integers to stdout that we support in the LLVM backend.</p>
+<p>As always the <a href="https://github.com/eatonphil/ulisp">code is available on
+Github</a>.</p>
+<p>But first a digression into how this is suddenly easy for us to do
+with x86 and one-pass (sorta) code generation.</p>
+<h3 id="stack-based-languages">Stack-based languages</h3><p>Stack-based languages have the extremely convenient attribute that
+values are (by default) stored on the stack, which allows a code
+generator targeting a stack-based language the option to omit handling
+register allocation. And as it happens, x86 has enough support to make
+it easy to treat as a stack machine.</p>
+<p>As we build out the code generator for x86 as a stack machine we need
+to keep two commitments in mind:</p>
+<ul>
+<li>Every expression must pop all arguments/operands</li>
+<li>Every expression must store one result back on the stack</li>
+</ul>
+<p>In the future, we may replace the second commitment. But for now it is
+more than enough.</p>
+<h3 id="boilerplate">Boilerplate</h3><p>We'll start with the existing x86 backend code and strip all the
+implementation code:</p>
+<pre><code class="hljs javascript">const cp = require(&#39;child_process&#39;);
+const fs = require(&#39;fs&#39;);
+const os = require(&#39;os&#39;);
+
+let GLOBAL_COUNTER = 0;
+
+const SYSCALL_MAP = {
+  darwin: {
+    exit: &#39;0x2000001&#39;,
+    write: &#39;0x2000004&#39;,
+  },
+  linux: {
+    exit: 60,
+    write: 1,
+  },
+}[os.platform()];
+
+class Scope {}
+
+class Compiler {
+  constructor() {
+    this.outBuffer = [];
+    this.primitiveFunctions = {
+      def: this.compileDefine.bind(this),
+      begin: this.compileBegin.bind(this),
+      if: this.compileIf.bind(this),
+      ...this.prepareArithmeticWrappers(),
+      ...this.prepareLogicalWrappers(),
+      ...this.prepareSyscallWrappers(),
+    };
+  }
+
+  prepareArithmeticWrappers() {}
+
+  prepareLogicalWrappers() {}
+
+  prepareSyscallWrappers() {}
+
+  emit(depth, args) {
+    if (depth === undefined || args === undefined) {
+      throw new Error(&#39;Invalid call to emit&#39;);
+    }
+
+    const indent = new Array(depth + 1).join(&#39;  &#39;);
+    this.outBuffer.push(indent + args);
+  }
+
+  compileExpression(arg, scope, depth) {}
+
+  compileIf([test, then, els], scope, depth) {}
+
+  compileBegin(body, scope, depth, topLevel = false) {}
+
+  compileDefine([name, params, ...body], scope, depth) {}
+
+  compileCall(fun, args, scope, depth) {}
+
+  emitPrefix() {
+    this.emit(1, &#39;.global _main\n&#39;);
+
+    this.emit(1, &#39;.text\n&#39;);
+  }
+
+  emitPostfix() {
+    this.emit(0, &#39;_main:&#39;);
+    this.emit(1, &#39;CALL main&#39;);
+    this.emit(1, &#39;MOV RDI, RAX&#39;); // Set exit arg
+    this.emit(1, `MOV RAX, ${SYSCALL_MAP[&#39;exit&#39;]}`);
+    this.emit(1, &#39;SYSCALL&#39;);
+  }
+
+  getOutput() {
+    const output = this.outBuffer.join(&#39;\n&#39;);
+
+    // Leave at most one empty line
+    return output.replace(/\n\n\n+/g, &#39;\n\n&#39;);
+  }
+}
+
+module.exports.compile = function(ast) {
+  const c = new Compiler();
+  c.emitPrefix();
+  const s = new Scope();
+  c.compileBegin(ast, s, 1, true);
+  c.emitPostfix();
+  return c.getOutput();
+};
+
+module.exports.build = function(buildDir, program) {
+  const prog = &#39;prog&#39;;
+  fs.writeFileSync(`${buildDir}/${prog}.s`, program);
+  cp.execSync(
+    `gcc -mstackrealign -masm=intel -o ${buildDir}/${prog} ${buildDir}/${prog}.s`,
+  );
+};
+</code></pre>
+<p>The prefix and postfix stays mostly the same as the original
+implementation. But we'll assume a couple of new helpers to get us in
+parity with the LLVM backend:</p>
+<ul>
+<li><code>compileDefine</code></li>
+<li><code>compileBegin</code></li>
+<li><code>compileIf</code></li>
+<li><code>compileCall</code></li>
+<li><code>prepareArithmeticWrappers</code></li>
+<li><code>prepareLogicalWrappers</code></li>
+<li><code>prepareSyscallWrappers</code></li>
+</ul>
+<p>The <code>prepareArithmeticWrappers</code> helper will define wrappers
+for arithmetic instructions. The <code>prepareLogicalWrappers</code>
+helper will define wrappers for logical instructions. And the
+<code>prepareSyscallWrappers</code> helper will define a wrapper for
+syscalls and generate builtins based on the SYSCALL_MAP entries.</p>
+<h3 id="scope">Scope</h3><p>Similar to our LLVM backend's Context and Scope helpers we'll define
+our own for the x86 backend. Since we're placing all locals on the
+stack, the two most important things Scope will do for us are:</p>
+<ul>
+<li>Map identifiers to escaped strings</li>
+<li>Store and increment the location of the local on the stack</li>
+</ul>
+<p>Here's what it will look like:</p>
+<pre><code class="hljs javascript">class Scope {
+  constructor() {
+    this.localOffset = 1;
+    this.map = {};
+  }
+
+  assign(name) {
+    const safe = name.replace(&#39;-&#39;, &#39;_&#39;);
+    this.map[safe] = this.localOffset++;
+    return safe;
+  }
+
+  symbol() {
+    return this.localOffset++;
+  }
+
+  lookup(name) {
+    const safe = name.replace(&#39;-&#39;, &#39;_&#39;);
+    if (this.map[safe]) {
+      return { name: safe, offset: this.map[safe] };
+    }
+
+    return null;
+  }
+
+  copy() {
+    const s = new Scope();
+    // In the future we may need to store s.scopeOffset = this.scopeOffset + 1
+    // so we can read outer-scoped values at runtime.
+    s.map = { ...this.map };
+    return s;
+  }
+}
+</code></pre>
+<h3 id="compileexpression">compileExpression</h3><p>An expression will be one of:</p>
+<ul>
+<li>A function call (possibly a builtin like <code>def</code> or <code>+</code>)</li>
+<li>A literal value (e.g. <code>29</code>)</li>
+<li>A reference (e.g. <code>&c</code>)</li>
+<li>An identifier (e.g. <code>my-var</code>)</li>
+</ul>
+<p>We'll handle compiling an expression in that order. If the AST
+argument passed to <code>compileExpression</code> is an array, we will
+call <code>compileCall</code> and return.</p>
+<pre><code class="hljs javascript">  compileExpression(arg, scope, depth) {
+    // Is a nested function call, compile it
+    if (Array.isArray(arg)) {
+      this.compileCall(arg[0], arg.slice(1), scope, depth);
+      return;
+    }
+  }
+</code></pre>
+<p>If the AST is a number, we will push the number onto the stack and
+return.</p>
+<pre><code class="hljs javascript">  compileExpression(arg, scope, depth) {
+    // Is a nested function call, compile it
+    if (Array.isArray(arg)) {
+      this.compileCall(arg[0], arg.slice(1), scope, depth);
+      return;
+    }
+
+    if (Number.isInteger(arg)) {
+      this.emit(depth, `PUSH ${arg}`);
+      return;
+    }
+  }
+</code></pre>
+<p>If the AST is a string that starts with <code>&</code> we will look up
+the location of the identifier after the <code>&</code>, push its
+<em>location</em> onto the stack and return.</p>
+<p>We count on the Scope storing its offset from the "frame pointer",
+which we will later set up to be stored in <code>RBP</code>.</p>
+<p>Locals will be stored after the frame pointer and parameters will be
+stored before it. So we'll need to add or subtract from the frame
+pointer depending on if we need a positive or negative offset from it.</p>
+<pre><code class="hljs javascript">  compileExpression(arg, scope, depth) {
+    // Is a nested function call, compile it
+    if (Array.isArray(arg)) {
+      this.compileCall(arg[0], arg.slice(1), scope, depth);
+      return;
+    }
+
+    if (Number.isInteger(arg)) {
+      this.emit(depth, `PUSH ${arg}`);
+      return;
+    }
+
+    if (arg.startsWith(&#39;&amp;&#39;)) {
+      const { offset } = scope.lookup(arg.substring(1));
+      // Copy the frame pointer so we can return an offset from it
+      this.emit(depth, `MOV RAX, RBP`);
+      const operation = offset &lt; 0 ? &#39;ADD&#39; : &#39;SUB&#39;;
+      this.emit(depth, `${operation} RAX, ${Math.abs(offset * 8)} # ${arg}`);
+      this.emit(depth, `PUSH RAX`);
+      return;
+    }
+  }
+</code></pre>
+<p>Finally, we'll look up the identifier and copy the value (in its
+offset on the stack) to the top of the stack.</p>
+<pre><code class="hljs javascript">  compileExpression(arg, scope, depth) {
+    // Is a nested function call, compile it
+    if (Array.isArray(arg)) {
+      this.compileCall(arg[0], arg.slice(1), scope, depth);
+      return;
+    }
+
+    if (Number.isInteger(arg)) {
+      this.emit(depth, `PUSH ${arg}`);
+      return;
+    }
+
+    if (arg.startsWith(&#39;&amp;&#39;)) {
+      const { offset } = scope.lookup(arg.substring(1));
+      // Copy the frame pointer so we can return an offset from it
+      this.emit(depth, `MOV RAX, RBP`);
+      const operation = offset &lt; 0 ? &#39;ADD&#39; : &#39;SUB&#39;;
+      this.emit(depth, `${operation} RAX, ${Math.abs(offset * 8)} # ${arg}`);
+      this.emit(depth, `PUSH RAX`);
+      return;
+    }
+
+    // Variable lookup
+    const { offset } = scope.lookup(arg);
+    if (offset) {
+      const operation = offset &lt; 0 ? &#39;+&#39; : &#39;-&#39;;
+      this.emit(
+        depth,
+        `PUSH [RBP ${operation} ${Math.abs(offset * 8)}] # ${arg}`,
+      );
+    } else {
+      throw new Error(
+        &#39;Attempt to reference undefined variable or unsupported literal: &#39; +
+          arg,
+      );
+    }
+  }
+</code></pre>
+<p>And that's it for handling expression! Let's add
+<code>compileCall</code> support now that we referenced it.</p>
+<h3 id="compilecall">compileCall</h3><p>A call will first check if the call is a builtin. If so, it will
+immediately pass control to the builtin.</p>
+<pre><code class="hljs javascript">  compileCall(fun, args, scope, depth) {
+    if (this.primitiveFunctions[fun]) {
+      this.primitiveFunctions[fun](args, scope, depth);
+      return;
+    }
+  }
+</code></pre>
+<p>Otherwise it will compile every argument to the call (which will leave
+all the resulting values on the stack.)</p>
+<pre><code class="hljs javascript">  compileCall(fun, args, scope, depth) {
+    if (this.primitiveFunctions[fun]) {
+      this.primitiveFunctions[fun](args, scope, depth);
+      return;
+    }
+
+    // Compile registers and store on the stack
+    args.map((arg, i) =&gt; this.compileExpression(arg, scope, depth));
+  }
+</code></pre>
+<p>Then we will check that function is defined and call it.</p>
+<pre><code class="hljs javascript">  compileCall(fun, args, scope, depth) {
+    if (this.primitiveFunctions[fun]) {
+      this.primitiveFunctions[fun](args, scope, depth);
+      return;
+    }
+
+    // Compile registers and store on the stack
+    args.map((arg, i) =&gt; this.compileExpression(arg, scope, depth));
+
+    const fn = scope.lookup(fun);
+    if (fn) {
+      this.emit(depth, `CALL ${fn.name}`);
+    } else {
+      throw new Error(&#39;Attempt to call undefined function: &#39; + fun);
+    }
+  }
+</code></pre>
+<p>Then we'll reset the stack pointer (to maintain our commitment) based
+on the number of arguments and push <code>RAX</code> (where the return
+result of the function call will be stored) onto the stack. We'll make
+two minor optimizations for when there is exactly zero or one argument
+to the function.</p>
+<pre><code class="hljs javascript">  compileCall(fun, args, scope, depth) {
+    if (this.primitiveFunctions[fun]) {
+      this.primitiveFunctions[fun](args, scope, depth);
+      return;
+    }
+
+    // Compile registers and store on the stack
+    args.map((arg, i) =&gt; this.compileExpression(arg, scope, depth));
+
+    const fn = scope.lookup(fun);
+    if (fn) {
+      this.emit(depth, `CALL ${fn.name}`);
+    } else {
+      throw new Error(&#39;Attempt to call undefined function: &#39; + fun);
+    }
+
+    if (args.length &gt; 1) {
+      // Drop the args
+      this.emit(depth, `ADD RSP, ${args.length * 8}`);
+    }
+
+    if (args.length === 1) {
+      this.emit(depth, `MOV [RSP], RAX\n`);
+    } else {
+      this.emit(depth, &#39;PUSH RAX\n&#39;);
+    }
+  }
+</code></pre>
+<p>When there is only one argument, we can just set the top value on the
+stack to be the return result of the call rather than resetting the
+stack pointer just to push onto it.</p>
+<p>And that's it for <code>compileCall</code>! Now that we've got a feel
+for expressions and function calls, let's add some simple arithmetic
+operations.</p>
+<h3 id="preparearithmeticwrappers">prepareArithmeticWrappers</h3><p>There are two major kind of arithmetic instructions we'll wrap for now:</p>
+<ul>
+<li>"General" instructions that operate on two arguments, putting the
+return result in the first argument</li>
+<li>"RAX" instructions that operate on RAX and the first argument,
+putting the return result in <code>RAX</code> and possibly
+<code>RDX</code></li>
+</ul>
+<h4 id="preparegeneral">prepareGeneral</h4><p>This helper will compile its two arguments and pop the second argument
+into <code>RAX</code>. This is because x86 instructions typically
+require one argument to be a register if one argument is allowed to be
+a memory address.</p>
+<p>We'll use the stack address as the first argument so 1) that
+non-commutative operations are correct and 2) the result is stored
+right back onto the stack in the right location.</p>
+<pre><code class="hljs javascript">    const prepareGeneral = (instruction) =&gt; (arg, scope, depth) =&gt; {
+      depth++;
+      this.emit(depth, `# ${instruction.toUpperCase()}`);
+
+      // Compile first argument
+      this.compileExpression(arg[0], scope, depth);
+
+      // Compile second argument
+      this.compileExpression(arg[1], scope, depth);
+      this.emit(depth, `POP RAX`);
+
+      // Compile operation
+      this.emit(depth, `${instruction.toUpperCase()} [RSP], RAX`);
+
+      this.emit(depth, `# End ${instruction.toUpperCase()}`);
+    };
+</code></pre>
+<h4 id="preparerax">prepareRax</h4><p>This helper will similarly compile its two arguments and pop
+the second argument into <code>RAX</code>. But the RAX-implicit
+instructions require the argument to be stored in a register
+so we'll use the <code>XCHG</code> instruction to swap <code>RAX</code>
+with the value on the top of the stack (the first argument).</p>
+<pre><code class="hljs javascript">    const prepareRax = (instruction, outRegister = &#39;RAX&#39;) =&gt; (
+      arg,
+      scope,
+      depth,
+    ) =&gt; {
+      depth++;
+      this.emit(depth, `# ${instruction.toUpperCase()}`);
+
+      // Compile first argument, store in RAX
+      this.compileExpression(arg[0], scope, depth);
+
+      // Compile second argument
+      this.compileExpression(arg[1], scope, depth);
+
+      // POP second argument and swap with first
+      this.emit(depth, `POP RAX`);
+      this.emit(depth, `XCHG [RSP], RAX`);
+</code></pre>
+<p>This may seem roundabout but remember that we <em>must</em> pop all
+arguments to the instruction to maintain our commitment.</p>
+<p>Next we'll zero out the <code>RDX</code> register if the operation is
+<code>DIV</code>, perform the operation, and store the result on the
+top of the stack.</p>
+<pre><code class="hljs javascript">    const prepareRax = (instruction, outRegister = &#39;RAX&#39;) =&gt; (
+      arg,
+      scope,
+      depth,
+    ) =&gt; {
+      depth++;
+      this.emit(depth, `# ${instruction.toUpperCase()}`);
+
+      // Compile first argument, store in RAX
+      this.compileExpression(arg[0], scope, depth);
+
+      // Compile second argument
+      this.compileExpression(arg[1], scope, depth);
+
+      // POP second argument and swap with first
+      this.emit(depth, `POP RAX`);
+      this.emit(depth, `XCHG [RSP], RAX`);
+
+      // Reset RDX for DIV
+      if (instruction.toUpperCase() === &#39;DIV&#39;) {
+        this.emit(depth, `XOR RDX, RDX`);
+      }
+
+      // Compiler operation
+      this.emit(depth, `${instruction.toUpperCase()} QWORD PTR [RSP]`);
+
+      // Swap the top of the stack
+      this.emit(depth, `MOV [RSP], ${outRegister}`);
+    };
+</code></pre>
+<p>We parameterize the out register because the <code>%</code> wrapper
+will call <code>DIV</code> but need <code>RDX</code> rather than
+<code>RAX</code> after the operation.</p>
+<h4 id="preparearithmeticwrappers">prepareArithmeticWrappers</h4><p>Putting everything together we get:</p>
+<pre><code class="hljs javascript">  prepareArithmeticWrappers() {
+    // General operatations
+    const prepareGeneral = (instruction) =&gt; (arg, scope, depth) =&gt; {
+      depth++;
+      this.emit(depth, `# ${instruction.toUpperCase()}`);
+
+      // Compile first argument
+      this.compileExpression(arg[0], scope, depth);
+
+      // Compile second argument
+      this.compileExpression(arg[1], scope, depth);
+      this.emit(depth, `POP RAX`);
+
+      // Compile operation
+      this.emit(depth, `${instruction.toUpperCase()} [RSP], RAX`);
+
+      this.emit(depth, `# End ${instruction.toUpperCase()}`);
+    };
+
+    // Operations that use RAX implicitly
+    const prepareRax = (instruction, outRegister = &#39;RAX&#39;) =&gt; (
+      arg,
+      scope,
+      depth,
+    ) =&gt; {
+      depth++;
+      this.emit(depth, `# ${instruction.toUpperCase()}`);
+
+      // Compile first argument, store in RAX
+      this.compileExpression(arg[0], scope, depth);
+
+      // Compile second argument
+      this.compileExpression(arg[1], scope, depth);
+
+      // POP second argument and swap with first
+      this.emit(depth, `POP RAX`);
+      this.emit(depth, `XCHG [RSP], RAX`);
+
+      // Reset RDX for DIV
+      if (instruction.toUpperCase() === &#39;DIV&#39;) {
+        this.emit(depth, `XOR RDX, RDX`);
+      }
+
+      // Compiler operation
+      this.emit(depth, `${instruction.toUpperCase()} QWORD PTR [RSP]`);
+
+      // Swap the top of the stack
+      this.emit(depth, `MOV [RSP], ${outRegister}`);
+    };
+
+    return {
+      &#39;+&#39;: prepareGeneral(&#39;add&#39;),
+      &#39;-&#39;: prepareGeneral(&#39;sub&#39;),
+      &#39;&amp;&#39;: prepareGeneral(&#39;and&#39;),
+      &#39;|&#39;: prepareGeneral(&#39;or&#39;),
+      &#39;=&#39;: prepareGeneral(&#39;mov&#39;),
+      &#39;*&#39;: prepareRax(&#39;mul&#39;),
+      &#39;/&#39;: prepareRax(&#39;div&#39;),
+      &#39;%&#39;: prepareRax(&#39;div&#39;, &#39;RDX&#39;),
+    };
+  }
+</code></pre>
+<p>Next we'll tackle <code>compileBegin</code> and
+<code>compileDefine</code>.</p>
+<h3 id="compilebegin">compileBegin</h3><p>A begin form is an expression made up of a series of expressions where
+all expression values are thrown away and the last expression value is
+the result of the begin form.</p>
+<p>To compile this form we will compile each expression passed in and pop
+from the stack to throw its value away. If the expression is the
+last in the list we will not pop since it is the result of the begin
+form.</p>
+<p>We will add one exception to this popping logic: if the begin is
+called from the top-level we will omit the popping.</p>
+<pre><code class="hljs javascript">  compileBegin(body, scope, depth, topLevel = false) {
+    body.forEach((expression, i) =&gt; {
+      this.compileExpression(expression, scope, depth);
+      if (!topLevel &amp;&amp; i &lt; body.length - 1) {
+        this.emit(depth, `POP RAX # Ignore non-final expression`);
+      }
+    });
+  }
+</code></pre>
+<p>That's it for <code>compileBegin</code>!</p>
+<h3 id="compiledefine">compileDefine</h3><p>The prelude for a function definition will add its name to scope, push
+the current frame pointer (<code>RBP</code>) onto the stack and store
+the current stack pointer (<code>RSP</code>) as the new frame pointer
+(<code>RBP</code>).</p>
+<p>Remember that we use the frame pointer as a point of reference when
+setting and getting local and parameter values. It works out entirely
+by convention.</p>
+<pre><code class="hljs javascript">  compileDefine([name, params, ...body], scope, depth) {
+    // Add this function to outer scope
+    const safe = scope.assign(name);
+
+    // Copy outer scope so parameter mappings aren&#39;t exposed in outer scope.
+    const childScope = scope.copy();
+
+    this.emit(0, `${safe}:`);
+    this.emit(depth, `PUSH RBP`);
+    this.emit(depth, `MOV RBP, RSP\n`);
+  }
+</code></pre>
+<p>Next we copy the parameters into local scope at their negative (from
+the frame pointer) location. In the future we may decide to actually
+copy in the parameter <em>values</em> into the local stack but for now
+there's no benefit.</p>
+<pre><code class="hljs javascript">  compileDefine([name, params, ...body], scope, depth) {
+    // Add this function to outer scope
+    const safe = scope.assign(name);
+
+    // Copy outer scope so parameter mappings aren&#39;t exposed in outer scope.
+    const childScope = scope.copy();
+
+    this.emit(0, `${safe}:`);
+    this.emit(depth, `PUSH RBP`);
+    this.emit(depth, `MOV RBP, RSP\n`);
+
+    // Copy params into local scope
+    params.forEach((param, i) =&gt; {
+      childScope.map[param] = -1 * (params.length - i - 1 + 2);
+    });
+  }
+</code></pre>
+<p>Next we'll compile the body of the function within a
+<code>begin</code> block.</p>
+<pre><code class="hljs javascript">  compileDefine([name, params, ...body], scope, depth) {
+    // Add this function to outer scope
+    const safe = scope.assign(name);
+
+    // Copy outer scope so parameter mappings aren&#39;t exposed in outer scope.
+    const childScope = scope.copy();
+
+    this.emit(0, `${safe}:`);
+    this.emit(depth, `PUSH RBP`);
+    this.emit(depth, `MOV RBP, RSP\n`);
+
+    // Copy params into local scope
+    params.forEach((param, i) =&gt; {
+      childScope.map[param] = -1 * (params.length - i - 1 + 2);
+    });
+
+    // Pass childScope in for reference when body is compiled.
+    this.compileBegin(body, childScope, depth);
+  }
+</code></pre>
+<p>Then in the postlude we'll pop the stack (for the return result of the
+begin form), save it in RAX, pop the previous frame pointer back to
+restore the calling frame, and return.</p>
+<pre><code>  compileDefine([name, params, ...body], scope, depth) {
+    // Add this function to outer scope
+    const safe = scope.assign(name);
+
+    // Copy outer scope so parameter mappings aren't exposed in outer scope.
+    const childScope = scope.copy();
+
+    this.emit(0, `${safe}:`);
+    this.emit(depth, `PUSH RBP`);
+    this.emit(depth, `MOV RBP, RSP\n`);
+
+    // Copy params into local scope
+    params.forEach((param, i) =&gt; {
+      childScope.map[param] = -1 * (params.length - i - 1 + 2);
+    });
+
+    // Pass childScope in for reference when body is compiled.
+    this.compileBegin(body, childScope, depth);
+
+    // Save the return value
+    this.emit(0, '');
+    this.emit(depth, `POP RAX`);
+    this.emit(depth, `POP RBP\n`);
+
+    this.emit(depth, 'RET\n');
+  }
+</code></pre>
+<p>And now we're ready to compile a simple program!</p>
+<h3 id="our-first-program">Our first program</h3><p>Here's a simple one we can support:</p>
+<pre><code class="hljs lisp">$ cat tests/meaning-of-life.lisp
+(def main ()
+  (+ 8 (* 2 17)))
+</code></pre>
+<p>We'll compile this program without the ulisp kernel (which contains a
+lisp library we cannot currently compile):</p>
+<pre><code class="hljs bash">$ node src/ulisp.js tests/meaning-of-life.lisp --no-kernel --backend x86
+$ ./build/prog
+$ echo $?
+42
+</code></pre>
+<p>Not bad. Let's finish up with support for
+<code>prepareLogicalWrappers</code>,
+<code>prepareSyscallWrappers</code>, and <code>compileIf</code>.</p>
+<h3 id="preparelogicalwrappers">prepareLogicalWrappers</h3><p>Storing logical results as values is a bit of pain. Most of the
+internet wants you to use branching. And a better compiler may
+optimize an idiom like <code>(if (> 5 2) ...)</code> into a single
+branch.</p>
+<p>But we're going to resort to an instruction I just learned about
+called <code>CMOV</code>. This allows us to conditionally assign a
+value based on flags, similar to how you can conditionally branch.</p>
+<p>Otherwise we'll follow a pattern similar to our arithmetic
+wrappers. At the end of the procedure we will have a 0 or a 1 on the
+top of the stack.</p>
+<pre><code class="hljs javascript">  prepareLogicalWrappers() {
+    const prepareComparison = (operator) =&gt; {
+      return {
+        [operator]: (arg, scope, depth) =&gt; {
+          depth++;
+          this.emit(depth, `# ${operator}`);
+
+          // Compile first argument, store in RAX
+          this.compileExpression(arg[0], scope, depth);
+
+          // Compile second argument
+          this.compileExpression(arg[1], scope, depth);
+          this.emit(depth, `POP RAX`);
+
+          // Compile operation
+          this.emit(depth, `CMP [RSP], RAX`);
+
+          // Reset RAX to serve as CMOV* dest, MOV to keep flags (vs. XOR)
+          this.emit(depth, `MOV RAX, 0`);
+
+          // Conditional set [RSP]
+          const operation = {
+            &#39;&gt;&#39;: &#39;CMOVA&#39;,
+            &#39;&gt;=&#39;: &#39;CMOVAE&#39;,
+            &#39;&lt;&#39;: &#39;CMOVB&#39;,
+            &#39;&lt;=&#39;: &#39;CMOVBE&#39;,
+            &#39;==&#39;: &#39;CMOVE&#39;,
+            &#39;!=&#39;: &#39;CMOVNE&#39;,
+          }[operator];
+          // CMOV* requires the source to be memory or register
+          this.emit(depth, `MOV DWORD PTR [RSP], 1`);
+          // CMOV* requires the dest to be a register
+          this.emit(depth, `${operation} RAX, [RSP]`);
+          this.emit(depth, `MOV [RSP], RAX`);
+          this.emit(depth, `# End ${operator}`);
+        },
+      };
+    };
+
+    return {
+      ...prepareComparison(&#39;&gt;&#39;),
+      ...prepareComparison(&#39;&gt;=&#39;),
+      ...prepareComparison(&#39;&lt;&#39;),
+      ...prepareComparison(&#39;&lt;=&#39;),
+      ...prepareComparison(&#39;==&#39;),
+      ...prepareComparison(&#39;!=&#39;),
+    }
+  }
+</code></pre>
+<h3 id="preparesyscallwrappers">prepareSyscallWrappers</h3><p>This helper is similar to <code>compileCall</code> except for that it
+needs to follow the SYS V ABI and use the <code>SYSCALL</code>
+instruction rather than <code>CALL</code>.</p>
+<pre><code class="hljs javascript">  prepareSyscallWrappers() {
+    const registers = [&#39;RDI&#39;, &#39;RSI&#39;, &#39;RDX&#39;, &#39;R10&#39;, &#39;R8&#39;, &#39;R9&#39;];
+
+    const wrappers = {};
+    Object.keys(SYSCALL_MAP).forEach((key, obj) =&gt; {
+      wrappers[`syscall/${key}`] = (args, scope, depth) =&gt; {
+        if (args.length &gt; registers.length) {
+          throw new Error(`Too many arguments to syscall/${key}`);
+        }
+
+        // Compile first
+        args.forEach((arg) =&gt; this.compileExpression(arg, scope, depth));
+
+        // Then pop to avoid possible register contention
+        args.forEach((_, i) =&gt;
+          this.emit(depth, `POP ${registers[args.length - i - 1]}`),
+        );
+
+        this.emit(depth, `MOV RAX, ${SYSCALL_MAP[key]}`);
+        this.emit(depth, &#39;SYSCALL&#39;);
+        this.emit(depth, `PUSH RAX`);
+      };
+    });
+
+    return wrappers;
+  }
+</code></pre>
+<p>And we're set! Last up is <code>compileIf</code>.</p>
+<h3 id="compileif">compileIf</h3><p>This is standard code generation but gets a little tricky due to our
+stack commitments. Testing must pop the test value off the stack. And
+then/else blocks must <em>push</em> a value onto the stack (even if
+there is no else block).</p>
+<p>Here is an example we'd like to support:</p>
+<pre><code class="hljs lisp">(if (foo)
+  (do-bar))
+</code></pre>
+<p>We compile the test and branch:</p>
+<pre><code class="hljs javascript">  compileIf([test, then, els], scope, depth) {
+    this.emit(depth, &#39;# If&#39;);
+    // Compile test
+    this.compileExpression(test, scope, depth);
+    const branch = `else_branch` + GLOBAL_COUNTER++;
+    // Must pop/use up argument in test
+    this.emit(0, &#39;&#39;);
+    this.emit(depth, `POP RAX`);
+    this.emit(depth, `TEST RAX, RAX`);
+    this.emit(depth, `JZ .${branch}\n`);
+  }
+</code></pre>
+<p>Then we compile the then block and jump to after the else block
+afterward.</p>
+<pre><code class="hljs javascript">  compileIf([test, then, els], scope, depth) {
+    this.emit(depth, &#39;# If&#39;);
+    // Compile test
+    this.compileExpression(test, scope, depth);
+    const branch = `else_branch` + GLOBAL_COUNTER++;
+    // Must pop/use up argument in test
+    this.emit(0, &#39;&#39;);
+    this.emit(depth, `POP RAX`);
+    this.emit(depth, `TEST RAX, RAX`);
+    this.emit(depth, `JZ .${branch}\n`);
+
+    // Compile then section
+    this.emit(depth, `# If then`);
+    this.compileExpression(then, scope, depth);
+    this.emit(depth, `JMP .after_${branch}\n`);
+  }
+</code></pre>
+<p>Finally we compile the else block if it exists, and otherwise we push
+a zero onto the stack (possibly to represent null).</p>
+<pre><code class="hljs javascript">  compileIf([test, then, els], scope, depth) {
+    this.emit(depth, &#39;# If&#39;);
+    // Compile test
+    this.compileExpression(test, scope, depth);
+    const branch = `else_branch` + GLOBAL_COUNTER++;
+    // Must pop/use up argument in test
+    this.emit(0, &#39;&#39;);
+    this.emit(depth, `POP RAX`);
+    this.emit(depth, `TEST RAX, RAX`);
+    this.emit(depth, `JZ .${branch}\n`);
+
+    // Compile then section
+    this.emit(depth, `# If then`);
+    this.compileExpression(then, scope, depth);
+    this.emit(depth, `JMP .after_${branch}\n`);
+
+    // Compile else section
+    this.emit(depth, `# If else`);
+    this.emit(0, `.${branch}:`);
+    if (els) {
+      this.compileExpression(els, scope, depth);
+    } else {
+      this.emit(1, &#39;PUSH 0 # Null else branch&#39;);
+    }
+    this.emit(0, `.after_${branch}:`);
+    this.emit(depth, &#39;# End if&#39;);
+  }
+</code></pre>
+<p>And we're ready for an interesting program! Let's print (to stdout)
+the result of <code>fib(20)</code>.</p>
+<h3 id="fibonacci">Fibonacci</h3><pre><code class="hljs lisp">$ cat ./tests/fib.lisp
+(def fib (n)
+     (if (&lt; n 2)
+       n
+       (+ (fib (- n 1)) (fib (- n 2)))))
+
+(def main ()
+     (print (fib 20)))
+</code></pre>
+<p>And check out the kernel:</p>
+<pre><code class="hljs lisp">$ cat ./lib/kernel.lisp
+(def print-char (c)
+     (syscall/write 1 &amp;c 1))
+
+(def print (n)
+     (if (&gt; n 9)
+       (print (/ n 10)))
+
+     (print-char (+ 48 (% n 10))))
+</code></pre>
+<p>Compile and run it:</p>
+<pre><code class="hljs bash">$ node src/ulisp.js tests/fib.lisp --backend x86
+$ ./build/prog
+6765
+</code></pre>
+<p>And we're in business!</p>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet" data-conversation="none"><p lang="en" dir="ltr">Latest post in the compiler basics series: an x86 upgrade. We&#39;ve got basic syscall support, &quot;infinite&quot; locals and parameters, and if/else. More than enough to handle printing integers to stdout and recursive fibonacci. <a href="https://t.co/B3OV0vEX1V">https://t.co/B3OV0vEX1V</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1203816831456284677?ref_src=twsrc%5Etfw">December 8, 2019</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Writing an x86 emulator from scratch in JavaScript: 2. system calls | notes.eatonphil.com</title>
+    <meta name="description" content="Writing an x86 emulator from scratch in JavaScript: 2. system calls" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>July 20, 2019</h2>
+          <h1>Writing an x86 emulator from scratch in JavaScript: 2. system calls</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/emulator.html" class="tag">emulator</a><a href="/tags/amd64.html" class="tag">amd64</a><a href="/tags/javascript.html" class="tag">javascript</a><a href="/tags/x86.html" class="tag">x86</a><a href="/tags/syscall.html" class="tag">syscall</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p class="note">
+  Previously in emulator basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/emulator-basics-a-stack-and-register-machine.html">1. a stack and register machine</a>
+</p><p>In this post we'll extend <a href="https://github.com/eatonphil/x86e">x86e</a> to
+support the exit and write Linux system calls, or syscalls. A syscall
+is a function handled by the kernel that allows the process to
+interact with data outside of its memory. The <code>SYSCALL</code>
+instruction takes arguments in the same order that the
+regular <code>CALL</code> instruction does.  But <code>SYSCALL</code>
+additionally requires the <code>RAX</code> register to contain the
+integer number of the syscall.</p>
+<p>Historically, there have been a number of different ways to make
+syscalls. All methods perform variations on a software interrupt.
+Before AMD64, on x86 processors, there was the <code>SYSENTER</code>
+instruction. And before that there there was only <code>INT 80h</code>
+to trigger the interrupt with the syscall handler (since interrupts
+can be used for more than just syscalls).  The various instructions
+around interrupts have been added for efficiency as the processors and
+use by operating systems evolved.</p>
+<p>Since this is a general need and AMD64 processors are among the most
+common today, you'll see similar code in every modern operating system
+such as FreeBSD, OpenBSD, NetBSD, macOS, and Linux. (I have no
+background in Windows.) The calling convention may differ (e.g. which
+arguments are in which registers) and the syscall numbers differ.
+Even within Linux both the calling convention and the syscall numbers
+differ between x86 (32-bit) and AMD64/x86_64 (64-bit) versions.</p>
+<p>See this <a href="https://stackoverflow.com/a/15169141/1507139">StackOverflow
+post</a> for some more
+detail.</p>
+<p><a href="https://gist.github.com/eatonphil/2d16bc3dae33bff8a8d7f2a9d13025c3">Code for this post in full is available as a
+Gist.</a></p>
+<h4 id="exit">Exit</h4><p>The exit syscall is how a child process communicates with the process
+that spawned it (its parent) when the child is finished running. Exit
+takes one argument, called the exit code or status code. It is an
+arbitrary signed 8-bit integer. If the high bit is set (i.e. the
+number is negative), this is interpreted to mean the process exited
+abnormally such as due to a segfault. Shells additionally
+interpret any non-zero exit code as a "failure". Otherwise, and
+ignoring these two common conventions, it can be used to mean anything
+the programmer wants.</p>
+<p class="note">
+  The wait syscall is how the parent process can block until exit is
+  called by the child and receive its exit code.
+</p><p>On AMD64 Linux the syscall number is 60. For example:</p>
+<pre><code class="hljs assembly">  MOV RDI, 0
+  MOV RAX, 60
+  SYSCALL
+</code></pre>
+<p>This calls exit with a status code of 0.</p>
+<h4 id="write">Write</h4><p>The write syscall is how a process can send data to file descriptors,
+which are integers representing some file-like object. By default, a
+Linux process is given access to three file descriptors with
+consistent integer values: stdin is 0, stdout is 1, and stderr is 2.
+Write takes three arguments: the file descriptor integer to write
+to, a starting address to memory that is interpreted as a byte array,
+and the number of bytes to write to the file descriptor beginning at
+the start address.</p>
+<p>On AMD64 Linux the syscall number is 1. For example:</p>
+<pre><code class="hljs assembly">  MOV RDI, 1   ; stdout
+  MOV RSI, R12 ; address of string
+  MOV RDX, 8   ; 8 bytes to write
+  MOV RAX, 1   ; write
+  SYSCALL
+</code></pre>
+<p>This writes 8 bytes to stdout starting from the string whose address
+is in R12.</p>
+<h3 id="implementing-syscalls">Implementing syscalls</h3><p>Our emulator is simplistic and is currently only implementing process
+emulation, not full CPU emulation. So the syscalls themselves will be
+handled in JavaScript. First we'll write out stubs for the two
+syscalls we are adding. And we'll provide a map from syscall id to the
+syscall.</p>
+<pre><code class="hljs javascript">const SYSCALLS_BY_ID = {
+  1: function sys_write(process) {},
+  60: function sys_exit(process) {},
+};
+</code></pre>
+<p>We need to add an instruction handler to our instruction switch. In
+doing so we must convert the value in <code>RAX</code> from a BigInt
+to a regular Number so we can look it up in the syscall map.</p>
+<pre><code class="hljs javascript">      case &#39;syscall&#39;: {
+        const idNumber = Number(process.registers.RAX);
+        SYSCALLS_BY_ID[idNumber](process);
+        process.registers.RIP++;
+        break;
+      }
+</code></pre>
+<h4 id="exit">Exit</h4><p>Exit is really simple. It will be implemented by calling Node's
+<code>global.process.exit()</code>. Again we'll need to convert the
+register's BigInt value to a Number.</p>
+<pre><code class="hljs javascript">const SYSCALLS_BY_ID = {
+  1: function sys_write(process) {},
+  60: function sys_exit(process) {
+    global.process.exit(Number(process.registers.RDI));
+  },
+};
+</code></pre>
+<h4 id="write">Write</h4><p>Write will be implemented by iterating over the process memory as
+bytes and by calling <code>write()</code> on the relevant file
+descriptor. We'll store a map of these on the process object and
+supply stdout, stderr, and stdin proxies on startup.</p>
+<pre><code class="hljs javascript">function main(file) {
+  ...
+
+  const process = {
+    registers,
+    memory,
+    instructions,
+    labels,
+    fd: {
+      // stdout
+      1: global.process.stdout,
+    }
+  };
+
+  ...
+}
+</code></pre>
+<p>The base address is stored in <code>RSI</code>, the number of bytes to
+write are stored in <code>RDX</code>. And the file descriptor to write
+to is stored in <code>RDI</code>.</p>
+<pre><code class="hljs javascript">const SYSCALLS_BY_ID = {
+  1: function sys_write(process) {
+    const msg = BigInt(process.registers.RSI);
+    const bytes = Number(process.registers.RDX);
+    for (let i = 0; i &lt; bytes; i++) {
+      const byte = readMemoryBytes(process, msg + BigInt(i), 1);
+      const char = String.fromCharCode(Number(byte));
+      process.fd[Number(process.registers.RDI)].write(char);
+    }
+  },
+  ...
+</code></pre>
+<h3 id="all-together">All together</h3><pre><code class="hljs bash">$ cat exit3.asm
+main:
+  MOV RDI, 1
+  MOV RSI, 2
+  ADD RDI, RSI
+
+  MOV RAX, 60 ; exit
+  SYSCALL
+$ node emulator.js exit3.asm
+$ echo $?
+3
+</code></pre>
+<pre><code class="hljs bash">$ cat hello.asm
+main:
+  PUSH 10  ; \n
+  PUSH 33  ; !
+  PUSH 111 ; o
+  PUSH 108 ; l
+  PUSH 108 ; l
+  PUSH 101 ; e
+  PUSH 72  ; H
+
+  MOV RDI, 1   ; stdout
+  MOV RSI, RSP ; address of string
+  MOV RDX, 56  ; 7 8-bit characters in the string but PUSH acts on 64-bit integers
+  MOV RAX, 1   ; write
+  SYSCALL
+
+  MOV RDI, 0
+  MOV RAX, 60
+  SYSCALL
+$ node emulator.js hello.asm
+Hello!
+$
+</code></pre>
+<h3 id="next-steps">Next steps</h3><p>We still aren't setting flags appropriately to support conditionals,
+so that's low-hanging fruit. There are some other fun syscalls to
+implement that would also give us access to an emulated VGA card so we
+could render graphics. Syntactic support for string constants would
+also be convenient and more efficient.</p>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">Latest post in the emulator basics series up: implementing some syscalls starting with sys_exit and sys_write so we can print a nice hello message. <a href="https://t.co/NEfId0lnJx">https://t.co/NEfId0lnJx</a> <a href="https://twitter.com/hashtag/javascript?src=hash&amp;ref_src=twsrc%5Etfw">#javascript</a> <a href="https://twitter.com/hashtag/x86?src=hash&amp;ref_src=twsrc%5Etfw">#x86</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1152689255900176386?ref_src=twsrc%5Etfw">July 20, 2019</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

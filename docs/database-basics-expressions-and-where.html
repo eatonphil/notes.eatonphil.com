@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Writing a SQL database from scratch in Go: 2. binary expressions and WHERE filters | notes.eatonphil.com</title>
+    <meta name="description" content="Writing a SQL database from scratch in Go: 2. binary expressions and WHERE filters" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>April 12, 2020</h2>
+          <h1>Writing a SQL database from scratch in Go: 2. binary expressions and WHERE filters</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/database.html" class="tag">database</a><a href="/tags/golang.html" class="tag">golang</a><a href="/tags/parsing.html" class="tag">parsing</a><a href="/tags/sql.html" class="tag">sql</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p class="note">
+  Previously in database basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/database-basics.html">1. SELECT, INSERT, CREATE and a REPL</a>
+  <br />
+  <br />
+  Next in database basics:
+  <br />
+  <a href="/database-basics-indexes.html">3. indexes</a>
+  <br />
+  <a href="/database-basics-a-database-sql-driver.html">4. a database/sql driver</a>
+</p><p>In this post, we'll extend <a href="https://github.com/eatonphil/gosql">gosql</a>
+to support binary expressions and very simple filtering on SELECT
+results via WHERE. We'll introduce a general mechanism for
+interpreting an expression on a row in a table. The expression may be
+an identifier (where the result is the value of the cell corresponding
+to that column in the row), a numeric literal, a combination via a
+binary expression, etc.</p>
+<p>The following interactions will be possible:</p>
+<pre><code class="hljs sql"># CREATE TABLE users (name TEXT, age INT);
+ok
+#  INSERT INTO users VALUES (&#39;Stephen&#39;, 16);
+ok
+# SELECT name, age FROM users;
+name   | age
+----------+------
+Stephen |  16
+(1 result)
+ok
+# INSERT INTO users VALUES (&#39;Adrienne&#39;, 23);
+ok
+# SELECT age + 2, name FROM users WHERE age = 23;
+age |   name
+------+-----------
+25 | Adrienne
+(1 result)
+ok
+# SELECT name FROM users;
+name
+------------
+Stephen
+Adrienne
+(2 results)
+ok
+</code></pre>
+<p>The changes we'll make in this post are roughly a walk through of
+<a href="https://github.com/eatonphil/gosql/commit/bd6a5d0d4a7410699b0d01beaabf91923df34b28">this
+commit</a>.</p>
+<h3 id="boilerplate-updates">Boilerplate updates</h3><p>There are a few updates to pick up that I won't go into in this
+post. Grab the following files from the main repo:</p>
+<ul>
+<li><a href="https://github.com/eatonphil/gosql/blob/master/lexer.go">lexer.go</a><ul>
+<li>The big change here is to use the same keyword matching algorithm
+for symbols. This allows us to support symbols that are longer
+than one character.</li>
+<li>This file also now includes the following keywords and symbols:
+<code>and</code>, <code>or</code>, <code>true</code>,
+<code>false</code>, <code>=</code>, <code><></code>,
+<code>||</code>, and <code>+</code>.</li>
+</ul>
+</li>
+<li><a href="https://github.com/eatonphil/gosql/blob/master/cmd/main.go">cmd/main.go</a><ul>
+<li>This file now uses a <a href="https://github.com/olekukonko/tablewriter">third-party table-rendering
+library</a> instead of the
+hacky, handwritten original one.</li>
+<li>This also uses a <a href="https://github.com/chzyer/readline">third-party readline
+implementation</a> so you get
+history and useful cursor movement in the REPL.</li>
+</ul>
+</li>
+</ul>
+<h4 id="parsing-boilerplate">Parsing boilerplate</h4><p>We'll redefine three helper functions in <code>parser.go</code> before
+going further:
+<code>parseToken</code>, <code>parseTokenKind</code>, and
+<code>helpMessage</code>.</p>
+<p>The <code>parseToken</code> helper will consume a token if it matches
+the one provided as an argument (ignoring location).</p>
+<pre><code class="hljs go">func parseToken(tokens []*token, initialCursor uint, t token) (*token, uint, bool) {
+    cursor := initialCursor
+
+    if cursor &gt;= uint(len(tokens)) {
+        return nil, initialCursor, false
+    }
+
+    if p := tokens[cursor]; t.equals(p) {
+        return p, cursor + 1, true
+    }
+
+    return nil, initialCursor, false
+}
+</code></pre>
+<p>The <code>parseTokenKind</code> helper will consume a token if it is
+the same kind as an argument provided.</p>
+<pre><code class="hljs go">func parseTokenKind(tokens []*token, initialCursor uint, kind tokenKind) (*token, uint, bool) {
+    cursor := initialCursor
+
+    if cursor &gt;= uint(len(tokens)) {
+        return nil, initialCursor, false
+    }
+
+    current := tokens[cursor]
+    if current.kind == kind {
+        return current, cursor + 1, true
+    }
+
+    return nil, initialCursor, false
+}
+</code></pre>
+<p>And the <code>helpMessage</code> helper will give an indication of
+where in a program something happened.</p>
+<pre><code class="hljs go">func helpMessage(tokens []*token, cursor uint, msg string) {
+    var c *token
+    if cursor+1 &lt; uint(len(tokens)) {
+        c = tokens[cursor+1]
+    } else {
+        c = tokens[cursor]
+    }
+
+    fmt.Printf(&quot;[%d,%d]: %s, near: %s\n&quot;, c.loc.line, c.loc.col, msg, c.value)
+}
+</code></pre>
+<h3 id="parsing-binary-expressions">Parsing binary expressions</h3><p>Next we'll extend the AST structure in <code>ast.go</code> to
+support a "binary kind" of expression. The binary expression will have
+two sub-expressions and an operator.</p>
+<pre><code class="hljs go">const (
+    literalKind expressionKind
+    binaryKind
+)
+
+type binaryExpression struct {
+    a  expression
+    b  expression
+    op token
+}
+
+type expression struct {
+    literal *token
+    binary  *binaryExpression
+    kind    expressionKind
+}
+</code></pre>
+<p>We'll use Pratt parsing to handle operator precedence. There is an
+excellent introduction to this technique
+<a href="https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html">here</a>.</p>
+<p>If at the beginning of parsing we see a left parenthesis, we'll
+consume it and parse an expression within it. Then we'll look for a
+right parenthesis. Otherwise we'll look for a non-binary expression
+first (e.g. symbol, number).</p>
+<pre><code class="hljs go">func parseExpression(tokens []*token, initialCursor uint, delimiters []token, minBp uint) (*expression, uint, bool) {
+    cursor := initialCursor
+
+    var exp *expression
+    _, newCursor, ok := parseToken(tokens, cursor, tokenFromSymbol(leftParenSymbol))
+    if ok {
+        cursor = newCursor
+        rightParenToken := tokenFromSymbol(rightParenSymbol)
+
+        exp, cursor, ok = parseExpression(tokens, cursor, append(delimiters, rightParenToken), minBp)
+        if !ok {
+            helpMessage(tokens, cursor, &quot;Expected expression after opening paren&quot;)
+            return nil, initialCursor, false
+        }
+
+        _, cursor, ok = parseToken(tokens, cursor, rightParenToken)
+        if !ok {
+            helpMessage(tokens, cursor, &quot;Expected closing paren&quot;)
+            return nil, initialCursor, false
+        }
+    } else {
+        exp, cursor, ok = parseLiteralExpression(tokens, cursor)
+        if !ok {
+            return nil, initialCursor, false
+        }
+    }
+
+    ...
+
+    return exp, cursor, true
+}
+</code></pre>
+<p>Then we'll look for a binary operator (e.g. <code>=</code>,
+<code>and</code>) or delimiter. If we find an operator and it of
+lesser "binding power" than the current minimum (<code>minBp</code>
+passed as an argument to the parse function with a default value of
+<code>0</code>), we'll return the current expression.</p>
+<pre><code class="hljs go">    ...
+
+    lastCursor := cursor
+outer:
+    for cursor &lt; uint(len(tokens)) {
+        for _, d := range delimiters {
+            _, _, ok = parseToken(tokens, cursor, d)
+            if ok {
+                break outer
+            }
+        }
+
+        binOps := []token{
+            tokenFromKeyword(andKeyword),
+            tokenFromKeyword(orKeyword),
+            tokenFromSymbol(eqSymbol),
+            tokenFromSymbol(neqSymbol),
+            tokenFromSymbol(concatSymbol),
+            tokenFromSymbol(plusSymbol),
+        }
+
+        var op *token = nil
+        for _, bo := range binOps {
+            var t *token
+            t, cursor, ok = parseToken(tokens, cursor, bo)
+            if ok {
+                op = t
+                break
+            }
+        }
+
+        if op == nil {
+            helpMessage(tokens, cursor, &quot;Expected binary operator&quot;)
+            return nil, initialCursor, false
+        }
+
+        bp := op.bindingPower()
+        if bp &lt; minBp {
+            cursor = lastCursor
+            break
+        }
+
+        ...
+    }
+
+    return exp, cursor, true
+</code></pre>
+<p>The <code>bindingPower</code> function on tokens can be defined for
+now such that sum and concatenation have the highest binding power,
+followed by equality operations, then boolean operators, and then
+everything else at zero.</p>
+<pre><code class="hljs go">func (t token) bindingPower() uint {
+    switch t.kind {
+    case keywordKind:
+        switch keyword(t.value) {
+        case andKeyword:
+            fallthrough
+        case orKeyword:
+            return 1
+        }
+    case symbolKind:
+        switch symbol(t.value) {
+        case eqSymbol:
+            fallthrough
+        case neqSymbol:
+            fallthrough
+        case concatSymbol:
+            fallthrough
+        case plusSymbol:
+            return 3
+        }
+    }
+
+    return 0
+}
+</code></pre>
+<p>Back in <code>parseExpression</code>, if the new operator has greater
+binding power we'll parse the next operand expression (a recursive
+call, passing the binding power of the new operator as the new
+<code>minBp</code>).</p>
+<p>Upon completion, the current expression (the return value of the
+recursive call) is set to a new binary expression containing the
+previously current expression on the left and the just-parsed
+expression on the right.</p>
+<pre><code class="hljs go">        ...
+
+        b, newCursor, ok := parseExpression(tokens, cursor, delimiters, bp)
+        if !ok {
+            helpMessage(tokens, cursor, &quot;Expected right operand&quot;)
+            return nil, initialCursor, false
+        }
+        exp = &amp;expression{
+            binary: &amp;binaryExpression{
+                *exp,
+                *b,
+                *op,
+            },
+            kind: binaryKind,
+        }
+        cursor = newCursor
+        lastCursor = cursor
+    }
+
+    return exp, cursor, true
+}
+</code></pre>
+<p>All together:</p>
+<pre><code class="hljs go">func parseExpression(tokens []*token, initialCursor uint, delimiters []token, minBp uint) (*expression, uint, bool) {
+    cursor := initialCursor
+
+    var exp *expression
+    _, newCursor, ok := parseToken(tokens, cursor, tokenFromSymbol(leftParenSymbol))
+    if ok {
+        cursor = newCursor
+        rightParenToken := tokenFromSymbol(rightParenSymbol)
+
+        exp, cursor, ok = parseExpression(tokens, cursor, append(delimiters, rightParenToken), minBp)
+        if !ok {
+            helpMessage(tokens, cursor, &quot;Expected expression after opening paren&quot;)
+            return nil, initialCursor, false
+        }
+
+        _, cursor, ok = parseToken(tokens, cursor, rightParenToken)
+        if !ok {
+            helpMessage(tokens, cursor, &quot;Expected closing paren&quot;)
+            return nil, initialCursor, false
+        }
+    } else {
+        exp, cursor, ok = parseLiteralExpression(tokens, cursor)
+        if !ok {
+            return nil, initialCursor, false
+        }
+    }
+
+    lastCursor := cursor
+outer:
+    for cursor &lt; uint(len(tokens)) {
+        for _, d := range delimiters {
+            _, _, ok = parseToken(tokens, cursor, d)
+            if ok {
+                break outer
+            }
+        }
+
+        binOps := []token{
+            tokenFromKeyword(andKeyword),
+            tokenFromKeyword(orKeyword),
+            tokenFromSymbol(eqSymbol),
+            tokenFromSymbol(neqSymbol),
+            tokenFromSymbol(concatSymbol),
+            tokenFromSymbol(plusSymbol),
+        }
+
+        var op *token = nil
+        for _, bo := range binOps {
+            var t *token
+            t, cursor, ok = parseToken(tokens, cursor, bo)
+            if ok {
+                op = t
+                break
+            }
+        }
+
+        if op == nil {
+            helpMessage(tokens, cursor, &quot;Expected binary operator&quot;)
+            return nil, initialCursor, false
+        }
+
+        bp := op.bindingPower()
+        if bp &lt; minBp {
+            cursor = lastCursor
+            break
+        }
+
+        b, newCursor, ok := parseExpression(tokens, cursor, delimiters, bp)
+        if !ok {
+            helpMessage(tokens, cursor, &quot;Expected right operand&quot;)
+            return nil, initialCursor, false
+        }
+        exp = &amp;expression{
+            binary: &amp;binaryExpression{
+                *exp,
+                *b,
+                *op,
+            },
+            kind: binaryKind,
+        }
+        cursor = newCursor
+        lastCursor = cursor
+    }
+
+    return exp, cursor, true
+}
+</code></pre>
+<p>Now that we have this general parse expression helper in place, we can
+add support for parsing <code>WHERE</code> in <code>SELECT</code>
+statements.</p>
+<h3 id="parsing-where">Parsing WHERE</h3><p>This part's pretty easy. We modify the existing
+<code>parseSelectStatement</code> to search for an optional
+<code>WHERE</code> token followed by an expression.</p>
+<pre><code class="hljs go">func parseSelectStatement(tokens []*token, initialCursor uint, delimiter token) (*SelectStatement, uint, bool) {
+    var ok bool
+    cursor := initialCursor
+    _, cursor, ok = parseToken(tokens, cursor, tokenFromKeyword(selectKeyword))
+    if !ok {
+        return nil, initialCursor, false
+    }
+
+    slct := SelectStatement{}
+
+    fromToken := tokenFromKeyword(fromKeyword)
+    item, newCursor, ok := parseSelectItem(tokens, cursor, []token{fromToken, delimiter})
+    if !ok {
+        return nil, initialCursor, false
+    }
+
+    slct.item = item
+    cursor = newCursor
+
+    whereToken := tokenFromKeyword(whereKeyword)
+    delimiters := []token{delimiter, whereToken}
+
+    _, cursor, ok = parseToken(tokens, cursor, fromToken)
+    if ok {
+        from, newCursor, ok := parseFromItem(tokens, cursor, delimiters)
+        if !ok {
+            helpMessage(tokens, cursor, &quot;Expected FROM item&quot;)
+            return nil, initialCursor, false
+        }
+
+        slct.from = from
+        cursor = newCursor
+    }
+
+    _, cursor, ok = parseToken(tokens, cursor, whereToken)
+    if ok {
+        where, newCursor, ok := parseExpression(tokens, cursor, []token{delimiter}, 0)
+        if !ok {
+            helpMessage(tokens, cursor, &quot;Expected WHERE conditionals&quot;)
+            return nil, initialCursor, false
+        }
+
+        slct.where = where
+        cursor = newCursor
+    }
+
+    return &amp;slct, cursor, true
+}
+</code></pre>
+<p>Now we're all done with parsing binary expressions and
+<code>WHERE</code> filters! If in doubt, refer to
+<a href="https://github.com/eatonphil/gosql/blob/master/parser.go">parser.go</a>
+in the project.</p>
+<h3 id="re-thinking-query-execution">Re-thinking query execution</h3><p>In the first post in this series, we didn't establish any standard way
+for interpreting an expression in any kind of statement. In SQL
+though, every expression is always run in the context of a row in a
+table. We'll handle cases like <code>SELECT 1</code> and <code>INSERT INTO
+users VALUES (1)</code> by creating a table with a single empty row to act
+as the context.</p>
+<p>This requires a bit of re-architecting. So we'll rewrite the
+<code>memory.go</code> implementation in this post from scratch.</p>
+<p>We'll also stop <code>panic</code>-ing when things go wrong. Instead
+we'll print a message. This allows the REPL loop to keep going.</p>
+<h4 id="memory-cells">Memory cells</h4><p>Again the fundamental blocks of memory in the table will be an untyped
+array of bytes. We'll provide conversion methods from this memory cell
+into integers, strings, and boolean Go values.</p>
+<pre><code class="hljs go">type MemoryCell []byte
+
+func (mc MemoryCell) AsInt() int32 {
+    var i int32
+    err := binary.Read(bytes.NewBuffer(mc), binary.BigEndian, &amp;i)
+    if err != nil {
+        fmt.Printf(&quot;Corrupted data [%s]: %s\n&quot;, mc, err)
+        return 0
+    }
+
+    return i
+}
+
+func (mc MemoryCell) AsText() string {
+    return string(mc)
+}
+
+func (mc MemoryCell) AsBool() bool {
+    return len(mc) != 0
+}
+
+func (mc MemoryCell) equals(b MemoryCell) bool {
+    // Seems verbose but need to make sure if one is nil, the
+    // comparison still fails quickly
+    if mc == nil || b == nil {
+        return mc == nil &amp;&amp; b == nil
+    }
+
+    return bytes.Compare(mc, b) == 0
+}
+</code></pre>
+<p>We'll also extend the <code>Cell</code> interface in
+<code>backend.go</code> to support the new boolean type.</p>
+<pre><code class="hljs go">package gosql
+
+type ColumnType uint
+
+const (
+    TextType ColumnType = iota
+    IntType
+    BoolType
+)
+
+type Cell interface {
+    AsText() string
+    AsInt() int32
+    AsBool() bool
+}
+
+...
+</code></pre>
+<p>Finally, we need a way for mapping a Go value <em>into</em> a memory
+cell.</p>
+<pre><code class="hljs go">func literalToMemoryCell(t *token) MemoryCell {
+    if t.kind == numericKind {
+        buf := new(bytes.Buffer)
+        i, err := strconv.Atoi(t.value)
+        if err != nil {
+            fmt.Printf(&quot;Corrupted data [%s]: %s\n&quot;, t.value, err)
+            return MemoryCell(nil)
+        }
+
+        // TODO: handle bigint
+        err = binary.Write(buf, binary.BigEndian, int32(i))
+        if err != nil {
+            fmt.Printf(&quot;Corrupted data [%s]: %s\n&quot;, string(buf.Bytes()), err)
+            return MemoryCell(nil)
+        }
+        return MemoryCell(buf.Bytes())
+    }
+
+    if t.kind == stringKind {
+        return MemoryCell(t.value)
+    }
+
+    if t.kind == boolKind {
+        if t.value == &quot;true&quot; {
+            return MemoryCell([]byte{1})
+        } else {
+            return MemoryCell(nil)
+        }
+    }
+
+    return nil
+}
+</code></pre>
+<p>And we'll provide global <code>true</code> and <code>false</code>
+values:</p>
+<pre><code class="hljs go">
+var (
+    trueToken  = token{kind: boolKind, value: &quot;true&quot;}
+    falseToken = token{kind: boolKind, value: &quot;false&quot;}
+
+    trueMemoryCell  = literalToMemoryCell(&amp;trueToken)
+    falseMemoryCell = literalToMemoryCell(&amp;falseToken)
+)
+</code></pre>
+<h4 id="tables">Tables</h4><p>A table has a list of rows (an array of memory cells) and a list of
+column names and types.</p>
+<pre><code class="hljs go">type table struct {
+    columns     []string
+    columnTypes []ColumnType
+    rows        [][]MemoryCell
+}
+</code></pre>
+<p>Finally we'll add a series of methods on <code>table</code> that,
+given a row index, interprets an expression AST against that row in
+the table.</p>
+<h3 id="interpreting-literals">Interpreting literals</h3><p>First we'll implement <code>evaluateLiteralCell</code> that will look
+up an identifier or return the value of integers, strings, and
+booleans.</p>
+<pre><code class="hljs go">func (t *table) evaluateLiteralCell(rowIndex uint, exp expression) (MemoryCell, string, ColumnType, error) {
+    if exp.kind != literalKind {
+        return nil, &quot;&quot;, 0, ErrInvalidCell
+    }
+
+    lit := exp.literal
+    if lit.kind == identifierKind {
+        for i, tableCol := range t.columns {
+            if tableCol == lit.value {
+                return t.rows[rowIndex][i], tableCol, t.columnTypes[i], nil
+            }
+        }
+
+        return nil, &quot;&quot;, 0, ErrColumnDoesNotExist
+    }
+
+    columnType := IntType
+    if lit.kind == stringKind {
+        columnType = TextType
+    } else if lit.kind == boolKind {
+        columnType = BoolType
+    }
+
+    return literalToMemoryCell(lit), &quot;?column?&quot;, columnType, nil
+}
+</code></pre>
+<h3 id="interpreting-binary-expressions">Interpreting binary expressions</h3><p>Now we can implement <code>evaluateBinaryCell</code> that will
+evaluate it's two sub-expressions and combine them together according
+to the operator. The SQL operators we have defined so far do no
+coercion. So we'll fail immediately if the two sides of the operation
+are not of the same type. Additionally, the concatenation and addition
+operators require that their arguments are strings and numbers,
+respectively.</p>
+<pre><code class="hljs go">func (t *table) evaluateBinaryCell(rowIndex uint, exp expression) (MemoryCell, string, ColumnType, error) {
+    if exp.kind != binaryKind {
+        return nil, &quot;&quot;, 0, ErrInvalidCell
+    }
+
+    bexp := exp.binary
+
+    l, _, lt, err := t.evaluateCell(rowIndex, bexp.a)
+    if err != nil {
+        return nil, &quot;&quot;, 0, err
+    }
+
+    r, _, rt, err := t.evaluateCell(rowIndex, bexp.b)
+    if err != nil {
+        return nil, &quot;&quot;, 0, err
+    }
+
+    switch bexp.op.kind {
+    case symbolKind:
+        switch symbol(bexp.op.value) {
+        case eqSymbol:
+            eq := l.equals(r)
+            if lt == TextType &amp;&amp; rt == TextType &amp;&amp; eq {
+                return trueMemoryCell, &quot;?column?&quot;, BoolType, nil
+            }
+
+            if lt == IntType &amp;&amp; rt == IntType &amp;&amp; eq {
+                return trueMemoryCell, &quot;?column?&quot;, BoolType, nil
+            }
+
+            if lt == BoolType &amp;&amp; rt == BoolType &amp;&amp; eq {
+                return trueMemoryCell, &quot;?column?&quot;, BoolType, nil
+            }
+
+            return falseMemoryCell, &quot;?column?&quot;, BoolType, nil
+        case neqSymbol:
+            if lt != rt || !l.equals(r) {
+                return trueMemoryCell, &quot;?column?&quot;, BoolType, nil
+            }
+
+            return falseMemoryCell, &quot;?column?&quot;, BoolType, nil
+        case concatSymbol:
+            if lt != TextType || rt != TextType {
+                return nil, &quot;&quot;, 0, ErrInvalidOperands
+            }
+
+            return literalToMemoryCell(&amp;token{kind: stringKind, value: l.AsText() + r.AsText()}), &quot;?column?&quot;, TextType, nil
+        case plusSymbol:
+            if lt != IntType || rt != IntType {
+                return nil, &quot;&quot;, 0, ErrInvalidOperands
+            }
+
+            iValue := int(l.AsInt() + r.AsInt())
+            return literalToMemoryCell(&amp;token{kind: numericKind, value: strconv.Itoa(iValue)}), &quot;?column?&quot;, IntType, nil
+        default:
+            // TODO
+            break
+        }
+    case keywordKind:
+        switch keyword(bexp.op.value) {
+        case andKeyword:
+            if lt != BoolType || rt != BoolType {
+                return nil, &quot;&quot;, 0, ErrInvalidOperands
+            }
+
+            res := falseMemoryCell
+            if l.AsBool() &amp;&amp; r.AsBool() {
+                res = trueMemoryCell
+            }
+
+            return res, &quot;?column?&quot;, BoolType, nil
+        case orKeyword:
+            if lt != BoolType || rt != BoolType {
+                return nil, &quot;&quot;, 0, ErrInvalidOperands
+            }
+
+            res := falseMemoryCell
+            if l.AsBool() || r.AsBool() {
+                res = trueMemoryCell
+            }
+
+            return res, &quot;?column?&quot;, BoolType, nil
+        default:
+            // TODO
+            break
+        }
+    }
+
+    return nil, &quot;&quot;, 0, ErrInvalidCell
+}
+</code></pre>
+<p>Then we'll provide a generic <code>evaluateCell</code> method to wrap
+these two correctly:</p>
+<pre><code class="hljs go">func (t *table) evaluateCell(rowIndex uint, exp expression) (MemoryCell, string, ColumnType, error) {
+    switch exp.kind {
+        case literalKind:
+            return t.evaluateLiteralCell(rowIndex, exp)
+        case binaryKind:
+            return t.evaluateBinaryCell(rowIndex, exp)
+        default:
+            return nil, &quot;&quot;, 0, ErrInvalidCell
+    }
+}
+</code></pre>
+<h3 id="implementing-select">Implementing SELECT</h3><p>As before, each statement will operate on a backend of tables.</p>
+<pre><code class="hljs go">type MemoryBackend struct {
+    tables map[string]*table
+}
+
+func NewMemoryBackend() *MemoryBackend {
+    return &amp;MemoryBackend{
+        tables: map[string]*table{},
+    }
+}
+</code></pre>
+<p>When we implement <code>SELECT</code>, we'll iterate over each row in
+the table (we only support looking up one table for now).  If the
+<code>SELECT</code> statement contains a <code>WHERE</code> block,
+we'll evaluate the <code>WHERE</code> expression against the current
+row and move on if the result is <code>false</code>.</p>
+<p>Otherwise for each expression in the <code>SELECT</code> list of items
+we'll evaluate it against the current row in the table.</p>
+<p>If there is no table selected, we provide a fake table with a single
+empty row.</p>
+<pre><code class="hljs go">func (mb *MemoryBackend) Select(slct *SelectStatement) (*Results, error) {
+    t := &amp;table{}
+
+    if slct.from != nil &amp;&amp; slct.from.table != nil {
+        var ok bool
+        t, ok = mb.tables[slct.from.table.value]
+        if !ok {
+            return nil, ErrTableDoesNotExist
+        }
+    }
+
+    if slct.item == nil || len(*slct.item) == 0 {
+        return &amp;Results{}, nil
+    }
+
+    results := [][]Cell{}
+    columns := []struct {
+        Type ColumnType
+        Name string
+    }{}
+
+    if slct.from == nil {
+        t = &amp;table{}
+        t.rows = [][]MemoryCell{{}}
+    }
+
+    for i := range t.rows {
+        result := []Cell{}
+        isFirstRow := len(results) == 0
+
+        if slct.where != nil {
+            val, _, _, err := t.evaluateCell(uint(i), *slct.where)
+            if err != nil {
+                return nil, err
+            }
+
+            if !val.AsBool() {
+                continue
+            }
+        }
+
+        for _, col := range *slct.item {
+            if col.asterisk {
+                // TODO: handle asterisk
+                fmt.Println(&quot;Skipping asterisk.&quot;)
+                continue
+            }
+
+            value, columnName, columnType, err := t.evaluateCell(uint(i), *col.exp)
+            if err != nil {
+                return nil, err
+            }
+
+            if isFirstRow {
+                columns = append(columns, struct {
+                    Type ColumnType
+                    Name string
+                }{
+                    Type: columnType,
+                    Name: columnName,
+                })
+            }
+
+            result = append(result, value)
+        }
+
+        results = append(results, result)
+    }
+
+    return &amp;Results{
+        Columns: columns,
+        Rows:    results,
+    }, nil
+}
+</code></pre>
+<h3 id="implementing-insert,-create">Implementing INSERT, CREATE</h3><p>The <code>INSERT</code> and <code>CREATE</code> statements stay mostly
+the same except for that we'll use the <code>evaluateCell</code> help
+for every expression. Refer back to the first post if the
+implementation is otherwise unclear.</p>
+<pre><code class="hljs go">func (mb *MemoryBackend) Insert(inst *InsertStatement) error {
+    t, ok := mb.tables[inst.table.value]
+    if !ok {
+        return ErrTableDoesNotExist
+    }
+
+    if inst.values == nil {
+        return nil
+    }
+
+    row := []MemoryCell{}
+
+    if len(*inst.values) != len(t.columns) {
+        return ErrMissingValues
+    }
+
+    for _, value := range *inst.values {
+        if value.kind != literalKind {
+            fmt.Println(&quot;Skipping non-literal.&quot;)
+            continue
+        }
+
+        emptyTable := &amp;table{}
+        value, _, _, err := emptyTable.evaluateCell(0, *value)
+        if err != nil {
+            return err
+        }
+
+        row = append(row, value)
+    }
+
+    t.rows = append(t.rows, row)
+    return nil
+}
+
+func (mb *MemoryBackend) CreateTable(crt *CreateTableStatement) error {
+    t := table{}
+    mb.tables[crt.name.value] = &amp;t
+    if crt.cols == nil {
+
+        return nil
+    }
+
+    for _, col := range *crt.cols {
+        t.columns = append(t.columns, col.name.value)
+
+        var dt ColumnType
+        switch col.datatype.value {
+        case &quot;int&quot;:
+            dt = IntType
+        case &quot;text&quot;:
+            dt = TextType
+        default:
+            return ErrInvalidDatatype
+        }
+
+        t.columnTypes = append(t.columnTypes, dt)
+    }
+
+    return nil
+}
+</code></pre>
+<h3 id="back-to-the-repl">Back to the REPL</h3><p>Putting it all together, we run the following session:</p>
+<pre><code class="hljs go"># CREATE TABLE users (name TEXT, age INT);
+ok
+#  INSERT INTO users VALUES (&#39;Stephen&#39;, 16);
+ok
+# SELECT name, age FROM users;
+name   | age
+----------+------
+Stephen |  16
+(1 result)
+ok
+# INSERT INTO users VALUES (&#39;Adrienne&#39;, 23);
+ok
+# SELECT age + 2, name FROM users WHERE age = 23;
+age |   name
+------+-----------
+25 | Adrienne
+(1 result)
+ok
+# SELECT name FROM users;
+name
+------------
+Stephen
+Adrienne
+(2 results)
+ok
+</code></pre>
+<p>And that's it for now! In future posts we'll get into indices, joining
+tables, etc.</p>
+<h4 id="comment">Comment</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">Latest post up in the database basics series: adding support for binary expressions and WHERE filtering in SELECTs.<br><br>Much nicer to have a real table rendering library and readline implementation in the REPL too.<a href="https://t.co/GYzn3FUNon">https://t.co/GYzn3FUNon</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1249426633347473408?ref_src=twsrc%5Etfw">April 12, 2020</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

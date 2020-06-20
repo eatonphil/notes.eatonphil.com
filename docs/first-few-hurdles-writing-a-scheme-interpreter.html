@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>First few hurdles writing a Scheme interpreter | notes.eatonphil.com</title>
+    <meta name="description" content="First few hurdles writing a Scheme interpreter" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>January 10, 2018</h2>
+          <h1>First few hurdles writing a Scheme interpreter</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/scheme.html" class="tag">scheme</a><a href="/tags/interpreter.html" class="tag">interpreter</a><a href="/tags/d.html" class="tag">d</a><a href="/tags/lisp.html" class="tag">lisp</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>I started working on <a href="https://github.com/eatonphil/bsdscheme">BSDScheme</a> last October, inspired to get back
+into language implementation after my coworker built <a href="https://github.com/briansteffens/bshift">bshift</a>, a
+compiler for a C-like language. BSDScheme is an interpreter for a
+(currently small subset of) Scheme written in D. It implements a few
+substantial primitive <a href="https://github.com/eatonphil/bsdscheme/blob/c49bb14182f04682a5cda4dd224b853b4fc92e92/src/runtime.d#L422">functions</a> (in under 1000 LoC!). It uses the
+same test framework bshift uses, <a href="https://github.com/briansteffens/btest">btest</a>. I'm going to expand here
+on some notes I wrote in a <a href="https://www.reddit.com/r/scheme/comments/7nvd1y/my_small_scheme_implementation_in_d/">post</a> on Reddit on some issues I faced
+during these first few months developing BSDSCheme.</p>
+<p>Before I get too far, here is a simple exponent function running in
+BSDScheme. It demonstates a few of the basic builtin primitives and
+also integers being upgraded to D's <a href="https://dlang.org/phobos/std_bigint.html">std.bigint</a> when an integer
+operation produces an integer unable to fit in 64 bits. (See the
+<a href="https://github.com/eatonphil/bsdscheme/blob/b202e8b5a24fe4281a06e39241f2be3cd51720fc/src/runtime.d#L99">times</a> and <a href="https://github.com/eatonphil/bsdscheme/blob/b202e8b5a24fe4281a06e39241f2be3cd51720fc/src/runtime.d#L63">plus</a> guards for details; see the <a href="https://github.com/eatonphil/bsdscheme/tree/master/examples">examples</a>
+directory for other examples.)</p>
+<pre><code class="hljs shell">$ cat examples/recursion.scm
+(define (exp base pow)
+  (if (= pow 0)
+      1
+      (* base (exp base (- pow 1)))))
+
+(display (exp 2 64))
+(newline)
+$ ./bin/bsdscheme examples/exp.scm
+18446744073709551616
+</code></pre>
+<p>The first big correction I made was to the way values are represented
+in memory. I originally implemented BSDScheme's value representation
+as a <a href="https://github.com/eatonphil/bsdscheme/pull/3/files#diff-653d5ccdaa287f13a3b2d964da52ab4aL284">struct</a> with a pointer to each possible value type. This
+design was simple to begin with but space-inefficient. I modelled a
+<a href="https://github.com/eatonphil/bsdscheme/pull/3">redesign</a> after the <a href="https://wiki.call-cc.org/man/4/Data%20representation">Chicken Scheme</a> data representation. It
+uses a struct with <a href="https://github.com/eatonphil/bsdscheme/pull/3/files#diff-c586618fe7ea7c64340046e89fd82621R14">two fields</a>, header and data. Both fields are
+word-size integers (currently hard-coded as 64 bits). The header
+stores type and length information and the data stores data.</p>
+<p>In this representation, simple types (integers &lt; 2^63, booleans,
+characters, etc.) take up only 128 bits. The integers, booleans, etc.
+are placed directly into the 64 bit data field. Other types (larger
+integers, strings, functions, etc) use the data field to store a
+pointer to memory allocated in the heap. Getting the conversion of
+these complex types right was the trickiest part of this data
+representation effort... lots of void-pointer conversions.</p>
+<p>The next big fix I made was to simplify the way generic functions
+dealt with their arguments. Originally I passed each function its
+arguments un-evaluated and left it up to each function to evaluate its
+arguments before operating on them. While there was nothing
+intrinsically wrong with this method, it was overly complicated and
+bug-prone. I refactored the builtin functions into two groups:
+<a href="https://github.com/eatonphil/bsdscheme/blob/c49bb14182f04682a5cda4dd224b853b4fc92e92/src/runtime.d#L422">normal</a> functions and <a href="https://github.com/eatonphil/bsdscheme/blob/c3286df73a32da657e780db8f33e845c9f806a9d/src/runtime.d#L435">special</a> functions. Normal function
+arguments are <a href="https://github.com/eatonphil/bsdscheme/blob/c3286df73a32da657e780db8f33e845c9f806a9d/src/runtime.d#L399">evaluated</a> before sending the arguments S-expression
+to the function. Special functions receive the arguments S-expression
+verbatim so they can decide what / when to evaluate.</p>
+<p>The last issue I'll talk about in this post was dealing with the AST
+representation. When I started out, the easiest way to get things
+working was to have an AST representation completely separate from the
+representation of BSDScheme values. This won't get you far in
+Scheme. In order to (eventually) support macros (and in the meantime
+support eval), the AST representation would have to make use of the
+value representation. This was the most complicated and confusing
+issue so far in BSDScheme. With the switch to recursive data
+structures, it was hard to know if an error occurred because I parsed
+incorrectly, or recursed over what I parsed incorrectly, or even if I
+was printing out what I parsed incorrectly. After some embarrassing
+pain, I got all the <a href="https://github.com/eatonphil/bsdscheme/pull/5">pieces in place</a> after a month and it set me
+up to easily support converting my original interpret function into a
+generic eval function that I could expose to the language like any
+other special function.</p>
+<p>One frustrating side-effect of this AST conversion is that since the
+parsing stage builds out trees using the internal value
+representation, the parsing stage is tied to the interpreter. From
+what I can tell, this basically means I have to revert back to some
+intermediate AST representation or throw away the parser to support a
+compiler backend.</p>
+<p>Next steps in BSDScheme include converting all the examples into
+tests, combining the needlessly split out lexing and parsing stage
+into a single read function that can be exposed into the language,
+fleshing out R7RS library support, and looking more into LLVM as a
+backend.</p>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">Wrote a full post on the first few hurdles faced writing a Scheme interpreter in D <a href="https://t.co/Cyjy7pk3OB">https://t.co/Cyjy7pk3OB</a> <a href="https://twitter.com/hashtag/scheme?src=hash&amp;ref_src=twsrc%5Etfw">#scheme</a> <a href="https://twitter.com/hashtag/schemelang?src=hash&amp;ref_src=twsrc%5Etfw">#schemelang</a> <a href="https://twitter.com/hashtag/lisp?src=hash&amp;ref_src=twsrc%5Etfw">#lisp</a> <a href="https://twitter.com/hashtag/dlang?src=hash&amp;ref_src=twsrc%5Etfw">#dlang</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/951091952740651008?ref_src=twsrc%5Etfw">January 10, 2018</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

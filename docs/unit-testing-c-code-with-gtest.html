@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Unit testing C code with gtest | notes.eatonphil.com</title>
+    <meta name="description" content="Unit testing C code with gtest" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>August 31, 2019</h2>
+          <h1>Unit testing C code with gtest</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/c.html" class="tag">c</a><a href="/tags/cmake.html" class="tag">cmake</a><a href="/tags/ctest.html" class="tag">ctest</a><a href="/tags/testing.html" class="tag">testing</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>This post covers building and testing a minimal, but still useful, C
+project. We'll use <a href="https://github.com/google/googletest">Google's
+gtest</a> and
+<a href="https://cmake.org">CMake</a> for testing C code. This will serve as a
+foundation for some upcoming posts/projects on programming Linux,
+userland networking and interpreters.</p>
+<p class="note">
+  The first version of this post only included one module to
+  test. The <code>test/CMakeLists.txt</code> would also only expose a
+  single pass-fail status for all modules. The second version of this
+  post extends the <code>test/CMakeLists.txt</code> to expose
+  each <code>test/*.cpp</code> file as its own CMake test so that
+  results are displayed by <code>ctest</code> per file. The second
+  version also splits the original <code>src/testy.c</code>
+  and <code>include/testy/testy.h</code> module into
+  a <code>widget</code> and <code>customer</code> module to
+  demonstrate the changes to the CMake configuration.
+</p><h3 id="the-"testy"-sample-project">The "testy" sample project</h3><p>In this project, we'll put source code in <code>src/</code> and publicly
+exported symbols (functions, structs, etc.) in header files in
+<code>include/testy/</code>. There will be a <code>main.c</code> in the <code>src/</code>
+directory. Tests are written in C++ (since gtest is a C++ testing
+framework) and are in the <code>test/</code> directory.</p>
+<p>Here's an overview of the source and test code.</p>
+<h4 id="src/widget.c">src/widget.c</h4><p>This file has some library code that we should be able to test.</p>
+<pre><code class="hljs c">#include &quot;testy/widget.h&quot;
+
+int private_ok_value = 2;
+
+int widget_ok(int a, int b) {
+  return a + b == private_ok_value;
+}
+</code></pre>
+<h4 id="include/testy/widget.h">include/testy/widget.h</h4><p>This file handles exported symbols for widget code.</p>
+<pre><code class="hljs c">#ifndef _WIDGET_H_
+#define _WIDGET_H_
+
+int widget_ok(int, int);
+
+#endif
+</code></pre>
+<h4 id="src/customer.c">src/customer.c</h4><p>This file has some more library code that we should be able to test.</p>
+<pre><code class="hljs c">#include &quot;testy/customer.h&quot;
+
+int customer_check(int a) {
+  return a == 5;
+}
+</code></pre>
+<h4 id="include/testy/customer.h">include/testy/customer.h</h4><p>This file handles exported symbols for customer code.</p>
+<pre><code class="hljs c">#ifndef _CUSTOMER_H_
+#define _CUSTOMER_H_
+
+int customer_check(int);
+
+#endif
+</code></pre>
+<h4 id="src/main.c">src/main.c</h4><p>This is the entrypoint to a program built around libtesty.</p>
+<pre><code class="hljs c">#include &quot;testy/customer.h&quot;
+#include &quot;testy/widget.h&quot;
+
+int main() {
+  if (widget_ok(1, 1)) {
+    return customer_check(5);
+  }
+
+  return 0;
+}
+</code></pre>
+<h4 id="test/widget.cpp">test/widget.cpp</h4><p>This is one of our test files. It registers test cases and uses gtest
+to make assertions. We need to wrap the <code>testy/widget.h</code> include in an
+<code>extern "C"</code> to stop C++ from
+<a href="https://www.geeksforgeeks.org/extern-c-in-c/">name-mangling</a>.</p>
+<pre><code class="hljs cpp">#include &quot;gtest/gtest.h&quot;
+
+extern &quot;C&quot; {
+#include &quot;testy/widget.h&quot;
+}
+
+TEST(widget, ok) {
+  ASSERT_EQ(widget_ok(1, 1), 1);
+}
+
+TEST(testy, not_ok) {
+  ASSERT_EQ(widget_ok(1, 2), 0);
+}
+</code></pre>
+<p>You can see a good high-level overview of gtest testing utilities like
+<code>ASSERT_EQ</code> and <code>TEST</code>
+<a href="https://github.com/google/googletest/blob/master/googletest/docs/primer.md">here</a>.</p>
+<h4 id="test/customer.cpp">test/customer.cpp</h4><p>This is another one of our test files.</p>
+<pre><code class="hljs cpp">#include &quot;gtest/gtest.h&quot;
+
+extern &quot;C&quot; {
+#include &quot;testy/customer.h&quot;
+}
+
+TEST(customer, ok) {
+  ASSERT_EQ(customer_check(5), 1);
+}
+
+TEST(testy, not_ok) {
+  ASSERT_EQ(customer_check(0), 0);  
+}
+</code></pre>
+<h4 id="test/main.cpp">test/main.cpp</h4><p>This is a standard entrypoint for the test runner.</p>
+<pre><code class="hljs cpp">#include &quot;gtest/gtest.h&quot;
+
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&amp;argc, argv);
+  return RUN_ALL_TESTS();
+}
+</code></pre>
+<h3 id="building-with-cmake">Building with CMake</h3><p><a href="https://cmake.org">CMake</a> is a build tool that (among other things)
+produces a Makefile we can run to build our code. We will also use it
+for dependency management. But fundementally we use it because gtest
+requires it.</p>
+<p>CMake options/rules are defined in a CMakeLists.txt file. We'll have
+one in the root directory, one in the test directory, and a template
+for one that will handle the gtest dependency.</p>
+<p>A first draft of the top-level CMakeLists.txt might look like this:</p>
+<pre><code class="hljs cmake">cmake_minimum_required(VERSION 3.1)
+
+project(testy)
+
+##
+### Source definitions ###
+##
+
+include_directories(&quot;${PROJECT_SOURCE_DIR}/include&quot;)
+
+file(GLOB sources &quot;${PROJECT_SOURCE_DIR}/src/*.c&quot;)
+
+add_executable(testy ${sources})
+</code></pre>
+<p>Using <code>include_directory</code> will make sure we compile with the <code>-I</code> flag
+set up correctly for our include directory.</p>
+<p>Using <code>add_executable</code> sets up the binary name to produce from the
+given sources. And we're using the <code>file</code> helper to get a glob match
+of C files rather than listing them all out verbatim in the
+<code>add_executable</code> call.</p>
+<h4 id="building-and-running">Building and running</h4><p>CMake pollutes the current directory, and is fine running in a
+different directory, so we'll make a <code>build/</code> directory so we don't
+pollute root. Then we'll build a Makefile with CMake, run Make, and
+run our program.</p>
+<pre><code class="hljs bash">$ mkdir build
+$ cd build
+$ cmake ..
+-- The C compiler identification is AppleClang 10.0.1.10010046
+-- The CXX compiler identification is AppleClang 10.0.1.10010046
+-- Check for working C compiler: /Library/Developer/CommandLineTools/usr/bin/cc
+-- Check for working C compiler: /Library/Developer/CommandLineTools/usr/bin/cc -- works
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Check for working CXX compiler: /Library/Developer/CommandLineTools/usr/bin/c++
+-- Check for working CXX compiler: /Library/Developer/CommandLineTools/usr/bin/c++ -- works
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /Users/philipeaton/tmp/testy/build
+$ make
+[ 25%] Building C object CMakeFiles/testy.dir/src/customer.c.o
+[ 50%] Building C object CMakeFiles/testy.dir/src/widget.c.o
+[ 75%] Building C object CMakeFiles/testy.dir/src/main.c.o
+[100%] Linking C executable testy
+[100%] Built target testy
+$ ./testy
+$ echo $?
+1
+</code></pre>
+<h3 id="cmakelists.txt.in">CMakeLists.txt.in</h3><p>This template file handles downloading the gtest dependency from
+github.com pinned to a release. It will be copied into a subdirectory
+during the <code>cmake ..</code> step.</p>
+<pre><code class="hljs cmake">cmake_minimum_required(VERSION 3.1)
+
+project(googletest-download NONE)
+
+include(ExternalProject)
+ExternalProject_Add(googletest
+  GIT_REPOSITORY    https://github.com/google/googletest.git
+  GIT_TAG           release-1.8.1
+  SOURCE_DIR        &quot;${CMAKE_BINARY_DIR}/googletest-src&quot;
+  BINARY_DIR        &quot;${CMAKE_BINARY_DIR}/googletest-build&quot;
+  CONFIGURE_COMMAND &quot;&quot;
+  BUILD_COMMAND     &quot;&quot;
+  INSTALL_COMMAND   &quot;&quot;
+  TEST_COMMAND      &quot;&quot;
+)
+</code></pre>
+<p>Now we can tell CMake about it and how to build, within the top-level
+CMakeLists.txt file.</p>
+<pre><code class="hljs cmake">cmake_minimum_required(VERSION 3.1)
+
+project(testy)
+
+##
+### Test definitions ###
+##
+
+configure_file(CMakeLists.txt.in
+        googletest-download/CMakeLists.txt)
+execute_process(COMMAND ${CMAKE_COMMAND} -G &quot;${CMAKE_GENERATOR}&quot; .
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/googletest-download )
+execute_process(COMMAND ${CMAKE_COMMAND} --build .
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/googletest-download )
+
+add_subdirectory(${CMAKE_BINARY_DIR}/googletest-src
+        ${CMAKE_BINARY_DIR}/googletest-build)
+
+enable_testing()
+add_subdirectory(test)
+
+##
+### Source definitions ###
+##
+
+include_directories(&quot;${PROJECT_SOURCE_DIR}/include&quot;)
+
+file(GLOB sources
+  &quot;${PROJECT_SOURCE_DIR}/include/testy/*.h&quot;
+  &quot;${PROJECT_SOURCE_DIR}/src/*.c&quot;)
+
+add_executable(testy ${sources})
+</code></pre>
+<p>The <code>add_subdirectory</code> calls register a directory that contains its
+own CMakeLists.txt. It would fail now without a <code>CMakeLists.txt</code> file
+in the <code>test/</code> directory.</p>
+<h3 id="test/cmakelists.txt">test/CMakeLists.txt</h3><p>This final file registers a <code>unit_test</code> executable compiling against
+the source and test code, and includes the project header files.</p>
+<pre><code class="hljs cmake">include_directories(&quot;${PROJECT_SOURCE_DIR}/include&quot;)
+
+file(GLOB sources &quot;${PROJECT_SOURCE_DIR}/src/*.c&quot;)
+list(REMOVE_ITEM sources &quot;${PROJECT_SOURCE_DIR}/src/main.c&quot;)
+
+file(GLOB tests &quot;${PROJECT_SOURCE_DIR}/test/*.cpp&quot;)
+list(REMOVE_ITEM tests &quot;${PROJECT_SOURCE_DIR}/test/main.cpp&quot;)
+
+foreach(file ${tests})
+  set(name)
+  get_filename_component(name ${file} NAME_WE)
+  add_executable(&quot;${name}_tests&quot;
+    ${sources}
+    ${file}
+    &quot;${PROJECT_SOURCE_DIR}/test/main.cpp&quot;)
+  target_link_libraries(&quot;${name}_tests&quot; gtest_main)
+  add_test(NAME ${name} COMMAND &quot;${name}_tests&quot;)
+endforeach()
+</code></pre>
+<p>We have to register a test for each file otherwise each file's tests
+won't show up by default (i.e. without a <code>--verbose</code> flag).</p>
+<h4 id="building-and-running-tests">Building and running tests</h4><p>Similar to building and running the source, we run CMake in a
+subdirectory but run <code>make test</code> or <code>ctest</code> after building all sources
+and tests with <code>make</code>.</p>
+<pre><code class="hljs bash">$ cd build
+$ cmake ..
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /Users/philipeaton/tmp/testy/build/googletest-download
+Scanning dependencies of target googletest
+[ 11%] Creating directories for &#39;googletest&#39;
+[ 22%] Performing download step (git clone) for &#39;googletest&#39;
+Cloning into &#39;googletest-src&#39;...
+Note: checking out &#39;release-1.8.1&#39;.
+
+You are in &#39;detached HEAD&#39; state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by performing another checkout.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -b with the checkout command again. Example:
+
+  git checkout -b &lt;new-branch-name&gt;
+
+HEAD is now at 2fe3bd99 Merge pull request #1433 from dsacre/fix-clang-warnings
+[ 33%] No patch step for &#39;googletest&#39;
+[ 44%] Performing update step for &#39;googletest&#39;
+[ 55%] No configure step for &#39;googletest&#39;
+[ 66%] No build step for &#39;googletest&#39;
+[ 77%] No install step for &#39;googletest&#39;
+[ 88%] No test step for &#39;googletest&#39;
+[100%] Completed &#39;googletest&#39;
+[100%] Built target googletest
+-- Found PythonInterp: /usr/local/bin/python (found version &quot;2.7.16&quot;)
+-- Looking for pthread.h
+-- Looking for pthread.h - found
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /Users/philipeaton/tmp/testy/build
+$ make
+[  4%] Building C object CMakeFiles/testy.dir/src/customer.c.o
+[  9%] Building C object CMakeFiles/testy.dir/src/widget.c.o
+[ 13%] Building C object CMakeFiles/testy.dir/src/main.c.o
+[ 18%] Linking C executable testy
+[ 18%] Built target testy
+[ 22%] Building CXX object googletest-build/googlemock/gtest/CMakeFiles/gtest.dir/src/gtest-all.cc.o
+[ 27%] Linking CXX static library libgtest.a
+[ 27%] Built target gtest
+[ 31%] Building CXX object googletest-build/googlemock/CMakeFiles/gmock.dir/src/gmock-all.cc.o
+[ 36%] Linking CXX static library libgmock.a
+[ 36%] Built target gmock
+[ 40%] Building CXX object googletest-build/googlemock/CMakeFiles/gmock_main.dir/src/gmock_main.cc.o
+[ 45%] Linking CXX static library libgmock_main.a
+[ 45%] Built target gmock_main
+[ 50%] Building CXX object googletest-build/googlemock/gtest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.o
+[ 54%] Linking CXX static library libgtest_main.a
+[ 54%] Built target gtest_main
+[ 59%] Building C object test/CMakeFiles/customer_tests.dir/__/src/customer.c.o
+[ 63%] Building C object test/CMakeFiles/customer_tests.dir/__/src/widget.c.o
+[ 68%] Building CXX object test/CMakeFiles/customer_tests.dir/customer.cpp.o
+[ 72%] Building CXX object test/CMakeFiles/customer_tests.dir/main.cpp.o
+[ 77%] Linking CXX executable customer_tests
+[ 77%] Built target customer_tests
+Scanning dependencies of target widget_tests
+[ 81%] Building C object test/CMakeFiles/widget_tests.dir/__/src/customer.c.o
+[ 86%] Building C object test/CMakeFiles/widget_tests.dir/__/src/widget.c.o
+[ 90%] Building CXX object test/CMakeFiles/widget_tests.dir/widget.cpp.o
+[ 95%] Building CXX object test/CMakeFiles/widget_tests.dir/main.cpp.o
+[100%] Linking CXX executable widget_tests
+[100%] Built target widget_tests
+</code></pre>
+<p>After running <code>cmake</code> and <code>make</code>, we're finally ready to run <code>ctest</code>.</p>
+<pre><code class="hljs bash">$ ctest
+Test project /Users/philipeaton/tmp/testy/build
+    Start 1: customer
+1/2 Test #1: customer ..........................   Passed    0.01 sec
+    Start 2: widget
+2/2 Test #2: widget ............................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Total Test time (real) =   0.01 sec
+</code></pre>
+<p>Now we're in a good place with most of the challenges of unit testing
+C code (i.e. ignoring mocks) past us.</p>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">In preparation for a couple new articles on some C projects, here&#39;s a foundational post on building C code and writing/running unit tests with gtest and cmake <a href="https://t.co/aMVyr7LO73">https://t.co/aMVyr7LO73</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1167826536298405894?ref_src=twsrc%5Etfw">August 31, 2019</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

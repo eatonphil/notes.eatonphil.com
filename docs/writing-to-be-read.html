@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Writing to be read | notes.eatonphil.com</title>
+    <meta name="description" content="Writing to be read" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>May 18, 2018</h2>
+          <h1>Writing to be read</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/writing.html" class="tag">writing</a><a href="/tags/documentation.html" class="tag">documentation</a><a href="/tags/reading.html" class="tag">reading</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>There is a common struggle in the writing and maintenance of
+documentation, checklists, emails, guides, etc. Each provides immense
+value; a document may be the key to an important process. The goal is
+to remove barriers -- to encourage understanding and correct
+application of what has been noted -- without requiring a change in
+the character of the reader. That is, expect reading to be difficult
+and people to be lazy. <strong>Don't make things harder for your reader than
+need be.</strong></p>
+<p>Ignoring imperfections in the <em>ideas</em> transcribed into writing, there
+are a few particular aesthetic approaches I take to (hopefully) make
+my notes more effective. These ideas have been influenced by readings
+on writing, psychology, and user experience. In particular, I
+recommend
+<a href="https://amzn.to/2rT0dsE">On Writing Well</a>,
+<a href="https://amzn.to/2IttNAl">Thinking Fast and Slow</a>,
+and <a href="https://www.nngroup.com/">Nielsen Norman</a> research.</p>
+<h3 id="language-correctness">Language correctness</h3><p>Spelling and grammatical correctness are low hanging fruit. They are
+easy to achieve. Use full sentences, use punctuation, and capitalize
+appropriately. But don't be a grammar stickler unreasonably; language
+is flexible and always changing. Don't allow anyone the opportunity to
+take your work less seriously by screwing up the basics.</p>
+<h3 id="structuring-sentences-and-paragraphs">Structuring sentences and paragraphs</h3><p>Keep your sentences short. And avoid run on sentences; they are always
+difficult to parse. If you use more than two commas in a sentences
+(aside from in lists), the sentence is terrible. Split it up. Commas
+are often used superfluously. Don't do that.</p>
+<p>Remember that if a comma separates two sentences, you can separate
+them into two sentences with a period instead. And if you ever have a
+list containing another list, separate the outer list with semi colons
+instead of commas to provide better differentiation.</p>
+<p>Keep your paragraphs short too. In primary school you may have learned
+to use 5-8 sentences per paragraph. Don't do so needlessly. 3-5
+sentences can be perfectly appropriate. As both sentences and
+paragraphs get longer, they appear more intimidating and can
+discourage readers from continuing.</p>
+<div class="note">
+  <header class="note-header">Visually speaking</header>
+  <p>
+    Make your line height
+    <a href="https://practicaltypography.com/line-spacing.html">120-145%</a>
+    the height of the font. Increase the spacing between lines in a
+    paragraph to make the paragraph less dense and more friendly.
+  </p>
+  <p>
+    Keep contrast high. Don't put very gray (or colored) text on a
+    white background.
+  </p>
+  <p>
+    Additionally, a number of studies suggest that limiting the width
+    of text increases readability. For best results, limit the width
+    such
+    that <a href="https://baymard.com/blog/line-length-readability">50-75
+    characters</a> appear per line of text.
+  </p>
+</div><h4 id="don't-put-checklists-in-paragraphs">Don't put checklists in paragraphs</h4><p>If a document describes concrete steps that should be followed exactly
+and can be reasonably summarized, don't hide the steps within
+paragraphs of text. Instead use an ordered or unordered list to
+clearly enumerate the expectations. <strong>You can't expect a checklist to
+be followed when it is hidden within the sentences of a paragraph.</strong></p>
+<h3 id="structuring-sections">Structuring sections</h3><p>Any document (regardless the type) longer than 3-5 paragraphs should
+be broken into sub-sections with summarizing headers to aid
+scanning. Use the HTML <code>id</code> attribute to allow a direct link to a
+particular section in a long page. If the page has more than two
+sections or vertically flows beyond a single screen, consider adding a
+table of contents at the top of the page to allow the reader to find
+the exact section she needs.</p>
+<div class="note">
+  <header class="note-header">Visually speaking</header>
+  <p>
+    Don't put large headers immediately next to each other. It is
+    disruptive to have multiple lines of large text.
+  </p>
+  <p>
+    I almost completely avoid Github Markdown's h1/# tag because it is
+    just too large and jarring relative to the rest of the text. It is
+    often best for the flow of a Github Markdown document to stick to
+    only h3-h4/###-#### tags for headers, using the h2/## tag for the
+    document title.
+  </p>
+</div><h3 id="in-summary">In summary</h3><p>The aesthetic flow of a document can help or hurt the experience of a
+reader consuming it. Good aesthetic "sense" in this regard can be
+boiled down to a few methods that primarily revolve around simplifying
+structure and facilitating the rewarding feeling of progress as a
+reader reads.</p>
+<p>Writing is difficult and takes time to evolve helpfully. The dividends
+are paid when process is better followed and questions are readily
+clarified in writing without further human intervention. It is
+incumbent on those writing and maintaining to organize effectively and
+see confusion of the reader as fault of the document, not fault of the
+reader. It is easier to change something yourself than to expect
+others to change to accommodate you.</p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

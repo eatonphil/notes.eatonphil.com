@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Compiling dynamic programming languages | notes.eatonphil.com</title>
+    <meta name="description" content="Compiling dynamic programming languages" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>September 2, 2018</h2>
+          <h1>Compiling dynamic programming languages</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/scheme.html" class="tag">scheme</a><a href="/tags/compiler.html" class="tag">compiler</a><a href="/tags/d.html" class="tag">d</a><a href="/tags/c++.html" class="tag">c++</a><a href="/tags/javascript.html" class="tag">javascript</a><a href="/tags/v8.html" class="tag">v8</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>It can be difficult to disassociate the idea that dynamically typed
+programming languages are tied to byte-code interpreters (e.g. YARV
+Ruby, CPython, V8, Zend Engine, etc.). But for many languages, a
+compiled implementation also exists. Cython, Chicken Scheme and SBCL
+are good examples.</p>
+<p>In this post I will briefly describe how I built a compiler for my
+<a href="https://github.com/eatonphil/bsdscheme">Scheme implementation</a> using
+artifacts from the interpreter. In doing this, I learned a simple (not
+novel) technique for compiling dynamic languages. I'll introduce the
+<a href="https://github.com/eatonphil/jsc">Javascript to C++/V8 compiler</a> I
+am developing using this technique.</p>
+<h3 id="bsdscheme">BSDScheme</h3><p>For the past year I've developed a Scheme implementation,
+<a href="https://github.com/eatonphil/bsdscheme">BSDScheme</a>. I started with an
+AST-interpreter (as opposed to a byte-code compiler and VM). A more
+detailed blog post on the first few steps writing BSDScheme can be
+found
+<a href="http://notes.eatonphil.com/first-few-hurdles-writing-a-scheme-interpreter.html">here</a>.</p>
+<p>As I built up support for the various objects and operations in the
+language, I had a sizeable base of D code for the BSDScheme
+runtime. This included an object representation for primitive types
+(and support for converting to and from types in D) as well as basic
+Scheme operations
+(<code>+</code>, <code>-</code>, <code>car</code>, <code>cdr</code>,
+etc.).</p>
+<p>When the time came to implement a compiler backend, I only needed to
+do codegen since the parser already existed. Furthermore, the
+fundamental bits had already been written: object representation and
+much of the standard library. So I wrote the simplest compiler I could
+think of by targeting D and the objects/functions I had already
+written to support the interpreter.</p>
+<p>Take, for example, the <code>equals</code>
+<a href="https://github.com/eatonphil/bsdscheme/blob/master/src/common.d#L140">function</a>
+in the standard library:</p>
+<pre><code class="hljs c++">Value equals(Value arguments, void** rest) {
+  auto tuple = valueToList(arguments);
+  auto left = tuple[0];
+  auto right = car(tuple[1]);
+
+  bool b;
+
+  switch (tagOfValue(left)) {
+  case ValueTag.Integer:
+    b = valueIsInteger(right) &amp;&amp; valueToInteger(left) == valueToInteger(right);
+    break;
+  case ValueTag.Char:
+    b = valueIsChar(right) &amp;&amp; valueToChar(left) == valueToChar(right);
+    break;
+  case ValueTag.String:
+    b = valueIsString(right) &amp;&amp; valueToString(left) == valueToString(right);
+    break;
+  case ValueTag.Symbol:
+    b = valueIsSymbol(right) &amp;&amp; valueToSymbol(left) == valueToSymbol(right);
+    break;
+  case ValueTag.Function:
+    b = valueIsFunction(right) &amp;&amp; valueToFunction(left)[1] == valueToFunction(right)[1];
+    break;
+  case ValueTag.Bool:
+    b = valueIsBool(right) &amp;&amp; valueToBool(left) == valueToBool(right);
+    break;
+  default:
+    b = false;
+  }
+
+  return makeBoolValue(b);
+}
+</code></pre>
+<p>So long as my compiler generated code that used the <code>Value</code>
+object to represent Scheme data, I already had an <code>equals</code>
+function and large swaths of a Scheme standard library that I could
+share between the compiler and interpreter.</p>
+<p>Ultimately I only needed to implement a few control structures to
+support compiling a large subset of what I supported in the
+interpreter. The key aspects here include: function definitions (in
+D), function calls (D function calls), if/else (if/else in D) and so
+on.</p>
+<p>To give a concrete example of a whole program compiled, this Scheme program:</p>
+<pre><code class="hljs scheme">(define (exp base pow)
+  (if (= pow 0)
+      1
+      (* base (exp base (- pow 1)))))
+
+(define (main)
+  (display (exp 2 16))
+(newline))
+</code></pre>
+<p>when run through the BSDScheme compiler would become:</p>
+<pre><code class="hljs c++">import std.stdio;
+import lex;
+import common;
+import parse;
+import utility;
+import value;
+import buffer;
+
+Value exp(Value arguments, void** ctx) {
+    Value[] tmp = listToVector(arguments);
+    Value base = tmp[0];
+    Value pow = tmp[1];
+
+    Value equals_result = equals(vectorToList([pow, makeIntegerValue(0)]), null);
+    Value if_result;
+    if (truthy(equals_result)) {
+    makeIntegerValue(1);
+    if_result = makeIntegerValue(1);
+    } else {
+
+    Value minus_result = minus(vectorToList([pow, makeIntegerValue(1)]), null);
+
+    Value exp_result = exp(vectorToList([base, minus_result]), null);
+
+    Value times_result = times(vectorToList([base, exp_result]), null);
+    if_result = times_result;
+    };
+    return if_result;
+}
+
+Value BSDScheme_main(Value arguments, void** ctx) {
+
+    Value exp_result = exp(vectorToList([makeIntegerValue(2), makeIntegerValue(16)]), null);
+
+    Value display_result = display(vectorToList([exp_result]), null);
+
+    Value newline_result = newline(vectorToList([]), null);
+    return newline_result;
+}
+
+void main() { BSDScheme_main(nilValue, cast(void**)0); }
+</code></pre>
+<p>Where <em>every imported function had already been written for the
+interpreter</em>. I had only to translate a few lines to D and import/call
+these existing libraries. Now I had a small <em>binary</em> of compiled
+Scheme.</p>
+<p>It was at this point I realized I was using the same technique used by
+Cython to compile Python code.</p>
+<p class="note">
+  ...the Cython project has approached this problem by means of a
+  source code compiler that translates Python code to equivalent C
+  code. This code is executed within the CPython runtime environment,
+  but at the speed of compiled C and with the ability to call directly
+  into C libraries.
+
+  <a href="http://docs.cython.org/en/latest/src/quickstart/overview.html">
+    http://docs.cython.org/en/latest/src/quickstart/overview.html
+  </a>
+</p><h3 id="jsc">jsc</h3><p>I played with many PL-research-y languages over the years and wanted
+to do build something a little more practical. So I took what I
+learned writing the BSDScheme compiler and decided to write a
+Javascript compiler. Specifically, it would target the easiest backend
+I could imagine: C++ using the V8 C++ library and generating a Node
+addon.</p>
+<p>There already existed well-trodden guides/means of writing Node addons
+in C++ so I spent some time trying to hand-compile simple Javascript
+programs to C++ and V8. A string in Javascript would become a
+<code>v8::String</code> type in C++. A number in Javascript would become
+<code>v8::Number</code> in C++ and so forth.</p>
+<p>I decided to write this compiler in Rust given its roots in (and my
+familiarity with) ML and Python. I found a <a href="https://github.com/dherman/esprit">Javascript parser by Dave
+Herman</a> and after a few lazy weeks
+finally got a "Hello world!" program compiling. Getting my first
+program to compile has by far been the hardest part of building jsc.</p>
+<p>Let's look at a concrete example of a recursive fibonacci program
+(example/recursion.js in the
+<a href="https://github.com/eatonphil/jsc">repo</a>):</p>
+<pre><code class="hljs javascript">function fib(i) {
+  if (i &lt;= 1) {
+    return i;
+  }
+  return fib(i - 1) + fib(i - 2);
+}
+
+function main() {
+  console.log(fib(20));
+}
+</code></pre>
+<p>Let's add a call to <code>main()</code> at the end and time this with
+Node to get a baseline:</p>
+<pre><code class="hljs bash">$ time node example/recursion.js
+6765
+node example/recursion.js  0.06s user 0.02s system 97% cpu 0.083 total
+</code></pre>
+<p>Now let's install jsc to compare. We'll need Rust, Cargo, Node and
+Node-GYP.</p>
+<pre><code class="hljs bash">$ git clone https:/github.com/eatonphil/jsc
+$ cd jsc
+$ make &amp;&amp; make install
+$ jsc example/recursion.js
+</code></pre>
+<p>jsc produces a Javascript entrypoint that imports our addon
+(build/recursion.js):</p>
+<pre><code class="hljs javascript">require(&quot;./build/Release/recursion&quot;).jsc_main();
+</code></pre>
+<p>And it produces a C++ file that represents the entire program
+(build/recursion.cc):</p>
+<pre><code class="hljs cpp">#include &lt;string&gt;
+
+#include &lt;node.h&gt;
+
+using v8::Boolean;
+using v8::Context;
+using v8::Exception;
+using v8::Function;
+using v8::FunctionTemplate;
+using v8::FunctionCallbackInfo;
+using v8::Isolate;
+using v8::Local;
+using v8::Null;
+using v8::Number;
+using v8::Object;
+using v8::String;
+using v8::False;
+using v8::True;
+using v8::Value;
+
+void fib(const FunctionCallbackInfo&lt;Value&gt;&amp; args) {
+  Isolate* isolate = args.GetIsolate();
+  Local&lt;Value&gt; i = args[0];
+tail_recurse_1:
+  Local&lt;Context&gt; ctx_2 = isolate-&gt;GetCurrentContext();
+  Local&lt;Object&gt; global_3 = ctx_2-&gt;Global();
+  Local&lt;Function&gt; Boolean_4 = Local&lt;Function&gt;::Cast(global_3-&gt;Get(String::NewFromUtf8(isolate, &quot;Boolean&quot;)));
+  String::Utf8Value utf8value_tmp_5(i);
+  std::string string_tmp_6(*utf8value_tmp_5);
+  String::Utf8Value utf8value_tmp_7(Number::New(isolate, 1));
+  std::string string_tmp_8(*utf8value_tmp_7);
+  Local&lt;Value&gt; argv_9[] = { (i-&gt;IsNumber() || Number::New(isolate, 1)-&gt;IsNumber()) ? Boolean::New(isolate, i-&gt;ToNumber(isolate)-&gt;Value() &lt;= Number::New(isolate, 1)-&gt;ToNumber(isolate)-&gt;Value()) : ((i-&gt;IsString() || Number::New(isolate, 1)-&gt;IsString()) ? Boolean::New(isolate, string_tmp_6 &lt;= string_tmp_8) : (False(isolate))) };
+  Local&lt;Value&gt; result_10 = Boolean_4-&gt;Call(Null(isolate), 1, argv_9);
+  if (result_10-&gt;ToBoolean()-&gt;Value()) {
+    args.GetReturnValue().Set(i);
+    return;
+    return;
+  }
+  Local&lt;Value&gt; arg_11 = (i-&gt;IsNumber() || Number::New(isolate, 1)-&gt;IsNumber()) ? (Number::New(isolate, i-&gt;ToNumber(isolate)-&gt;Value() - Number::New(isolate, 1)-&gt;ToNumber(isolate)-&gt;Value())) : Local&lt;Number&gt;::Cast(Null(isolate));
+  Local&lt;FunctionTemplate&gt; ftpl_13 = FunctionTemplate::New(isolate, fib);
+  Local&lt;Function&gt; fn_12 = ftpl_13-&gt;GetFunction();
+  fn_12-&gt;SetName(String::NewFromUtf8(isolate, &quot;fib&quot;));
+  Local&lt;Value&gt; argv_14[] = { arg_11 };
+  Local&lt;Value&gt; result_15 = fn_12-&gt;Call(Null(isolate), 1, argv_14);
+  Local&lt;Value&gt; arg_16 = (i-&gt;IsNumber() || Number::New(isolate, 2)-&gt;IsNumber()) ? (Number::New(isolate, i-&gt;ToNumber(isolate)-&gt;Value() - Number::New(isolate, 2)-&gt;ToNumber(isolate)-&gt;Value())) : Local&lt;Number&gt;::Cast(Null(isolate));
+  Local&lt;FunctionTemplate&gt; ftpl_18 = FunctionTemplate::New(isolate, fib);
+  Local&lt;Function&gt; fn_17 = ftpl_18-&gt;GetFunction();
+  fn_17-&gt;SetName(String::NewFromUtf8(isolate, &quot;fib&quot;));
+  Local&lt;Value&gt; argv_19[] = { arg_16 };
+  Local&lt;Value&gt; result_20 = fn_17-&gt;Call(Null(isolate), 1, argv_19);
+  args.GetReturnValue().Set((result_15-&gt;IsString() || result_20-&gt;IsString()) ? Local&lt;Value&gt;::Cast(String::Concat(result_15-&gt;ToString(), result_20-&gt;ToString())) : Local&lt;Value&gt;::Cast((result_15-&gt;IsNumber() || result_20-&gt;IsNumber()) ? (Number::New(isolate, result_15-&gt;ToNumber(isolate)-&gt;Value() + result_20-&gt;ToNumber(isolate)-&gt;Value())) : Local&lt;Number&gt;::Cast(Null(isolate))));
+  return;
+}
+
+void jsc_main(const FunctionCallbackInfo&lt;Value&gt;&amp; args) {
+  Isolate* isolate = args.GetIsolate();
+tail_recurse_21:
+  Local&lt;Value&gt; arg_22 = Number::New(isolate, 20);
+  Local&lt;FunctionTemplate&gt; ftpl_24 = FunctionTemplate::New(isolate, fib);
+  Local&lt;Function&gt; fn_23 = ftpl_24-&gt;GetFunction();
+  fn_23-&gt;SetName(String::NewFromUtf8(isolate, &quot;fib&quot;));
+  Local&lt;Value&gt; argv_25[] = { arg_22 };
+  Local&lt;Value&gt; result_26 = fn_23-&gt;Call(Null(isolate), 1, argv_25);
+  Local&lt;Value&gt; arg_27 = result_26;
+  Local&lt;Function&gt; fn_28 = Local&lt;Function&gt;::Cast(Local&lt;Object&gt;::Cast(isolate-&gt;GetCurrentContext()-&gt;Global()-&gt;Get(String::NewFromUtf8(isolate, &quot;console&quot;)))-&gt;Get(String::NewFromUtf8(isolate, &quot;log&quot;)));
+  Local&lt;Value&gt; argv_29[] = { arg_27 };
+  Local&lt;Value&gt; result_30 = fn_28-&gt;Call(Null(isolate), 1, argv_29);
+  result_30;
+}
+
+void Init(Local&lt;Object&gt; exports) {
+  NODE_SET_METHOD(exports, &quot;jsc_main&quot;, jsc_main);
+}
+
+NODE_MODULE(NODE_GYP_MODULE_NAME, Init)
+</code></pre>
+<p>Let's time this version:</p>
+<pre><code class="hljs bash">$ time node build/recursion.js
+6765
+node build/recursion.js  0.16s user 0.03s system 107% cpu 0.175 total
+</code></pre>
+<p>jsc, over twice as slow, is already falling behind Node. :)</p>
+<p>As I incremented the number passed to my fibonacci function the
+compiled program time to completion get exponentially worse. Node
+stayed the same. I decided to try tail-call optimization to decrease
+the performance distance between Node and jsc.</p>
+<p>I implemented tail-call optimization for the interpreter in BSDScheme
+by putting all functions in a loop that would break if tail-call
+elimination was not to happen. It took me a week to implement this and
+I never put it in place for the compiler. This time around I was able
+to add basic tail call elimination to jsc in two hours. It is done
+by <code>label</code>s and <code>goto</code>s instead of a tail call
+when applicable.</p>
+<p>Here is a tail-call optimized version of the same program
+(example/tco.js):</p>
+<pre><code class="hljs javascript">function fib(n, a, b) {
+    if (n == 0) {
+        return a;
+    }
+
+    if (n == 1) {
+        return b;
+    }
+
+    return fib(n - 1, b, a + b);
+}
+
+function main() {
+  console.log(fib(50, 0, 1));
+}
+</code></pre>
+<p>We add a call to <code>main()</code> again for Node and time it:</p>
+<pre><code class="hljs bash">$ time node example/tco.js
+12586269025
+node example/tco.js  0.06s user 0.02s system 96% cpu 0.080 total
+</code></pre>
+<p>And compile it with jsc and time it:</p>
+<pre><code>$ jsc example/tco.js
+$ time node build/tco.js
+12586269025
+node build/tco.js  0.07s user 0.02s system 95% cpu 0.087 total
+</code></pre>
+<p>Well that's not bad at all. :)</p>
+<h3 id="next-steps-with-jsc">Next steps with jsc</h3><p>jsc has very limited support for... everything. Today I added almost
+all primitive numeric operations + equality/inequality operations +
+unit tests. jsc does not yet support nested functions, callbacks, or
+closures. It supports <code>while</code> loops but not
+yet <code>for</code> loops. And I'm not sure if it supports <code>else
+if</code>. It does not support arrays or objects let alone
+constructors and prototypes. Adding support for these is low-hanging
+fruit.</p>
+<p>After the low-hanging fruit, more interesting projects for jsc include:</p>
+<ul>
+<li>generating C++ with embedded V8 rather than only targeting Node addons</li>
+<li>type inference or type hinting for generating unboxed functions a la Cython and SBCL</li>
+</ul>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/languages/scheme.min.js"></script>
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

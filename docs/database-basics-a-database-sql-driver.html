@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Writing a SQL database from scratch in Go: 4. a database/sql driver | notes.eatonphil.com</title>
+    <meta name="description" content="Writing a SQL database from scratch in Go: 4. a database/sql driver" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>May 10, 2020</h2>
+          <h1>Writing a SQL database from scratch in Go: 4. a database/sql driver</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/golang.html" class="tag">golang</a><a href="/tags/database.html" class="tag">database</a><a href="/tags/sql.html" class="tag">sql</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p class="note">
+  Previously in database basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/database-basics.html">1. SELECT, INSERT, CREATE and a REPL</a>
+  <br />
+  <a href="/database-basics-expressions-and-where.html">2. binary expressions and WHERE filters</a>
+  <br />
+  <a href="/database-basics-indexes.html">3. indexes</a>
+</p><p>In this post, we'll extend <a href="https://github.com/eatonphil/gosql">gosql</a>
+to implement the <code>database/sql</code> driver interface. This will
+allow us to interact with gosql the same way we would interact with
+any other database.</p>
+<p>Here is an example familiar program (stored in
+<code>cmd/sqlexample/main.go</code>) we'll be able to run:</p>
+<pre><code class="hljs go">package main
+
+import (
+    &quot;database/sql&quot;
+    &quot;fmt&quot;
+
+    _ &quot;github.com/eatonphil/gosql&quot;
+)
+
+func main() {
+    db, err := sql.Open(&quot;postgres&quot;, &quot;&quot;)
+    if err != nil {
+        panic(err)
+    }
+    defer db.Close()
+
+    _, err = db.Query(&quot;CREATE TABLE users (name TEXT, age INT);&quot;)
+    if err != nil {
+        panic(err)
+    }
+
+    _, err = db.Query(&quot;INSERT INTO users VALUES (&#39;Terry&#39;, 45);&quot;)
+    if err != nil {
+        panic(err)
+    }
+
+    _, err = db.Query(&quot;INSERT INTO users VALUES (&#39;Anette&#39;, 57);&quot;)
+    if err != nil {
+        panic(err)
+    }
+
+    rows, err := db.Query(&quot;SELECT name, age FROM users;&quot;)
+    if err != nil {
+        panic(err)
+    }
+
+    var name string
+    var age uint64
+    defer rows.Close()
+    for rows.Next() {
+        err := rows.Scan(&amp;name, &amp;age)
+        if err != nil {
+            panic(err)
+        }
+
+        fmt.Printf(&quot;Name: %s, Age: %d\n&quot;, name, age)
+    }
+
+    if err = rows.Err(); err != nil {
+        panic(err)
+    }
+}
+</code></pre>
+<p>Our gosql driver will use a single instance of the
+<code>Backend</code> for all connections.</p>
+<p>Aside from that, it is a simple matter of wrapping our existing APIs
+in structs that implement the <code>database/sql/driver.Driver</code>
+interface.</p>
+<p>This post is largely a discussion of <a href="https://github.com/eatonphil/gosql/commit/0d0aa61a74580a6aef11296741abfba4e1d4ae5c">this
+commit</a>.</p>
+<h3 id="implementing-the-driver">Implementing the driver</h3><p>A driver is registered by calling <code>sql.Register</code> with a
+driver instance.</p>
+<p>We'll add the registration code to an <code>init</code> function in a
+new file, <code>driver.go</code>:</p>
+<pre><code class="hljs go">struct Driver {
+    bkd Backend
+}
+
+func init() {
+    sql.Register(&quot;postgres&quot;, &amp;Driver{NewMemoryBackend()})
+}
+</code></pre>
+<p>According to the <a href="https://pkg.go.dev/database/sql/driver?tab=doc#Driver">Driver
+interface</a>, we
+need only implement <code>Open</code> to return an connection instance
+that implements the <code>database/sql/driver.Conn</code> interface.</p>
+<pre><code class="hljs go">type Driver struct {
+    bkd Backend
+}
+
+func (d *Driver) Open(name string) (driver.Conn, error) {
+    return &amp;Conn{d.bkd}, nil
+}
+
+func init() {
+    sql.Register(&quot;postgres&quot;, &amp;Driver{NewMemoryBackend()})
+}
+</code></pre>
+<h3 id="implementing-the-connection">Implementing the connection</h3><p>According to the <a href="https://pkg.go.dev/database/sql/driver?tab=doc#Conn">Conn
+interface</a>, we
+must implement:</p>
+<ul>
+<li><code>Prepare(query string) (driver.Stmt, error)</code> to handle prepared statements</li>
+<li><code>Close</code> to handle cleanup</li>
+<li>and <code>Begin</code> to start a transaction</li>
+</ul>
+<p>The connection can also optionally implement <code>Query</code> and
+<code>Exec</code>.</p>
+<p>To simplify things we'll panic on <code>Prepare</code> and on
+<code>Begin</code> (we don't have transactions yet). There's no
+cleanup required so we'll do nothing in <code>Close</code>.</p>
+<pre><code class="hljs go">type Conn struct {
+    bkd Backend
+}
+
+func (dc *Conn) Prepare(query string) (driver.Stmt, error) {
+    panic(&quot;Prepare not implemented&quot;)
+}
+
+func (dc *Conn) Begin() (driver.Tx, error) {
+    panic(&quot;Begin not implemented&quot;)
+}
+
+func (dc *Conn) Close() error {
+    return nil
+}
+</code></pre>
+<p>The only method we actually need, <code>Query</code>, is not required
+by the interface. It takes a query string and array of query
+parameters, returning an instance implementing
+the <code>database/sql/driver.Rows</code> interface.</p>
+<p>To implement <code>Query</code>, we basically copy the logic we had in
+the <code>cmd/main.go</code> REPL. The only change is that when we
+return results when handling <code>SELECT</code>, we'll return a
+struct that implements the <code>database/sql/driver.Rows</code>
+interface.</p>
+<p class="note">
+  <code>database/sql/driver.Rows</code> is not the same type as
+  <code>database/sql.Rows</code>, which may sound more
+  familiar. <code>database/sql/driver.Rows</code> is a simpler,
+  lower-level interface.
+</p><p>If we receive parameterized query arguments, we'll ignore them for
+now. And if the query involves multiple statements, we'll process only
+the first statement.</p>
+<pre><code class="hljs go">func (dc *Conn) Query(query string, args []driver.Value) (driver.Rows, error) {
+    if len(args) &gt; 0 {
+        // TODO: support parameterization
+        panic(&quot;Parameterization not supported&quot;)
+    }
+
+    parser := Parser{}
+    ast, err := parser.Parse(query)
+    if err != nil {
+        return nil, fmt.Errorf(&quot;Error while parsing: %s&quot;, err)
+    }
+
+    // NOTE: ignorning all but the first statement
+    stmt := ast.Statements[0]
+    switch stmt.Kind {
+    case CreateIndexKind:
+        err = dc.bkd.CreateIndex(stmt.CreateIndexStatement)
+        if err != nil {
+            return nil, fmt.Errorf(&quot;Error adding index on table: %s&quot;, err)
+        }
+    case CreateTableKind:
+        err = dc.bkd.CreateTable(stmt.CreateTableStatement)
+        if err != nil {
+            return nil, fmt.Errorf(&quot;Error creating table: %s&quot;, err)
+        }
+    case DropTableKind:
+        err = dc.bkd.DropTable(stmt.DropTableStatement)
+        if err != nil {
+            return nil, fmt.Errorf(&quot;Error dropping table: %s&quot;, err)
+        }
+    case InsertKind:
+        err = dc.bkd.Insert(stmt.InsertStatement)
+        if err != nil {
+            return nil, fmt.Errorf(&quot;Error inserting values: %s&quot;, err)
+        }
+    case SelectKind:
+        results, err := dc.bkd.Select(stmt.SelectStatement)
+        if err != nil {
+            return nil, err
+        }
+
+        return &amp;Rows{
+            rows:    results.Rows,
+            columns: results.Columns,
+            index:   0,
+        }, nil
+    }
+
+    return nil, nil
+}
+</code></pre>
+<h3 id="implementing-results">Implementing results</h3><p>According to the <a href="https://pkg.go.dev/database/sql/driver?tab=doc#Rows">Rows
+interface</a> we
+must implement:</p>
+<ul>
+<li><code>Columns() []string</code> to return an array of columns names</li>
+<li><code>Next(dest []Value) error</code> to populate an row array with the next row's worth of cells</li>
+<li>and <code>Close() error</code></li>
+</ul>
+<p>Our <code>Rows</code> struct will contain the rows and colums as
+returned from <code>Backend</code>, and will also contain an
+<code>index</code> field we can use in <code>Next</code> to populate
+the next row of cells.</p>
+<pre><code class="hljs go">type Rows struct {
+    columns []ResultColumn
+    index   uint64
+    rows    [][]Cell
+}
+
+func (r *Rows) Columns() []string {}
+
+func (r *Rows) Close() error {}
+
+func (r *Rows) Next(dest []driver.Value) error {}
+</code></pre>
+<p>For <code>Columns</code> we simply need to extract and
+return the column names from <code>ResultColumn</code>.</p>
+<pre><code class="hljs go">func (r *Rows) Columns() []string {
+    columns := []string{}
+    for _, c := range r.columns {
+        columns = append(columns, c.Name)
+    }
+
+    return columns
+}
+</code></pre>
+<p>For <code>Next</code> we need to iterate over each cell in the current
+row and retrieve its Go value, storing it in <code>dest</code>. The
+<code>dest</code> argument is simply a fixed-length array of
+<code>interface{}</code>, so we'll need no manual conversion.</p>
+<p>Once we've reached the last row, the <code>Next</code> contract is to
+return an <code>io.EOF</code>.</p>
+<pre><code class="hljs go">func (r *Rows) Next(dest []driver.Value) error {
+    if r.index &gt;= uint64(len(r.rows)) {
+        return io.EOF
+    }
+
+    row := r.rows[r.index]
+
+    for idx, cell := range row {
+        typ := r.columns[idx].Type
+        switch typ {
+        case IntType:
+            i := cell.AsInt()
+            if i == nil {
+                dest[idx] = i
+            } else {
+                dest[idx] = *i
+            }
+        case TextType:
+            s := cell.AsText()
+            if s == nil {
+                dest[idx] = s
+            } else {
+                dest[idx] = *s
+            }
+        case BoolType:
+            b := cell.AsBool()
+            if b == nil {
+                dest[idx] = b
+            } else {
+                dest[idx] = b
+            }
+        }
+    }
+
+    r.index++
+    return nil
+}
+</code></pre>
+<p>Finally in <code>Close</code> we'll set <code>index</code> higher than
+the number of rows to force <code>Next</code> to only ever
+return <code>io.EOF</code>.</p>
+<pre><code class="hljs go">func (r *Rows) Close() error {
+    r.index = uint64(len(r.rows))
+    return nil
+}
+</code></pre>
+<p>And that's all the changes needed to implement a
+<code>database/sql</code> driver! See
+<a href="https://github.com/eatonphil/gosql/commit/0d0aa61a74580a6aef11296741abfba4e1d4ae5c#diff-749da71b40f8ff06fc9e78ce917b0cce">here</a>
+for <code>driver.go</code> in full.</p>
+<h3 id="running-the-example">Running the example</h3><p>With the driver in place we can try out the example:</p>
+<pre><code class="hljs bash">$ go build ./cmd/sqlexample/main.go
+$ ./main
+Name: Terry, Age: 45
+Name: Anette, Age: 57
+</code></pre>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">Next post in the database basics series, implementing a database/sql driver for more seamless interactions in Go.<a href="https://t.co/AUZfUByNGE">https://t.co/AUZfUByNGE</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1259594720315047942?ref_src=twsrc%5Etfw">May 10, 2020</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

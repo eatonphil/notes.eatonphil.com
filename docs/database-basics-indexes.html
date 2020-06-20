@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Writing a SQL database from scratch in Go: 3. indexes | notes.eatonphil.com</title>
+    <meta name="description" content="Writing a SQL database from scratch in Go: 3. indexes" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>May 1, 2020</h2>
+          <h1>Writing a SQL database from scratch in Go: 3. indexes</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/database.html" class="tag">database</a><a href="/tags/golang.html" class="tag">golang</a><a href="/tags/sql.html" class="tag">sql</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p class="note">
+  Previously in database basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/database-basics.html">1. SELECT, INSERT, CREATE and a REPL</a>
+  <br />
+  <a href="/database-basics-expressions-and-where.html">2. binary expressions and WHERE filters</a>
+  <br />
+  <br />
+  Next in database basics:
+  <br />
+  <a href="/database-basics-a-database-sql-driver.html">4. a database/sql driver</a>
+</p><p>In this post, we extend <a href="https://github.com/eatonphil/gosql">gosql</a>
+to support indexes. We focus on the addition of <code>PRIMARY
+KEY</code> constraints on table creation and some easy optimizations
+during <code>SELECT</code> statements.</p>
+<pre><code class="hljs sql">$ go run cmd/main.go
+Welcome to gosql.
+# CREATE TABLE users (id INT PRIMARY KEY, name TEXT, age INT);
+ok
+# \d users
+Table &quot;users&quot;
+Column |  Type   | Nullable
+---------+---------+-----------
+id     | integer | not null
+name   | text    |
+age    | integer |
+Indexes:
+        &quot;users_pkey&quot; PRIMARY KEY, rbtree (&quot;id&quot;)
+</code></pre>
+<p>This post will broadly be a discussion of <a href="https://github.com/eatonphil/gosql/commit/9608511d9888ce3842ec7d1bfa8f77499e8123b2">this
+commit</a>.</p>
+<h3 id="what-is-an-index?">What is an index?</h3><p>An index is a mapping of a value to a row in a table. The value is
+often a column, but it can be many kinds of expressions. Databases
+typically store indexes in tree structures that provide O(log(n))
+lookup time. When <code>SELECT</code>ing and filtering on a column
+that is indexed, a database can greatly improve lookup time by
+filtering first on this index. Without an index, a database must do a
+linear scan for matching rows. Though sometimes if a condition is
+broad enough, even with an index, a database may still end up doing a
+linear scan.</p>
+<p>While it may make sense initially to map a value to a row using a hash
+table for constant lookup times, hash tables don't provide
+ordering. So this would prevent an index from being applicable on
+anything but equality checks. For example, <code>SELECT x FROM y WHERE
+x > 2</code> couldn't use a hash index on <code>x</code>.</p>
+<p>Indexes in many SQL databases default to a
+<a href="https://www.cs.cornell.edu/courses/cs3110/2012sp/recitations/rec25-B-trees/rec25.html">B-Tree</a>,
+which offers efficient ordering of elements. These indexes are thus
+not constant-time lookups even if filtering on a unique column for a
+single item. Some databases, <a href="https://www.postgresql.org/docs/current/indexes-types.html">like
+PostgreSQL</a>,
+allow you to use a hash-based index instead of a tree. Here the
+previously listed restrictions apply (i.e. only equality checks will
+use the index).</p>
+<h3 id="upgrading-gosql">Upgrading gosql</h3><p>We proceed as follows:</p>
+<ul>
+<li>Upgrade table creation to support specifying a primary key<ul>
+<li>Pick a tree data structure for the index, adding it to the table</li>
+</ul>
+</li>
+<li>Upgrade <code>INSERT</code>s to let any indexes on the table process the new row</li>
+<li>Upgrade <code>SELECT</code>s to make use of any indexes, if possible</li>
+</ul>
+<h3 id="upgrading-table-creation">Upgrading table creation</h3><p>To allow the specification of a single column as the primary key when
+creating a table, we have to first modify the lexer and parser.</p>
+<h4 id="lexing/parsing">Lexing/parsing</h4><p>Since we've covered this process a few times already suffice it so say
+we make the following key additions:</p>
+<ul>
+<li><a href="https://github.com/eatonphil/gosql/blob/9608511d9888ce3842ec7d1bfa8f77499e8123b2/lexer.go#L36">Add <code>PRIMARY KEY</code> as a new keyword token to the lexer</a></li>
+<li><a href="https://github.com/eatonphil/gosql/blob/9608511d9888ce3842ec7d1bfa8f77499e8123b2/parser.go#L425">Add a check for this token to the parsing of column definitions</a></li>
+<li><a href="https://github.com/eatonphil/gosql/blob/9608511d9888ce3842ec7d1bfa8f77499e8123b2/ast.go#L98">Modify the AST to store a boolean value whether a column is a primary key</a></li>
+</ul>
+<h4 id="in-memory-backend">In-memory backend</h4><p>Next we move on to handling a primary key during table creation.</p>
+<p>Since there are many existing papers and blogs on implementing tree
+data structures, we will import an open-source implementation. And
+while most databases use a B-Tree, the most important properties of
+the tree for our purposes are 1) efficient ordering and 2) optionally
+duplicate keys. We go with a Red-Black Tree,
+<a href="https://github.com/petar/GoLLRB">GoLLRB</a>.</p>
+<p>The full definition of an index now includes:</p>
+<ul>
+<li>A name</li>
+<li>An expression (at first we only support this being an identifier referring to a
+column)</li>
+<li>A unique flag</li>
+<li>A type name (it will just be <code>rbtree</code> for now)</li>
+<li>A primary key flag (so we know to apply null checks among other things)</li>
+<li>And the actual tree itself</li>
+</ul>
+<pre><code class="hljs go">type index struct {
+    name       string
+    exp        expression
+    unique     bool
+    primaryKey bool
+    tree       *llrb.LLRB
+    typ        string
+}
+</code></pre>
+<p>When we create a table, we add an index if one of the columns is a
+primary key. We call out to a new public
+method, <code>CreateIndex</code>, that will handle actually setting
+things up.</p>
+<pre><code class="hljs go">func (mb *MemoryBackend) CreateTable(crt *CreateTableStatement) error {
+    if _, ok := mb.tables[crt.name.value]; ok {
+        return ErrTableAlreadyExists
+    }
+
+    t := createTable()
+    t.name = crt.name.value
+    mb.tables[t.name] = t
+    if crt.cols == nil {
+        return nil
+    }
+
+    var primaryKey *expression = nil
+    for _, col := range *crt.cols {
+        t.columns = append(t.columns, col.name.value)
+
+        var dt ColumnType
+        switch col.datatype.value {
+        case &quot;int&quot;:
+            dt = IntType
+        case &quot;text&quot;:
+            dt = TextType
+        case &quot;boolean&quot;:
+            dt = BoolType
+        default:
+            delete(mb.tables, t.name)
+            return ErrInvalidDatatype
+        }
+
+        if col.primaryKey {
+            if primaryKey != nil {
+                delete(mb.tables, t.name)
+                return ErrPrimaryKeyAlreadyExists
+            }
+
+            primaryKey = &amp;expression{
+                literal: &amp;col.name,
+                kind:    literalKind,
+            }
+        }
+
+        t.columnTypes = append(t.columnTypes, dt)
+    }
+
+    if primaryKey != nil {
+        err := mb.CreateIndex(&amp;CreateIndexStatement{
+            table:      crt.name,
+            name:       token{value: t.name + &quot;_pkey&quot;},
+            unique:     true,
+            primaryKey: true,
+            exp:        *primaryKey,
+        })
+        if err != nil {
+            delete(mb.tables, t.name)
+            return err
+        }
+    }
+
+    return nil
+}
+</code></pre>
+<p>Implementing <code>CreateIndex</code> is just a matter of adding a new
+index to the table.</p>
+<pre><code class="hljs go">func (mb *MemoryBackend) CreateIndex(ci *CreateIndexStatement) error {
+    table, ok := mb.tables[ci.table.value]
+    if !ok {
+        return ErrTableDoesNotExist
+    }
+
+    for _, index := range table.indexes {
+        if index.name == ci.name.value {
+            return ErrIndexAlreadyExists
+        }
+    }
+
+    index := &amp;index{
+        exp:        ci.exp,
+        unique:     ci.unique,
+        primaryKey: ci.primaryKey,
+        name:       ci.name.value,
+        tree:       llrb.New(),
+        typ:        &quot;rbtree&quot;,
+    }
+    table.indexes = append(table.indexes, index)
+    return nil
+}
+</code></pre>
+<p>And that's it for creation of tables and indexes! Table creation is
+also the last time we need to make changes to the gosql
+frontend. The rest of the changes simply wrap existing insertion and
+selection.</p>
+<h3 id="upgrading-insert">Upgrading INSERT</h3><p>When a row is inserted into a table, each index on that table needs to
+process the row so it can add value-to-row mappings to the index.</p>
+<p class="note">
+  In the project code, you'll notice logic in <code>CreateIndex</code>
+  to also go back over all existing rows to add them to the new index.
+  This post omits further discussing the case where an index is
+  created after a table is created. After reading this post, that case
+  should be easy to follow.
+</p><p>Adding a row to an index is a matter of evaluting the index expression
+against that row and storing the resulting value in the tree. Along
+with the value, we store the integer index of the row in the
+table.</p>
+<p>If the index is required to be unique, we first check that the value
+does not yet exist.</p>
+<pre><code class="hljs go">func (i *index) addRow(t *table, rowIndex uint) error {
+    indexValue, _, _, err := t.evaluateCell(rowIndex, i.exp)
+    if err != nil {
+        return err
+    }
+
+    if indexValue == nil {
+        return ErrViolatesNotNullConstraint
+    }
+
+    if i.unique &amp;&amp; i.tree.Has(treeItem{value: indexValue}) {
+        return ErrViolatesUniqueConstraint
+    }
+
+    i.tree.InsertNoReplace(treeItem{
+        value: indexValue,
+        index: rowIndex,
+    })
+    return nil
+}
+</code></pre>
+<p>And that's it for insertion!</p>
+<h3 id="upgrading-select">Upgrading SELECT</h3><p>Until now, the logic for selecting rows from a table is to pick the
+table and iterate over all rows. If the row does not match
+the <code>WHERE</code> filter, we pass the row.</p>
+<p>If the table has an index and we are using the index in a recognized
+pattern in the <code>WHERE</code> AST (more on that later), we can
+pre-filter the table based on the index before iterating over each
+row. We can do this for each index and for each time a recognized
+pattern shows up.</p>
+<p class="note">
+  This process is called query planning. We build a simplified
+  version of what you may see in SQL databases, specifically focusing
+  on index usage since we don't yet support <code>JOIN</code>s. For
+  further reading, SQLite has
+  an <a href="https://www.sqlite.org/queryplanner.html#_lookup_by_index">excellent
+  document</a> on their query planner for index usage.
+</p><pre><code class="hljs go">func (mb *MemoryBackend) Select(slct *SelectStatement) (*Results, error) {
+    t := createTable()
+
+    if slct.from != nil {
+        var ok bool
+        t, ok = mb.tables[slct.from.value]
+        if !ok {
+            return nil, ErrTableDoesNotExist
+        }
+    }
+
+    if slct.item == nil || len(*slct.item) == 0 {
+        return &amp;Results{}, nil
+    }
+
+    results := [][]Cell{}
+    columns := []ResultColumn{}
+
+    if slct.from == nil {
+        t = createTable()
+        t.rows = [][]memoryCell{{}}
+    }
+
+    for _, iAndE := range t.getApplicableIndexes(slct.where) {
+        index := iAndE.i
+        exp := iAndE.e
+        t = index.newTableFromSubset(t, exp)
+    }
+
+    for i := range t.rows {
+        result := []Cell{}
+        isFirstRow := len(results) == 0
+
+        if slct.where != nil {
+            val, _, _, err := t.evaluateCell(uint(i), *slct.where)
+            if err != nil {
+                return nil, err
+            }
+
+            if !*val.AsBool() {
+                continue
+            }
+        }
+
+        for _, col := range finalItems {
+            value, columnName, columnType, err := t.evaluateCell(uint(i), *col.exp)
+            if err != nil {
+                return nil, err
+            }
+
+            if isFirstRow {
+                columns = append(columns, ResultColumn{
+                    Type: columnType,
+                    Name: columnName,
+                })
+            }
+
+            result = append(result, value)
+        }
+
+        results = append(results, result)
+    }
+
+    return &amp;Results{
+        Columns: columns,
+        Rows:    results,
+    }, nil
+}
+</code></pre>
+<p>It's very simple and easy to miss, here is the change called out:</p>
+<pre><code class="hljs go">    for _, iAndE := range t.getApplicableIndexes(slct.where) {
+        index := iAndE.i
+        exp := iAndE.e
+        t = index.newTableFromSubset(t, exp)
+    }
+</code></pre>
+<h4 id="getapplicableindexes">getApplicableIndexes</h4><p>There are probably a few very simple patterns we could look for, but
+for now we look for boolean expressions joined by <code>AND</code>
+that contain an index expression.</p>
+<pre><code class="hljs go">func (t *table) getApplicableIndexes(where *expression) []indexAndExpression {
+    var linearizeExpressions func(where *expression, exps []expression) []expression
+    linearizeExpressions = func(where *expression, exps []expression) []expression {
+        if where == nil || where.kind != binaryKind {
+            return exps
+        }
+
+        if where.binary.op.value == string(orKeyword) {
+            return exps
+        }
+
+        if where.binary.op.value == string(andKeyword) {
+            exps := linearizeExpressions(&amp;where.binary.a, exps)
+            return linearizeExpressions(&amp;where.binary.b, exps)
+        }
+
+        return append(exps, *where)
+    }
+
+    exps := linearizeExpressions(where, []expression{})
+
+    iAndE := []indexAndExpression{}
+    for _, exp := range exps {
+        for _, index := range t.indexes {
+            if index.applicableValue(exp) != nil {
+                iAndE = append(iAndE, indexAndExpression{
+                    i: index,
+                    e: exp,
+                })
+            }
+        }
+    }
+
+    return iAndE
+}
+</code></pre>
+<p>More specifically though, within binary operations we only support
+matching on an index if the following three conditions are met:</p>
+<ul>
+<li>the operator is one of <code>=</code>,
+<code><></code>, <code>></code>, <code><</code>, <code>>=</code>, or
+<code><=</code></li>
+<li>one of the operands is an identifier literal that matches the index's <code>exp</code> value</li>
+<li>the other operand is a literal value</li>
+</ul>
+<p class="note">
+  This is a simpler, stricter matching of an index than PostgreSQL
+  where you can index expressions more generally, not just identifer
+  literals.
+</p><pre><code class="hljs go">func (i *index) applicableValue(exp expression) *expression {
+    if exp.kind != binaryKind {
+        return nil
+    }
+
+    be := exp.binary
+    // Find the column and the value in the boolean expression
+    columnExp := be.a
+    valueExp := be.b
+    if columnExp.generateCode() != i.exp.generateCode() {
+        columnExp = be.b
+        valueExp = be.a
+    }
+
+    // Neither side is applicable, return nil
+    if columnExp.generateCode() != i.exp.generateCode() {
+        return nil
+    }
+
+    supportedChecks := []symbol{eqSymbol, neqSymbol, gtSymbol, gteSymbol, ltSymbol, lteSymbol}
+    supported := false
+    for _, sym := range supportedChecks {
+        if string(sym) == be.op.value {
+            supported = true
+            break
+        }
+    }
+    if !supported {
+        return nil
+    }
+
+    if valueExp.kind != literalKind {
+        fmt.Println(&quot;Only index checks on literals supported&quot;)
+        return nil
+    }
+
+    return &amp;valueExp
+}
+</code></pre>
+<p>And that's it for finding applicable indexes.</p>
+<h4 id="newtablefromsubset">newTableFromSubset</h4><p>The last remaining piece is to go from a boolean expression in
+a <code>WHERE</code> clause (where an index is applicable) to a subset
+of rows in a table.</p>
+<p>Since we are only working with patterns of the type
+<code>indexed-column OP literal-value</code>, we grab the literal
+using the previous <code>applicableValue</code> helper. Then we
+look up that literal value in the index and return a new table with
+every row in the index that meets the condition of the operator for the
+literal value.</p>
+<pre><code class="hljs go">func (i *index) newTableFromSubset(t *table, exp expression) *table {
+    valueExp := i.applicableValue(exp)
+    if valueExp == nil {
+        return t
+    }
+
+    value, _, _, err := createTable().evaluateCell(0, *valueExp)
+    if err != nil {
+        fmt.Println(err)
+        return t
+    }
+
+    tiValue := treeItem{value: value}
+
+    indexes := []uint{}
+    switch symbol(exp.binary.op.value) {
+    case eqSymbol:
+        i.tree.AscendGreaterOrEqual(tiValue, func(i llrb.Item) bool {
+            ti := i.(treeItem)
+
+            if !bytes.Equal(ti.value, value) {
+                return false
+            }
+
+            indexes = append(indexes, ti.index)
+            return true
+        })
+    case neqSymbol:
+        i.tree.AscendGreaterOrEqual(llrb.Inf(-1), func(i llrb.Item) bool {
+            ti := i.(treeItem)
+            if bytes.Equal(ti.value, value) {
+                indexes = append(indexes, ti.index)
+            }
+
+            return true
+        })
+    case ltSymbol:
+        i.tree.DescendLessOrEqual(tiValue, func(i llrb.Item) bool {
+            ti := i.(treeItem)
+            if bytes.Compare(ti.value, value) &lt; 0 {
+                indexes = append(indexes, ti.index)
+            }
+
+            return true
+        })
+    case lteSymbol:
+        i.tree.DescendLessOrEqual(tiValue, func(i llrb.Item) bool {
+            ti := i.(treeItem)
+            if bytes.Compare(ti.value, value) &lt;= 0 {
+                indexes = append(indexes, ti.index)
+            }
+
+            return true
+        })
+    case gtSymbol:
+        i.tree.AscendGreaterOrEqual(tiValue, func(i llrb.Item) bool {
+            ti := i.(treeItem)
+            if bytes.Compare(ti.value, value) &gt; 0 {
+                indexes = append(indexes, ti.index)
+            }
+
+            return true
+        })
+    case gteSymbol:
+        i.tree.AscendGreaterOrEqual(tiValue, func(i llrb.Item) bool {
+            ti := i.(treeItem)
+            if bytes.Compare(ti.value, value) &gt;= 0 {
+                indexes = append(indexes, ti.index)
+            }
+
+            return true
+        })
+    }
+
+    newT := createTable()
+    newT.columns = t.columns
+    newT.columnTypes = t.columnTypes
+    newT.indexes = t.indexes
+    newT.rows = [][]memoryCell{}
+
+    for _, index := range indexes {
+        newT.rows = append(newT.rows, t.rows[index])
+    }
+
+    return newT
+}
+</code></pre>
+<p>As you can see, an index may not necessarily improve on a linear
+search in some conditions. Imagine a table of 1 million rows indexed
+on an autoincrementing column. Imagine filtering on <code>col >
+10</code>. The index may be able to eliminate 10 items but still
+return a pre-filtered table of around 1 million rows that must
+be passed through the <code>WHERE</code> filter.</p>
+<p>Additionally since we process each boolean expression one at a time,
+we can't take advantage of knowledge that might seem obvious to a
+human for two boolean expressions that together bound a range. For
+example in <code>x > 10 AND x < 20</code> we can see that only
+integers from 11 to 19 are applicable. But the current logic would go
+through each expression separately and find all rows that match either
+before the final linear search through all pre-filtered rows would
+eliminate the bulk.</p>
+<p class="note">
+  Thankfully real databases have decades of optimizations. But even
+  then it can be difficult to know what index usages are being
+  optimized without reading documentation, benchmarking, using
+  <code>EXPLAIN ANALYSE</code>, or reading the source.
+</p><p>But that's it for changes needed to support basic indexes end-to-end!</p>
+<h3 id="trialing-an-index">Trialing an index</h3><p>Since the addition of indexes is so seamless, it is difficult to tell
+without trial that the index is effective. So we write a simple
+program that inserts N rows with and without an index. Finally it will
+query for the first and last items inserted. We show time and
+memory used during both insertion and selection.</p>
+<pre><code class="hljs go">package main
+
+import (
+    &quot;fmt&quot;
+    &quot;os&quot;
+    &quot;runtime&quot;
+    &quot;strconv&quot;
+    &quot;time&quot;
+
+    &quot;github.com/eatonphil/gosql&quot;
+)
+
+var inserts = 0
+var lastId = 0
+var firstId = 0
+
+func doInsert(mb gosql.Backend) {
+    parser := gosql.Parser{}
+    for i := 0; i &lt; inserts; i++ {
+        lastId = i
+        if i == 0 {
+            firstId = lastId
+        }
+        ast, err := parser.Parse(fmt.Sprintf(&quot;INSERT INTO users VALUES (%d)&quot;, lastId))
+        if err != nil {
+            panic(err)
+        }
+
+        err = mb.Insert(ast.Statements[0].InsertStatement)
+        if err != nil {
+            panic(err)
+        }
+    }
+}
+
+func doSelect(mb gosql.Backend) {
+    parser := gosql.Parser{}
+    ast, err := parser.Parse(fmt.Sprintf(&quot;SELECT id FROM users WHERE id = %d&quot;, lastId))
+    if err != nil {
+        panic(err)
+    }
+
+    r, err := mb.Select(ast.Statements[0].SelectStatement)
+    if err != nil {
+        panic(err)
+    }
+
+    if len(r.Rows) != 1 {
+        panic(&quot;Expected 1 row&quot;)
+    }
+
+    if int(*r.Rows[0][1].AsInt()) != inserts-1 {
+        panic(fmt.Sprintf(&quot;Bad row, got: %d&quot;, r.Rows[0][1].AsInt()))
+    }
+
+    ast, err = parser.Parse(fmt.Sprintf(&quot;SELECT id FROM users WHERE id = %d&quot;, firstId))
+    if err != nil {
+        panic(err)
+    }
+
+    r, err = mb.Select(ast.Statements[0].SelectStatement)
+    if err != nil {
+        panic(err)
+    }
+
+    if len(r.Rows) != 1 {
+        panic(&quot;Expected 1 row&quot;)
+    }
+
+    if int(*r.Rows[0][1].AsInt()) != 0 {
+        panic(fmt.Sprintf(&quot;Bad row, got: %d&quot;, r.Rows[0][1].AsInt()))
+    }
+}
+
+func perf(name string, b gosql.Backend, cb func(b gosql.Backend)) {
+    start := time.Now()
+    fmt.Println(&quot;Starting&quot;, name)
+    cb(b)
+    fmt.Printf(&quot;Finished %s: %f seconds\n&quot;, name, time.Since(start).Seconds())
+
+    var m runtime.MemStats
+    runtime.ReadMemStats(&amp;m)
+    fmt.Printf(&quot;Alloc = %d MiB\n\n&quot;, m.Alloc/1024/1024)
+}
+
+func main() {
+    mb := gosql.NewMemoryBackend()
+
+    index := false
+    for i, arg := range os.Args {
+        if arg == &quot;--with-index&quot; {
+            index = true
+        }
+
+        if arg == &quot;--inserts&quot; {
+            inserts, _ = strconv.Atoi(os.Args[i+1])
+        }
+    }
+
+    primaryKey := &quot;&quot;
+    if index {
+        primaryKey = &quot; PRIMARY KEY&quot;
+    }
+
+    parser := gosql.Parser{}
+    ast, err := parser.Parse(fmt.Sprintf(&quot;CREATE TABLE users (id INT%s)&quot;, primaryKey))
+    if err != nil {
+        panic(err)
+    }
+
+    err = mb.CreateTable(ast.Statements[0].CreateTableStatement)
+    if err != nil {
+        panic(err)
+    }
+
+    indexingString := &quot; with indexing enabled&quot;
+    if !index {
+        indexingString = &quot;&quot;
+    }
+    fmt.Printf(&quot;Inserting %d rows%s\n&quot;, inserts, indexingString)
+
+    perf(&quot;INSERT&quot;, mb, doInsert)
+
+    perf(&quot;SELECT&quot;, mb, doSelect)
+}
+</code></pre>
+<p>Build and run once without an index:</p>
+<pre><code class="hljs bash">$ go build cmd/indextest/main.go
+./main --inserts 1000000
+Inserting 1000000 rows
+Starting INSERT
+Finished INSERT: 76.175133 seconds
+Alloc = 239 MiB
+
+Starting SELECT
+Finished SELECT: 1.301556 seconds
+Alloc = 238 MiB
+</code></pre>
+<p>And run again with an index:</p>
+<pre><code class="hljs bash">./main --inserts 1000000 --with-index
+Inserting 1000000 rows with indexing enabled
+Starting INSERT
+Finished INSERT: 89.108121 seconds
+Alloc = 341 MiB
+
+Starting SELECT
+Finished SELECT: 0.000137 seconds
+Alloc = 341 MiB
+</code></pre>
+<p>The basic tradeoff that you can see is that for more memory and longer
+insertion times, you get a significantly faster lookup.</p>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">Very excited to share the latest database basics post on implementing indexes in gosql.<a href="https://t.co/QHfjCe1XsC">https://t.co/QHfjCe1XsC</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1256209468133650433?ref_src=twsrc%5Etfw">May 1, 2020</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Starting a minimal Common Lisp project | notes.eatonphil.com</title>
+    <meta name="description" content="Starting a minimal Common Lisp project" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>March 5, 2018</h2>
+          <h1>Starting a minimal Common Lisp project</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/common lisp.html" class="tag">common lisp</a><a href="/tags/asdf.html" class="tag">asdf</a><a href="/tags/quicklisp.html" class="tag">quicklisp</a><a href="/tags/sbcl.html" class="tag">sbcl</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>If you've only vaguely heard of Lisp before or studied Scheme in
+school, Common Lisp is nothing like what you'd expect. While
+functional programming is all the rage in Scheme, Common Lisp was
+"expressly designed to be a real-world engineering language rather
+than a theoretically 'pure' language" (<a href="http://www.gigamonkeys.com/book/introduction-why-lisp.html">Practical Common
+Lisp</a>).
+Furthermore, <a href="http://sbcl.org/">SBCL</a> -- a popular implementation --
+is a highly optimized compiler that is competitive with
+<a href="https://benchmarksgame.alioth.debian.org/u64q/lisp.html">Java</a>.</p>
+<h3 id="building-blocks">Building blocks</h3><p>Common Lisp symbols, imagine "first-class" variables/labels, are
+encapsulated in namespaces called packages. However packages don't
+account for organization across directories, among other things. So
+while packages are a part of the core Common Lisp language, the
+"cross-directory" organizational structure is managed by the
+(all-but-standard) <a href="https://github.com/fare/asdf">ASDF</a> "systems". You
+can think of packages as roughly similar to modules in Python whereas
+systems in ASDF are more like packages in Python.</p>
+<p>ASDF does not manage non-local dependencies. For that we use
+<a href="https://www.quicklisp.org/beta/">Quicklisp</a>, the defacto package
+manager. ASDF should come bundled with your Common Lisp installation,
+which I'll assume is SBCL (not that it matters). Quicklisp does not
+come bundled.</p>
+<h3 id="getting-quicklisp">Getting Quicklisp</h3><p>You can follow the notes on the Quicklisp
+<a href="https://www.quicklisp.org/beta/">site</a> for installation, but the
+basic gist is:</p>
+<pre><code class="hljs shell">$ curl -O https://beta.quicklisp.org/quicklisp.lisp
+$ sbcl --load quicklisp.lisp
+...
+* (quicklisp-quickstart:install)
+...
+* ^D
+$ sbcl --load &quot;~/quicklisp/setup.lisp&quot;
+...
+* (ql:add-to-init-file)
+</code></pre>
+<h3 id="a-minimal-package">A minimal package</h3><p>Now we're ready to get started. Create a directory using the name of
+the library you'd like to package. For instance, I'll create a
+"cl-docker" directory for my Docker wrapper library. Then create a
+file using the same name in the directory with the ".asd" suffix:</p>
+<pre><code class="hljs shell">$ cd ~/projects
+$ mkdir cl-docker
+$ touch cl-docker/cl-docker.asd
+</code></pre>
+<p>It is important for the ".asd" file to share the same name as the
+directory because ASDF will look for it in that location (by default).</p>
+<p>Before we get too far into packaging, let's write a function we'd like
+to export from this library. Edit "cl-docker/docker.lisp" (this name does
+not matter) and add the following:</p>
+<pre><code class="hljs lisp">(defun ps ()
+  (let ((output (uiop:run-program &#39;(&quot;docker&quot; &quot;ps&quot;) :output :string)))
+    (loop for line in (rest (cl-ppcre:split &quot;(\\n+)&quot; output))
+      collect (cl-ppcre:split &quot;(\\s\\s+)&quot; line))))
+</code></pre>
+<p>This uses a portable library, "uiop", that ASDF exposes by default (we
+won't need to explicitly import this anywhere because the package is
+managed by ASDF). It will run the command "docker ps" in a subprocess
+and return the output as a string. Then we use the regex split
+function from the "cl-ppcre" library to split the output first into
+lines, take all but the first line, and split the lines up based one
+two or more whitespace characters.</p>
+<p>Next let's define the package (think module in Python) by editing
+"cl-docker/package.lisp" (this name also does not matter):</p>
+<pre><code class="hljs lisp">(defpackage cl-docker
+  (:use cl)
+  (:import-from :cl-ppcre :split)
+  (:export :ps))
+</code></pre>
+<p>Here we state the package's name, say that we want to import all
+Common Lisp base symbols into the package, say we want to import the
+"split" symbol from the "cl-ppcre" package, and say we only want to
+export our "ps" function.</p>
+<p>At this point we must also declare within the "cl-docker/docker.lisp"
+file that it is a part of this package:</p>
+<pre><code class="hljs lisp">(in-package :cl-docker)
+
+(defun ps ()
+  (let ((output (uiop:run-program &#39;(&quot;docker&quot; &quot;ps&quot;) :output :string)))
+    (loop for line in (rest (cl-ppcre:split &quot;(\\n+)&quot; output))
+      collect (cl-ppcre:split &quot;(\\s\\s+)&quot; line))))
+</code></pre>
+<p>Next let's define the system (ASDF-level, similar to a package in Python)
+in "cl-docker/cl-docker.asd":</p>
+<pre><code class="hljs lisp">(defsystem :cl-docker
+    :depends-on (:cl-ppcre)
+    :serial t
+    :components ((:file &quot;package&quot;)
+                 (:file &quot;docker&quot;)))
+</code></pre>
+<p>This defines all the pieces of the system for ASDF: the system name,
+the package definition and the component of the package
+("cl-docker/docker.lisp"), and tells ASDF to make the "cl-ppcre"
+system on disk available to us. We also tell ASDF to process the
+components in the order we specified (otherwise it will pick an order
+that may not be what we want).</p>
+<p>In preparation for times when we don't have the "cl-ppcre" system (or
+any other dependencies) on disk, we always load the system indirectly
+through Quicklisp (rather than directly via ASDF) so Quicklisp can
+fetch any missing dependencies from its repository of systems.</p>
+<p>But before then -- unless you put this directory in "~/common-lisp" --
+you'll need to register the directory containing the directory of your
+system definitions so ASDF (and Quicklisp) know where to look if you
+ask to load this system.</p>
+<p>To do this, add a ".conf" file to
+"~/.config/common-lisp/source-registry.conf.d/" and add the following:</p>
+<pre><code class="hljs lisp">(:tree &quot;~/path/to/dir/containing/system/dir&quot;)
+</code></pre>
+<p>So if you had a repo called "cl-docker" in your "~/projects" directory
+that contained the "cl-docker" directory we previously created (that,
+in turn, contains the "cl-docker.asd", "package.lisp", and
+"docker.lisp" files) then you might create
+"~/.config/common-lisp/source-registry.conf.d/1-cl-docker.conf" and
+add:</p>
+<pre><code class="hljs lisp">(:tree &quot;~/projects/cl-docker&quot;)
+</code></pre>
+<h4 id="using-the-system">Using the system</h4><p>Now you can use the library from anywhere on your computer. Enter a
+Common Lisp REPL and tell Quicklisp to load the system (and download
+any non-local dependencies):</p>
+<pre><code class="hljs shell">$ sbcl
+...
+* (ql:quickload &quot;cl-docker&quot;)
+To load &quot;cl-docker&quot;:
+  Load 1 ASDF system:
+    cl-docker
+; Loading &quot;cl-docker&quot;
+..................................................
+[package cl-docker]
+(&quot;cl-docker&quot;)
+* (cl-docker:ps)
+</code></pre>
+<p>And that's it!</p>
+<p>For the complete source of this example package, check out this
+<a href="https://gist.github.com/eatonphil/59cdfeb4826c7a12a07d7055f6817a56">Gist</a>.</p>
+<h3 id="in-conclusion">In conclusion</h3><p>Common Lisp is easy to work with, the packages are many and mature.
+Configuring an ASDF package is even simpler than configuring a Python
+"setup.py". I didn't demonstrate pinning versions of dependencies in
+ASDF, but <a href="https://stackoverflow.com/a/21663603/1507139">of course</a>
+you can do that too. If any of this -- as simple as it is -- seems
+tedious, you can also use Zach Beane's (creator of Quicklisp)
+<a href="http://xach.livejournal.com/278047.html">quickproject</a> tool to build
+out the structure for you.</p>
+<h3 id="resources-for-common-lisp">Resources for Common Lisp</h3><p>You must read <a href="http://www.gigamonkeys.com/book/">Practical Common
+Lisp</a>. It is freely available
+online. It is one of the best resources I keep referring to in
+dealing with simple issues (as a new Lisper, I stumble on a lot of
+simple issues).</p>
+<p>Paul Graham's <a href="http://www.paulgraham.com/onlisp.html">On Lisp</a> is also
+a must-read when you want to get a better understanding of macros in
+Lisp. It will help you out with macros in Scheme too. This book is
+freely available online, but out of print physically. I sent
+<a href="https://www.lulu.com/">Lulu</a> the PDF and I received my physical copy
+for under $20 (including shipping).</p>
+<p>I'm currently making my way through <a href="http://www.cs.cmu.edu/Groups/AI/html/cltl/cltl2.html">Common Lisp the Language, 2nd
+Edition</a> which I
+believe is also freely available online. However I don't really
+recommend this unless you are interested in implementing Common Lisp
+or are dying to learn the standard library (not a bad idea).</p>
+<p>Finally, Peter Norvig's <a href="https://github.com/norvig/paip-lisp">Paradigms of Artificial Intelligence
+Programming</a> just recently became
+freely available online. I haven't yet read it but I'm queuing it
+up. Don't let the title scare you, apparantly it is primarily
+considered a practical guide to Common Lisp around
+old-school/classical AI that isn't supposed to encumber.</p>
+<p class="note">
+  It
+  was <a href="https://twitter.com/HexstreamSoft/status/971419419862847494">pointed
+  out</a> on Twitter that Paul
+  Graham's <a href="http://www.paulgraham.com/acl.html">ANSI Common
+  Lisp</a> and the
+  <a href="http://www.lispworks.com/documentation/lw70/CLHS/Front/Contents.htm">CLHS</a>
+  are probably better resources for the Common Lisp that exists today
+  than Common Lisp the Language 2. CLtL2 is pre-standard.
+</p><p>Additionally, the <a href="http://lispcookbook.github.io/cl-cookbook/">Common Lisp
+Cookbook</a> is a great
+resource for Common Lisp recipes. It's been around since 2004 (on
+Sourceforge) but has been pretty active recently and has been revived
+on Github pages.</p>
+<h3 id="on-scheme">On Scheme</h3><p>I've done one or two unremarkable web prototypes in <a href="https://www.call-cc.org/">Chicken
+Scheme</a>, an R5RS/R7RS Scheme implementation.
+I don't think Chicken Scheme is the best bet for the web (I'm mostly
+biased to this topic) because it has no native-thread support and
+there are lighter interpreters out there that are easier to embed
+(e.g. in nginx). Chicken Scheme's "niche" is being a generally
+high-quality implementation with a great <a href="http://wiki.call-cc.org/chicken-projects/egg-index-4.html">collection of 3rd-party
+libraries</a>,
+but it is also not the
+<a href="https://ecraven.github.io/r7rs-benchmarks/">fastest</a> Scheme you could
+choose.</p>
+<p>I've worked on a larger web prototype -- a Github issue reporting app
+-- in <a href="https://racket-lang.org/">Racket</a>, a derivative of Scheme
+R6RS. And I've blogged
+<a href="http://notes.eatonphil.com/walking-through-a-basic-racket-web-service.html">favorably</a>
+about Racket. It is a
+<a href="https://ecraven.github.io/r7rs-benchmarks/">high-performance</a>
+interpreter with a JIT compiler, has thread support, and is also well
+known for its collection of <a href="https://pkgs.racket-lang.org/">3rd-party
+libaries</a>. However the Racket ecosystem
+<a href="https://fare.livejournal.com/188429.html">suffers</a> from the same
+issues Haskell's does: libraries and bindings are primarily
+proof-of-concept only; missing documentation, tests and use. Trying to
+render "templatized" HTML (like Jinja allows for in Flask) without
+using S-exp-based syntax was a nightmare.  (Read: there's space for
+someone to write a good string templating library.)</p>
+<h4 id="sorry,-racket">Sorry, Racket</h4><p>Last point on Racket (because it really is worth looking into),
+debugging in that Github issue project was not fun. The backtraces
+were mostly useless. Naively I assume this may have to do with the way
+Racket optimizes and rewrites functions. I was often left with zero
+context to find and correct my errors. But it could very well be I
+was making poor use of Racket.</p>
+<h4 id="on-the-other-hand">On the other hand</h4><p>Common Lisp (its implementations and ecosystem) seems more robust and
+developed. SBCL, with it's great performance and native-thread
+support, is a promising candidate for backend web development.</p>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">I wrote a post on putting together a Common Lisp project. It&#39;s easy! I also included some of my favorite CL books and a digression on Scheme. <a href="https://t.co/2LEDoFnAjk">https://t.co/2LEDoFnAjk</a> <a href="https://twitter.com/hashtag/commonlisp?src=hash&amp;ref_src=twsrc%5Etfw">#commonlisp</a> <a href="https://twitter.com/hashtag/lisp?src=hash&amp;ref_src=twsrc%5Etfw">#lisp</a> <a href="https://twitter.com/hashtag/scheme?src=hash&amp;ref_src=twsrc%5Etfw">#scheme</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/971398435856371712?ref_src=twsrc%5Etfw">March 7, 2018</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

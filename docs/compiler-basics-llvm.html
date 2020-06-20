@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Writing a lisp compiler from scratch in JavaScript: 3. LLVM | notes.eatonphil.com</title>
+    <meta name="description" content="Writing a lisp compiler from scratch in JavaScript: 3. LLVM" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>March 10, 2019</h2>
+          <h1>Writing a lisp compiler from scratch in JavaScript: 3. LLVM</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/compiler.html" class="tag">compiler</a><a href="/tags/llvm.html" class="tag">llvm</a><a href="/tags/javascript.html" class="tag">javascript</a><a href="/tags/lisp.html" class="tag">lisp</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p class="note">
+  Previously in compiler basics:
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/compiler-basics-lisp-to-assembly.html">1. lisp to assembly</a>
+  <br />
+  <a href="/compiler-basics-functions.html">2. user-defined functions and variables</a>
+  <br />
+  <br/>
+  Next in compiler basics:
+  <br />
+  <a href="/compiler-basics-llvm-conditionals.html">4. LLVM conditionals and compiling fibonacci</a>
+  <br />
+  <a href="/compiler-basics-llvm-system-calls.html">5. LLVM system calls</a>
+  <br />
+  <a href="/compiler-basics-an-x86-upgrade.html">6. an x86 upgrade</a>
+</p><p>In this post we'll extend the
+<a href="https://github.com/eatonphil/ulisp">compiler</a> to emit <a href="https://llvm.org/docs/LangRef.html">LLVM
+IR</a> as an option instead of x86
+assembly.</p>
+<p><a href="https://github.com/eatonphil/ulisp">All source code is available on Github</a>.</p>
+<p>LLVM IR is a portable, human-readable, typed, assembly-like syntax
+that LLVM can apply <a href="https://llvm.org/docs/Passes.html">optimizations</a>
+on before generating assembly for the target architecture. Many
+language implementors choose to compile to LLVM IR specifically to
+avoid needing to implement sophisticated optimizations.</p>
+<p>But the biggest reason I'm adding an LLVM backend is so that I can
+punt on implementing <a href="https://en.wikipedia.org/wiki/Register_allocation">register
+allocation</a>. This
+is the technique that allows you to generically use as many registers
+as possible before storing local variables on the stack. While
+register allocation algorithms are not <em>that</em> difficult, I got
+bored/lazy trying to implement this for ulisp. And LLVM IR provides
+"infinite" locals that get mapped as needed to registers and the stack
+-- implementing register allocation.</p>
+<h3 id="llvm-ir-basics">LLVM IR basics</h3><p>In LLVM IR, all local variables must be prefixed
+with <code>%</code>. All global variables (including function names)
+must be prefixed with <code>&#64;</code>. LLVM IR must be in
+<a href="https://www.cs.cmu.edu/~fp/courses/15411-f08/lectures/09-ssa.pdf">single-static
+assignment</a>
+(SSA) form, which means that no variable is assigned
+twice. Additionally, literals cannot be assigned to variables
+directly. So we'll work around that by adding 0 to the
+literal. Furthermore, we'll take advantage of
+the <code>add</code>, <code>sub</code>, and <code>mul</code>
+operations built into LLVM IR.</p>
+<pre><code class="hljs llvm">; x = 4
+%x = add i32 4, 0
+</code></pre>
+<p>The type that the operation is operating on must be specified after
+the operation name. In this case we are specifying
+that <code>add</code> is operating on and returning 32-bit integers.</p>
+<p>While this might seem very inefficient, we'll see in the end that
+LLVM easily optimizes this away.</p>
+<h4 id="function-definition">Function definition</h4><p>Functions are defined at the top-level and are much simpler than x86
+assembly since the details of calling conventions are handled by LLVM.</p>
+<pre><code class="hljs llvm">; (def plus (a b) (+ a b))
+define i32 @plus (i32 a, i32 b) {
+  %res = add i32 a, b
+  ret i32 %res
+}
+</code></pre>
+<p>In ulisp, all functions will return a result (and the only supported
+type for now are 32-bit integers). So we annotate the definition with
+this return type (<code>i32</code> in <code>define
+i32</code>). Finally, we return inside the function with
+the <code>ret</code> instruction that must also specify the type
+(again <code>i32</code>).</p>
+<h4 id="generating-llvm-ir">Generating LLVM IR</h4><p>We are going to generate LLVM IR as text. But any large project will
+benefit from generating LLVM IR via
+<a href="http://llvm.org/docs/ProgrammersManual.html">API</a>.</p>
+<h3 id="supporting-multiple-backends">Supporting multiple backends</h3><p>The goal is to be able to switch at compile-time between generating
+x86 assembly or generating LLVM IR. So we'll need to reorganize ulisp
+a little bit.</p>
+<p>We'll edit <code>src/ulisp.js</code> to accept a second argument to
+specify the backend (and from now on we'll default to LLVM).</p>
+<pre><code class="hljs javascript">const cp = require(&#39;child_process&#39;);
+const fs = require(&#39;fs&#39;);
+
+const { parse } = require(&#39;./parser&#39;);
+const backends = require(&#39;./backend&#39;);
+
+function main(args) {
+  const input = fs.readFileSync(args[2]).toString();
+
+  let backend;
+  switch (args[3]) {
+    case &#39;llvm&#39;:
+    case undefined:
+      backend = backends.llvm;
+      break;
+    case &#39;x86&#39;:
+      backend = backends.x86;
+      break;
+    default:
+      console.log(&#39;Unsupported backend &#39; + args[3]);
+  }
+
+  const [ast] = parse(input);
+  const program = backend.compile(ast);
+
+  try {
+    fs.mkdirSync(&#39;build&#39;);
+  } catch (e) {}
+  backend.build(&#39;build&#39;, program);
+}
+
+main(process.argv);
+</code></pre>
+<h3 id="the-llvm-backend">The LLVM backend</h3><p>We'll add <code>src/backend/llvm.js</code> and And expose
+<code>compile</code> and <code>build</code> functions.</p>
+<h4 id="compile(ast)">compile(ast)</h4><p>This will work the same as it did for the x86 backend, creating a new
+<code>Compiler</code> helper object, creating a scope manager (which
+we'll get into in more detail shortly), and generating code from the
+AST wrapped in a <code>begin</code>.</p>
+<pre><code class="hljs javascript">module.exports.compile = function(ast) {
+  const c = new Compiler();
+  const scope = new Scope();
+  c.compileBegin(ast, scope.symbol(), scope);
+  return c.getOutput();
+};
+</code></pre>
+<h4 id="build(builddir,-output)">build(buildDir, output)</h4><p>The job of <code>build</code> will be to clean up the build directory,
+write any output as needed to the directory, and compile the written
+output. Since we're dealing with LLVM IR, we first call
+<a href="https://llvm.org/docs/CommandGuide/llc.html">llc</a> on the IR file to
+get an assembly file. Then we can call <code>gcc</code> on the
+assembly to get a binary output.</p>
+<pre><code class="hljs javascript">const cp = require(&#39;child_process&#39;);
+const fs = require(&#39;fs&#39;);
+
+...
+
+module.exports.build = function(buildDir, program) {
+  const prog = &#39;prog&#39;;
+  fs.writeFileSync(buildDir + `/${prog}.ll`, program);
+  cp.execSync(`llc -o ${buildDir}/${prog}.s ${buildDir}/${prog}.ll`);
+  cp.execSync(`gcc -o ${buildDir}/${prog} ${buildDir}/${prog}.s`);
+};
+</code></pre>
+<h3 id="taking-advantage-of-locals">Taking advantage of locals</h3><p>Before we get too far into the specifics of LLVM IR code generation,
+let's build out the infrastructure to take advantage of "infinite"
+locals. In particular, we want a local-manager (<code>Scope</code>)
+with four functions:</p>
+<ul>
+<li><code>register(local: name)</code>: for tracking user variables and mapping to safe names</li>
+<li><code>symbol()</code>: for tracking internal temporary variables</li>
+<li><code>get(local: name)</code>: for returning the safe name of a user variable</li>
+<li><code>copy()</code>: for duplicating the local-tracker when we enter a new scope</li>
+</ul>
+<p>It is important to track and map user variables into safe names so we
+don't accidentally conflict between variable names used by the user
+and names used by the compiler itself.</p>
+<h4 id="register(local)">register(local)</h4><p>When we register, we'll want to replace any unsafe characters that
+Lisp allows but LLVM likely won't. For now, we'll just replace any
+dashes in the name (since dashes are fine in variables in Lisp) with
+underscores. Then we'll add a number to the end of the local name
+until we have a safe name that doesn't exist already. Finally we
+return that safe name after storing the mapping.</p>
+<pre><code class="hljs javascript">class Scope {
+  constructor() {
+    this.locals = {};
+  }
+
+  register(local) {
+    let copy = local.replace(&#39;-&#39;, &#39;_&#39;);
+    let n = 1;
+    while (this.locals[copy]) {
+      copy = local + n++;
+    }
+
+    this.locals[local] = copy;
+    return copy;
+  }
+}
+</code></pre>
+<h4 id="symbol()">symbol()</h4><p>This is a simple function that will return one new unused safe name
+that we can store things in.</p>
+<pre><code class="hljs javascript">class Scope {
+  ...
+
+  symbol() {
+    const nth = Object.keys(this.locals).length + 1;
+    return this.register(&#39;sym&#39; + nth);
+  }
+
+  ...
+}
+</code></pre>
+<p>We start off by making up a name based on the prefix <code>sym</code>
+and a suffix of the current key length and pass that into the
+<code>register</code> function to make sure we get a safe name.</p>
+<h4 id="get(local)">get(local)</h4><p>This function is a very simple lookup to return the safe name for a
+user variable. It is up to the caller of this function to handle if
+the user variable does not exist in scope (and perhaps throw a
+compiler error back to the programmer).</p>
+<pre><code class="hljs javascript">class Scope {
+  ...
+
+  get(local) {
+    return this.locals[local];
+  }
+
+  ...
+}
+</code></pre>
+<h4 id="copy()">copy()</h4><p>Finally, we want to expose a copy function so we can duplicate the
+local storage before entering a new scope. (A variable inside a
+function should not exist in scope outside the function.)</p>
+<pre><code class="hljs javascript">class Scope {
+  ...
+
+  copy() {
+    const c = new Scope();
+    c.locals = { ...this.locals };
+    return c;
+  }
+
+  ...
+}
+</code></pre>
+<h3 id="back-to-codegen!">Back to codegen!</h3><p>As mentioned in <code>module.exports.compile</code>, we're going to
+use a <code>Compiler</code> that exposes a number of compiler helpers:</p>
+<ul>
+<li><code>emit(depth, code)</code>: an internal helper for outputting indented lines of code</li>
+<li><code>compileBegin(ast, destination, scope)</code>: compiles a begin block</li>
+<li><code>compileExpression(ast, destination, scope)</code>: compiles variable references, literals, and passes on function calls</li>
+<li><code>compileCall(functionName, ast, destination, scope)</code>: compiles a function call</li>
+<li><code>compileDefine([functionName, parameters, ...body], destination, scope)</code>: compiles a function definition</li>
+<li><code>compileOp(op)</code>: helper function for generating code for primitive operations like <code>add</code></li>
+<li><code>getOutput()</code>: returns the code generated by the compiler</li>
+</ul>
+<h4 id="emit(depth,-code)">emit(depth, code)</h4><p>Like we had in the x86 backend, this will indent the code two spaces
+<code>depth</code> times and write it to the buffer we track generated
+code.</p>
+<pre><code class="hljs javascript">class Compiler {
+  constructor() {
+    this.outBuffer = [];
+  }
+
+  emit(depth, code) {
+    const indent = new Array(depth + 1).join(&#39;  &#39;);
+    this.outBuffer.push(indent + code);
+  }
+}
+</code></pre>
+<h4 id="compilebegin(ast,-destination,-scope)">compileBegin(ast, destination, scope)</h4><p>Our first compiler function actually does no code generation
+itself. We'll call <code>compileExpression</code> on each item within
+the begin block. And we'll pass the <code>destination</code> to the
+last expression in the list so that the value of a begin block is set
+to the value of its last expression. All other expressions will
+receive a temporary variable to store results.</p>
+<pre><code class="hljs javascript">class Compiler {
+  ...
+
+  compileBegin(body, destination, scope) {
+    body.forEach((expression, i) =&gt;
+      this.compileExpression(
+        expression,
+        i === body.length - 1 ? destination : scope.symbol(),
+        scope,
+      ),
+    );
+  }
+
+  ...
+}
+</code></pre>
+<p>Example:</p>
+<pre><code class="hljs lisp">(begin 1 2) ; returns 2
+</code></pre>
+<h4 id="compileexpression(ast,-destination,-scope)">compileExpression(ast, destination, scope)</h4><p>This is the most generic compile function. If the ast is a list
+(representing a function call), it will pass compilation off to
+<code>compileCall</code>. Otherwise the only non-function call parts
+of the language are variable references and numeric literals.</p>
+<pre><code class="hljs javascript">class Compiler {
+  ...
+
+  compileExpression(exp, destination, scope) {
+    // Is a nested function call, compile it
+    if (Array.isArray(exp)) {
+      this.compileCall(exp[0], exp.slice(1), destination, scope);
+      return;
+    }
+
+    // If numeric literal, store to destination register by adding 0.
+    if (Number.isInteger(exp)) {
+      this.emit(1, `%${destination} = add i32 ${exp}, 0`);
+      return;
+    }
+
+    // If is local, store to destination register similarly.
+    const res = scope.get(exp);
+    if (res) {
+      this.emit(1, `%${destination} = add i32 %${res}, 0`);
+    } else {
+      throw new Error(
+        &#39;Attempt to reference undefined variable or unsupported literal: &#39; +
+          exp,
+      );
+  }
+
+  ...
+}
+</code></pre>
+<p>Example:</p>
+<pre><code class="hljs lisp">1
+...
+a
+...
+(+ 1 a)
+</code></pre>
+<h4 id="compilecall(functionname,-arguments,-destination,-scope)">compileCall(functionName, arguments, destination, scope)</h4><p>Most function calls will automatically compile arguments before
+calling the function. However, certain control-flow primitives don't
+do this (e.g. <code>def</code>, <code>if</code>, etc.). Macros in Lisp
+allow you to add new control-flow primitives (even if you don't use it
+to modify control-flow). But we will ignore user-defined primitives
+for now.</p>
+<p>We'll keep a list of control-flow primitives and pass off compilation
+to them if the function name matches a primitive. Otherwise, we'll
+look up the function name in scope (to find its safe name), compile
+the arguments, and call the function with the results of the
+arguments.</p>
+<pre><code class="hljs javascript">class Compiler {
+  constructor() {
+    this.outBuffer = [];
+    this.primitiveFunctions = {
+      def: this.compileDefine.bind(this),
+      begin: this.compileBegin.bind(this),
+    };
+  }
+
+  ...
+
+  compileCall(fun, args, destination, scope) {
+    if (this.primitiveFunctions[fun]) {
+      this.primitiveFunctions[fun](args, destination, scope);
+      return;
+    }
+
+    const validFunction = scope.get(fun);
+    if (validFunction) {
+      const safeArgs = args
+        .map((a) =&gt; {
+          const res = scope.symbol();
+          this.compileExpression(a, res, scope);
+          return &#39;i32 %&#39; + res;
+        })
+        .join(&#39;, &#39;);
+      this.emit(1, `%${destination} = call i32 @${validFunction}(${safeArgs})`);
+    } else {
+      throw new Error(&#39;Attempt to call undefined function: &#39; + fun);
+    }
+  }
+
+  ...
+}
+</code></pre>
+<p>Yay LLVM for simplifying calls!</p>
+<p>Example:</p>
+<pre><code class="hljs lisp">(foo 1)
+...
+(+ 1 2)
+</code></pre>
+<h4 id="compiledefine([functionname,-parameters,-...body],-destination,-scope)">compileDefine([functionName, parameters, ...body], destination, scope)</h4><p>This is the last undefined compile function we've used. The call
+signature may look funny but we write less code if we keep the
+primitive signatures the same. In any case, JavaScript's destructuring
+makes it pretty enough.</p>
+<p>Aside from code generation, we also need to add the function itself to
+scope so we can look it up later in use. Additionally we need to
+create a copy of the current scope for the body of the function. And
+we'll add the parameter names themselves to the child scope.</p>
+<pre><code class="hljs javascript">class Compiler {
+  ...
+
+  compileDefine([name, params, ...body], destination, scope) {
+    // Add this function to outer scope
+    const safeName = scope.register(name);
+
+    // Copy outer scope so parameter mappings aren&#39;t exposed in outer scope.
+    const childScope = scope.copy();
+
+    const safeParams = params.map((param) =&gt;
+      // Store parameter mapped to associated local
+      childScope.register(param),
+    );
+
+    this.emit(
+      0,
+      `define i32 @${safeName}(${safeParams
+        .map((p) =&gt; `i32 %${p}`)
+        .join(&#39;, &#39;)}) {`,
+    );
+
+    // Pass childScope in for reference when body is compiled.
+    const ret = childScope.symbol();
+    this.compileExpression(body[0], ret, childScope);
+
+    this.emit(1, `ret i32 %${ret}`);
+    this.emit(0, &#39;}\n&#39;);
+  }
+
+  ...
+}
+</code></pre>
+<p>Example:</p>
+<pre><code class="hljs lisp">(def plus (a b) (+ a b))
+</code></pre>
+<h4 id="compileop(op)">compileOp(op)</h4><p>The last function mentioned above will help us expose some useful
+primitives.  This function will take a string builtin operation and
+return a function that can be used to generate code when the operation
+is called.</p>
+<pre><code class="hljs javascript">class Compiler {
+  ...
+
+  compileOp(op) {
+    return ([a, b], destination, scope) =&gt; {
+      const arg1 = scope.symbol();
+      const arg2 = scope.symbol();
+      this.compileExpression(a, arg1, scope);
+      this.compileExpression(b, arg2, scope);
+      this.emit(1, `%${destination} = ${op} i32 %${arg1}, %${arg2}`);
+    };
+  }
+
+  ...
+}
+</code></pre>
+<p>This allows us to add some builtin ops as primitives (even though they
+aren't control-flow modifying).</p>
+<pre><code class="hljs javascript">class Compiler {
+  constructor() {
+    this.outBuffer = [];
+    this.primitiveFunctions = {
+      def: this.compileDefine.bind(this),
+      begin: this.compileBegin.bind(this),
+      &#39;+&#39;: this.compileOp(&#39;add&#39;),
+      &#39;-&#39;: this.compileOp(&#39;sub&#39;),
+      &#39;*&#39;: this.compileOp(&#39;mul&#39;),
+    };
+  }
+
+  ...
+}
+</code></pre>
+<p>Example:</p>
+<pre><code class="hljs lisp">(+ 1 2)
+</code></pre>
+<h3 id="hello-world!">Hello world!</h3><p>Putting it all together, we'll compile this Lisp program:</p>
+<pre><code class="hljs lisp">(def plus-two (a b)
+     (+ a (+ b 2)))
+
+(def main ()
+     (plus-two 3 (plus-two 1 1)))
+</code></pre>
+<p>To get 9.</p>
+<pre><code class="hljs bash">$ node src/ulisp.js tests/function_definition.lisp
+$ ./build/prog
+$ echo $?
+9
+</code></pre>
+<h4 id="generated-code">Generated code</h4><p>The generated LLVM can be found in <code>./build/prog.ll</code>:</p>
+<pre><code class="hljs llvm">define i32 @plus_two(i32 %a, i32 %b) {
+  %sym7 = add i32 %a, 0
+  %sym9 = add i32 %b, 0
+  %sym10 = add i32 2, 0
+  %sym8 = add i32 %sym9, %sym10
+  %sym6 = add i32 %sym7, %sym8
+  ret i32 %sym6
+}
+
+define i32 @main() {
+  %sym6 = add i32 3, 0
+  %sym8 = add i32 1, 0
+  %sym9 = add i32 1, 0
+  %sym7 = call i32 @plus_two(i32 %sym8, i32 %sym9)
+  %sym5 = call i32 @plus_two(i32 %sym6, i32 %sym7)
+  ret i32 %sym5
+}
+</code></pre>
+<p>You can see all these unnecessary <code>add, ... 0</code>
+instructions. But let's look at the x86 assembly that LLVM generates
+in <code>build/prog.s</code>:</p>
+<pre><code class="hljs assembly">...
+
+_plus_two:                              ## @plus_two
+        .cfi_startproc
+## %bb.0:
+                                        ## kill: def $esi killed $esi def $rsi
+                                        ## kill: def $edi killed $edi def $rdi
+        leal    2(%rdi,%rsi), %eax
+        retq
+        .cfi_endproc
+                                        ## -- End function
+...
+</code></pre>
+<p>And we see that LLVM easily optimized the inefficiencies away. :)</p>
+<h3 id="next-up">Next up</h3><ul>
+<li>Compiling conditionals</li>
+<li>Tail call optimization</li>
+<li>Lists and dynamic memory</li>
+<li>Strings?</li>
+<li>Foreign function calls?</li>
+<li>Self-hosting?</li>
+</ul>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">Adding an LLVM backend to ulisp (small Lisp compiler in JavaScript) <a href="https://t.co/VIddKW1r3N">https://t.co/VIddKW1r3N</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1104795606365757442?ref_src=twsrc%5Etfw">March 10, 2019</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+
+      </div>
+      <div class="col-3">
+	<!--
+        <aside>
+          <p>
+            <small>
+              Looking for help on a JavaScript, Go, or Python
+              project?
+            </small>
+          </p>
+          <p>
+            <small>
+              Having trouble maintaining or upgrading
+              a legacy project?
+            </small>
+          </p>
+          <small>
+            <a href="mailto:phil@eatonphil.com">Ask me about my contract services.</a>
+          </small>
+        </aside>
+        -->
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>
