@@ -70,6 +70,10 @@ img {
     max-width: 100%;
 }
 
+footer {
+    margin-top: 50px;
+}
+
 .container {
     width: 650px;
     max-width: 100%;
@@ -79,6 +83,11 @@ img {
     justify-content: space-between;
 }
 
+header .container > div {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 15px;
+}
+
 header .notes {
     font-size: .8rem;
     color: #777;
@@ -86,7 +95,7 @@ header .notes {
 
 header .notes::before {
     display: inline-block;
-    content: '↩';
+    content: '';
     padding-right: 5px;
     font-size: .6rem;
 }
@@ -100,8 +109,8 @@ header .subscribe {
 }
 
 aside {
-    margin: 15px;
     padding: 15px;
+    padding-top: 0;
     background: honeydew;
     border: 1px solid #eee;
 }
@@ -165,7 +174,9 @@ aside p {
 }
 
 .sm-link {
-    padding-right: 5px;
+    display: inline-block;
+    padding: 10px 0;
+    padding-right: 15px;
     color: #333;
 }
 

@@ -1,5 +1,47 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sat, 20 Jun 2020 00:19:44 +0000</lastBuildDate><item><title>Generating a REST API from a database</title><link>http://notes.eatonphil.com/generating-a-rest-api-from-a-database.html</link><description>&lt;p&gt;I recently published an &lt;a href="https://eatonphil.github.io/dbcore/"&gt;alpha version of a code generation tool,
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 22 Jun 2020 00:11:51 +0000</lastBuildDate><item><title>Generating a full-stack application from a database</title><link>http://notes.eatonphil.com/generating-a-full-stack-application-from-a-database.html</link><description>&lt;p&gt;&lt;a href="&amp;quot;https://dbcore.org&amp;quot;"&gt;DBCore&lt;/a&gt; can now generate a TypeScript/React CRUD
+UI that is automatically hooked up to the generated REST API (in Go).&lt;/p&gt;
+&lt;p&gt;The UI has full support for login, viewing (and filtering), editing,
+and creating database entities.&lt;/p&gt;
+&lt;p&gt;PostgreSQL, SQLite and MySQL are supported.&lt;/p&gt;
+&lt;h3 id="how-to-use?"&gt;How to use?&lt;/h3&gt;&lt;p&gt;The goal of this project is primarily to provide as much useful
+boilerplate as possible for full-stack applications. The system is
+probably not sufficient to be an entire application development
+platform. It's currently missing hooks, overrides, and
+per-row/per-table authorization.&lt;/p&gt;
+&lt;p&gt;The UI code generation may be even less useful in the long-term than
+the API because UIs are by necessity very diverse. But it is good not
+to need to build the same browser-side API, authentication, and
+routing logic again now that it's taken care of in code generation.&lt;/p&gt;
+&lt;h3 id="screenshots"&gt;Screenshots&lt;/h3&gt;&lt;p&gt;Here are a few screenshots of the examples/todo application. Every
+page here is auto-generated after reading the database schema. The
+browser application is hooked up to the similarly auto-generated API.&lt;/p&gt;
+&lt;div style="padding-bottom: 15px;"&gt;
+  &lt;small&gt;Sign in&lt;/small&gt;
+  &lt;img style="border: 1px solid #ddd;" src="https://i.imgur.com/1ReEEdf.png"/&gt;
+&lt;/div&gt;
+&lt;div style="padding-bottom: 15px;"&gt;
+  &lt;small&gt;Creating a table entity&lt;/small&gt;
+  &lt;img style="border: 1px solid #ddd;" src="https://i.imgur.com/AiryzjX.png"/&gt;
+&lt;/div&gt;
+&lt;div style="padding-bottom: 15px;"&gt;
+  &lt;small&gt;Viewing all table entities&lt;/small&gt;
+  &lt;img style="border: 1px solid #ddd;" src="https://i.imgur.com/l9jI0LA.png"/&gt;
+&lt;/div&gt;
+&lt;div style="padding-bottom: 15px;"&gt;
+  &lt;small&gt;Filtering table entities&lt;/small&gt;
+  &lt;img style="border: 1px solid #ddd;" src="https://i.imgur.com/J21vQDE.png"/&gt;
+&lt;/div&gt;
+&lt;div style="padding-bottom: 15px;"&gt;
+  &lt;small&gt;Viewing an individual table entity&lt;/small&gt;
+  &lt;img style="border: 1px solid #ddd;" src="https://i.imgur.com/T2VhBFt.png"/&gt;
+&lt;/div&gt;
+&lt;div&gt;
+  &lt;small&gt;Editing a table entity&lt;/small&gt;
+  &lt;img style="border: 1px solid #ddd;" src="https://i.imgur.com/f2sRN1p.png"&gt;
+&lt;/div&gt;&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
+&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;What&amp;#39;s new in DBCore: a TypeScript/React UI generated from your database schema and hooked up to the similarly generated Go REST API.&lt;br&gt;&lt;br&gt;So you can now generate an entire full stack application from your database schema. Screenshots in the post.&lt;a href="https://t.co/BTGRVBsfUR"&gt;https://t.co/BTGRVBsfUR&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1272295312900661250?ref_src=twsrc%5Etfw"&gt;June 14, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/generating-a-full-stack-application-from-a-database.html</guid><pubDate>Sun, 14 Jun 2020 00:00:00 +0000</pubDate></item><item><title>Generating a REST API from a database</title><link>http://notes.eatonphil.com/generating-a-rest-api-from-a-database.html</link><description>&lt;p&gt;I recently published an &lt;a href="https://eatonphil.github.io/dbcore/"&gt;alpha version of a code generation tool,
 DBCore,&lt;/a&gt; that reads a database
 schema from PostgreSQL or MySQL and generates an entire Go API with
 CRUD operations, pagination, filtering, and authentication.&lt;/p&gt;
