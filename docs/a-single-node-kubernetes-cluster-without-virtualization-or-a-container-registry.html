@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>A single-node Kubernetes cluster without virtualization or a container registry | notes.eatonphil.com</title>
+    <meta name="description" content="A single-node Kubernetes cluster without virtualization or a container registry" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>July 25, 2020</h2>
+          <h1>A single-node Kubernetes cluster without virtualization or a container registry</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/kubernetes.html" class="tag">kubernetes</a><a href="/tags/docker.html" class="tag">docker</a><a href="/tags/k3s.html" class="tag">k3s</a><a href="/tags/recipe.html" class="tag">recipe</a><a href="/tags/fedora.html" class="tag">fedora</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>This post is a recipe for setting up a minimal Kubernetes cluster on
+Fedora without requiring virtualization or a container registry. These
+two features make the system cloud-agnostic and the cluster entirely
+self-contained. This setup is primarily useful for simple CI
+environments or application development on Linux. (Docker Desktop has
+better tooling for development on Mac or Windows.)</p>
+<h3 id="getting-kubernetes">Getting Kubernetes</h3><p>The core of this effort is <a href="https://k3s.io/">K3s</a>, a Kubernetes
+distribution that allows us to run on a single node without
+virtualization.</p>
+<p>But first off, <a href="https://docs.docker.com/engine/install/fedora/">install Docker</a>.</p>
+<p>Then install K3s:</p>
+<pre><code class="hljs bash">$ curl -sfL https://get.k3s.io | sh -
+</code></pre>
+<p>It may prompt you to adjust some SELinux policies like so:</p>
+<pre><code class="hljs bash">$ sudo dnf install -y container-selinux selinux-policy-base
+$ sudo rpm -i https://rpm.rancher.io/k3s-selinux-0.1.1-rc1.el7.noarch.rpm
+</code></pre>
+<p>Swap these out with whatever it prompts and retry the K3s install.</p>
+<p>Finally, <a href="https://kubernetes.io/docs/tasks/tools/install-kubectl/">install
+kubectl</a>:</p>
+<pre><code class="hljs bash">$ curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
+</code></pre>
+<p>Now copy the global K3s kubeconfig into <code>~/.kube/config</code>:</p>
+<pre><code class="hljs bash">$ sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+$ sudo chown $USER:$GROUP ~/.kube/config
+</code></pre>
+<p>And enable K3s:</p>
+<pre><code class="hljs bash">$ sudo systemctl enable k3s
+</code></pre>
+<p>If you're on Fedora 31+ you'll need to disable cgroups v2:</p>
+<pre><code class="hljs bash">$ sudo grubby --args=&quot;systemd.unified_cgroup_hierarchy=0&quot; --update-kernel=ALL
+$ sudo reboot
+</code></pre>
+<p>Finally, you can run <code>kubectl</code>:</p>
+<pre><code class="hljs bash">$ kubectl get pods
+No resources found in default namespace.
+</code></pre>
+<h3 id="a-simple-application">A simple application</h3><p>We'll create a small Flask app, containerize it, and write a
+Kubernetes deployment and service config for it.</p>
+<p>We begin with <code>app.py</code>:</p>
+<pre><code class="hljs python">from flask import Flask
+
+app = Flask(__name__)
+
+
+@app.route(&#39;/&#39;)
+def index():
+    return &#39;Hello World, Flask!&#39;
+
+
+if __name__ == &#39;__main__&#39;:
+    app.run(debug=True)
+</code></pre>
+<p>Then a <code>Dockerfile</code>:</p>
+<pre><code class="hljs dockerfile">FROM python:3-slim
+
+RUN pip install flask
+COPY . /app
+
+CMD python3 /app/app.py
+</code></pre>
+<p>Then the deployment in <code>manifest.yaml</code>:</p>
+<pre><code class="hljs yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: helloworld
+spec:
+  selector:
+    matchLabels:
+      name: helloworld
+  template:
+    metadata:
+      labels:
+        name: helloworld
+    spec:
+      containers:
+        - image: helloworld
+          name: helloworld
+</code></pre>
+<h3 id="running-in-kubernetes">Running in Kubernetes</h3><p>First we build, save, and import the image into <code>k3s</code>:</p>
+<pre><code>$ docker build . -t helloworld
+$ docker save helloworld &gt; helloworld.tar
+$ sudo k3s ctr image import helloworld.tar
+$ kubectl apply -f ./manifest.yaml
+$ kubectl port-forward $(kubectl get pods | grep helloworld | cut -d ' ' -f 1) 5000 &gt; log 2&gt;&amp;1 &amp;
+$ curl localhost:5000
+Hello World, Flask
+</code></pre>
+<p>And that's it!</p>
+
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>
