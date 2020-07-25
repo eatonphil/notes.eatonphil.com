@@ -1,0 +1,137 @@
+# A single-node Kubernetes cluster without virtualization or a container registry
+## July 25, 2020
+###### kubernetes,docker,k3s,recipe,fedora
+
+This post is a recipe for setting up a minimal Kubernetes cluster on
+Fedora without requiring virtualization or a container registry. These
+two features make the system cloud-agnostic and the cluster entirely
+self-contained. This setup is primarily useful for simple CI
+environments or application development on Linux. (Docker Desktop has
+better tooling for development on Mac or Windows.)
+
+### Getting Kubernetes
+
+The core of this effort is [K3s](https://k3s.io/), a Kubernetes
+distribution that allows us to run on a single node without
+virtualization.
+
+But first off, [install Docker](https://docs.docker.com/engine/install/fedora/).
+
+Then install K3s:
+
+```bash
+$ curl -sfL https://get.k3s.io | sh -
+```
+
+It may prompt you to adjust some SELinux policies like so:
+
+```bash
+$ sudo dnf install -y container-selinux selinux-policy-base
+$ sudo rpm -i https://rpm.rancher.io/k3s-selinux-0.1.1-rc1.el7.noarch.rpm
+```
+
+Swap these out with whatever it prompts and retry the K3s install.
+
+Finally, [install
+kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/):
+
+```bash
+$ curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
+```
+
+Now copy the global K3s kubeconfig into <code>~/.kube/config</code>:
+
+```bash
+$ sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+$ sudo chown $USER:$GROUP ~/.kube/config
+```
+
+And enable K3s:
+
+```bash
+$ sudo systemctl enable k3s
+```
+
+If you're on Fedora 31+ you'll need to disable cgroups v2:
+
+```bash
+$ sudo grubby --args="systemd.unified_cgroup_hierarchy=0" --update-kernel=ALL
+$ sudo reboot
+```
+
+Finally, you can run <code>kubectl</code>:
+
+```bash
+$ kubectl get pods
+No resources found in default namespace.
+```
+
+### A simple application
+
+We'll create a small Flask app, containerize it, and write a
+Kubernetes deployment and service config for it.
+
+We begin with <code>app.py</code>:
+
+```python
+from flask import Flask
+
+app = Flask(__name__)
+
+
+@app.route('/')
+def index():
+    return 'Hello World, Flask!'
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
+Then a <code>Dockerfile</code>:
+
+```dockerfile
+FROM python:3-slim
+
+RUN pip install flask
+COPY . /app
+
+CMD python3 /app/app.py
+```
+
+Then the deployment in <code>manifest.yaml</code>:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: helloworld
+spec:
+  selector:
+    matchLabels:
+      name: helloworld
+  template:
+    metadata:
+      labels:
+        name: helloworld
+    spec:
+      containers:
+        - image: helloworld
+          name: helloworld
+```
+
+### Running in Kubernetes
+
+First we build, save, and import the image into <code>k3s</code>:
+
+```
+$ docker build . -t helloworld
+$ docker save helloworld > helloworld.tar
+$ sudo k3s ctr image import helloworld.tar
+$ kubectl apply -f ./manifest.yaml
+$ kubectl port-forward $(kubectl get pods | grep helloworld | cut -d ' ' -f 1) 5000 > log 2>&1 &
+$ curl localhost:5000
+Hello World, Flask
+```
+
+And that's it!
