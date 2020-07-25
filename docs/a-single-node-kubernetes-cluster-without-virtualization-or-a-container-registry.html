@@ -22,7 +22,7 @@
           <h2>July 25, 2020</h2>
           <h1>A single-node Kubernetes cluster without virtualization or a container registry</h1>
           <div class="row" style="padding-bottom: 5px">
-            <div class="tags"><a href="/tags/kubernetes.html" class="tag">kubernetes</a><a href="/tags/docker.html" class="tag">docker</a><a href="/tags/k3s.html" class="tag">k3s</a><a href="/tags/recipe.html" class="tag">recipe</a><a href="/tags/fedora.html" class="tag">fedora</a></div>
+            <div class="tags"><a href="/tags/kubernetes.html" class="tag">kubernetes</a><a href="/tags/docker.html" class="tag">docker</a><a href="/tags/k3s.html" class="tag">k3s</a><a href="/tags/fedora.html" class="tag">fedora</a><a href="/tags/recipe.html" class="tag">recipe</a></div>
           </div>
           
           <div>
@@ -47,9 +47,11 @@
         <p>This post is a recipe for setting up a minimal Kubernetes cluster on
 Fedora without requiring virtualization or a container registry. These
 two features make the system cloud-agnostic and the cluster entirely
-self-contained. This setup is primarily useful for simple CI
-environments or application development on Linux. (Docker Desktop has
-better tooling for development on Mac or Windows.)</p>
+self-contained. The post will end with us running a simple Flask app
+from a local container.</p>
+<p>This setup is primarily useful for simple CI environments or
+application development on Linux. (Docker Desktop has better tooling
+for development on Mac or Windows.)</p>
 <h3 id="getting-kubernetes">Getting Kubernetes</h3><p>The core of this effort is <a href="https://k3s.io/">K3s</a>, a Kubernetes
 distribution that allows us to run on a single node without
 virtualization.</p>
@@ -73,7 +75,7 @@ $ sudo chown $USER:$GROUP ~/.kube/config
 <p>And enable K3s:</p>
 <pre><code class="hljs bash">$ sudo systemctl enable k3s
 </code></pre>
-<p>If you're on Fedora 31+ you'll need to disable cgroups v2:</p>
+<p>If you're on Fedora 31+ you'll need to disable cgroups v2 and reboot:</p>
 <pre><code class="hljs bash">$ sudo grubby --args=&quot;systemd.unified_cgroup_hierarchy=0&quot; --update-kernel=ALL
 $ sudo reboot
 </code></pre>
@@ -133,6 +135,7 @@ $ curl localhost:5000
 Hello World, Flask
 </code></pre>
 <p>And that's it!</p>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
 
       </div>
     </div>

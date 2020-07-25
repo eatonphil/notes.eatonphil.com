@@ -1,13 +1,16 @@
 # A single-node Kubernetes cluster without virtualization or a container registry
 ## July 25, 2020
-###### kubernetes,docker,k3s,recipe,fedora
+###### kubernetes,docker,k3s,fedora,recipe
 
 This post is a recipe for setting up a minimal Kubernetes cluster on
 Fedora without requiring virtualization or a container registry. These
 two features make the system cloud-agnostic and the cluster entirely
-self-contained. This setup is primarily useful for simple CI
-environments or application development on Linux. (Docker Desktop has
-better tooling for development on Mac or Windows.)
+self-contained. The post will end with us running a simple Flask app
+from a local container.
+
+This setup is primarily useful for simple CI environments or
+application development on Linux. (Docker Desktop has better tooling
+for development on Mac or Windows.)
 
 ### Getting Kubernetes
 
@@ -52,7 +55,7 @@ And enable K3s:
 $ sudo systemctl enable k3s
 ```
 
-If you're on Fedora 31+ you'll need to disable cgroups v2:
+If you're on Fedora 31+ you'll need to disable cgroups v2 and reboot:
 
 ```bash
 $ sudo grubby --args="systemd.unified_cgroup_hierarchy=0" --update-kernel=ALL
@@ -135,3 +138,9 @@ Hello World, Flask
 ```
 
 And that's it!
+
+#### Comments
+
+Please reply on Twitter with questions or comments.
+
+
