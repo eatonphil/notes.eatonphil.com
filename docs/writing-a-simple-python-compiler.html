@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Writing a simple Python compiler: 1. hello, fibonacci | notes.eatonphil.com</title>
+    <meta name="description" content="Writing a simple Python compiler: 1. hello, fibonacci" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>August 16, 2020</h2>
+          <h1>Writing a simple Python compiler: 1. hello, fibonacci</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/python.html" class="tag">python</a><a href="/tags/compiler.html" class="tag">compiler</a><a href="/tags/cpython.html" class="tag">cpython</a><a href="/tags/c.html" class="tag">c</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>In this post we'll write a Python to C compiler in Python. This is
+especially easy to do since Python has a <a href="https://docs.python.org/3/library/ast.html">builtin parser
+library</a> and because a
+number of <a href="https://docs.python.org/3/c-api/">CPython internals are exposed for extension
+writers</a>.</p>
+<p>By the end of this post, in a few hundred lines of Python, we'll be able to
+compile and run the following program:</p>
+<pre><code class="hljs python">$ cat tests/recursive_fib.py
+def fib(n):
+    if n == 0 or n == 1:
+        return n
+
+    return fib(n - 1) + fib(n - 2)
+
+
+def main():
+    print(fib(40))
+$ python3 pyc.py tests/recursive_fib.py
+$ ./bin/a.out
+102334155
+</code></pre>
+<p>This post implements an extremely small subset of Python and
+<strong>completely gives up on even trying to manage memory</strong>.</p>
+<h3 id="dependencies">Dependencies</h3><p>We'll need Python3, GCC, libpython3, and clang-format.</p>
+<p>On Fedora-based systems:</p>
+<pre><code class="hljs bash">$ sudo dnf install gcc python3-devel clang-format python3
+</code></pre>
+<p>And on Debian-based systems:</p>
+<pre><code class="hljs bash">$ sudo apt install gcc python3-dev clang-format python3
+</code></pre>
+<p class="note">
+  This program will likely work as well on Windows, Mac, FreeBSD,
+  etc. but I haven't gone through the trouble of testing this (or
+  providing custom compiler directives). Pull requests to do so are
+  welcome!
+</p><h3 id="a-hand-written-first-pass">A hand-written first-pass</h3><p>Before we get into the compiler, let's write the fibonacci program by
+hand in C using libpython.</p>
+<p>As described in the <a href="https://docs.python.org/3/extending/embedding.html#very-high-level-embedding">Python embedding
+guide</a>
+we'll need to include libpython and initialize it.</p>
+<pre><code class="hljs c">#define PY_SSIZE_T_CLEAN
+#include &lt;Python.h&gt;
+
+int main(int argc, char *argv[]) {
+  Py_Initialize();
+
+  return 0;
+}
+</code></pre>
+<p>To compile against libpython, we'll use
+<a href="https://helpmanual.io/man1/python3-config/">python3-config</a> installed
+as part of <code>python3-devel</code> to tell us what should be linked
+at each step during compilation.</p>
+<pre><code class="hljs bash">$ gcc -c -o main.o $(python3-config --cflags) main.c
+$ gcc $(python3-config --ldflags) main.o
+$ ./a.out; echo $?
+0
+</code></pre>
+<p>Cool! Now as we think about translating the fibonacci implementation,
+we want to keep everything as Python objects for as long as
+possible. This means passing and receiving
+<a href="https://docs.python.org/3/c-api/object.html">PyObject*</a> to and from
+all functions, and converting all C integers to
+<a href="https://docs.python.org/3/c-api/long.html">PyLong</a>, a "subtype" of
+<code>PyObject*</code>. You can imagine that everything in Python is
+an <code>object</code> until you operate on it.</p>
+<p>&lt;p class="note&gt;
+  For more information on objects in Python, check out
+  the <a href="https://docs.python.org/3/reference/datamodel.html">Data
+  model</a> page in Python docs.
+&lt;/p&gt;</p>
+<p>To map a C integer to a <code>PyLong*</code> we use
+<a href="https://docs.python.org/3/c-api/long.html#c.PyLong_FromLong">PyLong_FromLong</a>. To
+map in reverse, we use
+<a href="https://docs.python.org/3/c-api/long.html#c.PyLong_AsLong">PyLong_AsLong</a>.</p>
+<p>To compare two <code>PyObject*</code>s we can use
+<a href="https://docs.python.org/3/c-api/object.html#c.PyObject_RichCompareBool">PyObject_RichCompareBool</a>
+which will handle the comparison regardless of the type of the two
+parameters. Without this helper we'd have to write complex checks to
+make sure that the two sides are the same and if they are, unwrap them
+into their underlying C value and compare the C value.</p>
+<p>We can use
+<a href="https://docs.python.org/3/c-api/number.html#c.PyNumber_Add">PyNumber_Add</a>
+and
+<a href="https://docs.python.org/3/c-api/number.html#c.PyNumber_Subtract">PyNumber_Subtract</a>
+for basic arithmetic, but there are many similar helpers available to
+us for operations down the line.</p>
+<p>Now we can write a translation:</p>
+<pre><code class="hljs c">#define PY_SSIZE_T_CLEAN
+#include &lt;Python.h&gt;
+
+PyObject* fib(PyObject* n) {
+  PyObject* zero = PyLong_FromLong(0);
+  PyObject* one = PyLong_FromLong(1);
+  if (PyObject_RichCompareBool(n, zero, Py_EQ) || PyObject_RichCompareBool(n, one, Py_EQ)) {
+    return n;
+  }
+
+  PyObject* left = fib(PyNumber_Subtract(n, one));
+
+  PyObject* two = PyLong_FromLong(2);
+  PyObject* right = fib(PyNumber_Subtract(n, two));
+
+  return PyNumber_Add(left, right);
+}
+
+int main(int argc, char *argv[]) {
+  Py_Initialize();
+
+  PyObject* res = fib(PyLong_FromLong(7)); // Should be 13
+
+  return PyLong_AsLong(res);
+}
+</code></pre>
+<p>Compile and run it:</p>
+<pre><code class="hljs bash">$ gcc -c -o main.o $(python3-config --cflags) main.c
+$ gcc $(python3-config --ldflags) main.o
+$ ./a.out; echo $?
+13
+</code></pre>
+<p>That's great! But we cheated in one place. We assumed that the input
+to the <code>fib</code> function was an integer, and we propagated
+that assumption everywhere we wrote <code>PyNumber_*</code>
+operations. In the compiler we'll need to check that both arguments
+are an integer before we call a numeric helper, otherwise we may need
+to call a string concatenation helper or something else entirely.</p>
+<h3 id="compiler-architecture">Compiler Architecture</h3><p>We'll break the code into four major parts:</p>
+<ol>
+<li><code>libpyc.c</code>: helper functions for generated code</li>
+<li><code>pyc/context.py</code>: utilities for scope and writing code in memory</li>
+<li><code>pyc/codegenerator.py</code>: for generating C code from a Python AST</li>
+<li><code>pyc/__main__.py</code>: the entrypoint</li>
+</ol>
+<p class="note">
+  When I'm writing a new compiler using an existing parser I almost
+  always start with the entrypoint and code generator so I can explore
+  the AST. However, it's easiest to explain the code if we start with
+  the utilities first.
+</p><h3 id="libpyc.c">libpyc.c</h3><p>This C file will contain three helper functions for safely adding,
+subtracting, and printing. We'll only support integers for now but
+this structure sets us up for supporting more types later on.</p>
+<p>We'll use
+<a href="https://docs.python.org/3/c-api/long.html#c.PyLong_Check">PyLong_Check</a>
+before calling number-specific methods.</p>
+<p>This file will be concatenated to the top of the generated C file.</p>
+<pre><code class="hljs c">#define PY_SSIZE_T_CLEAN
+#include &lt;Python.h&gt;
+
+inline PyObject* PYC_Add(PyObject* l, PyObject* r) {
+  // TODO: allow __add__ override
+
+  // Includes ints and bools
+  if (PyLong_Check(l) &amp;&amp; PyLong_Check(r)) {
+    return PyNumber_Add(l, r);
+  }
+
+  // TODO: handle str, etc.
+
+  // TODO: throw exception
+  return NULL;
+}
+
+inline PyObject* PYC_Sub(PyObject* l, PyObject* r) {
+  // TODO: allow __add__ override
+
+  // Includes ints and bools
+  if (PyLong_Check(l) &amp;&amp; PyLong_Check(r)) {
+    return PyNumber_Subtract(l, r);
+  }
+
+  // TODO: handle str, etc.
+
+  // TODO: throw exception
+  return NULL;
+}
+
+inline PyObject* PYC_Print(PyObject* o) {
+  PyObject_Print(o, stdout, Py_PRINT_RAW);
+  printf(&quot;\n&quot;);
+  return Py_None;
+}
+</code></pre>
+<p>That's it! We could have generated these as strings in Python but it
+gets hairy to do so. We can take advantage of our text editor if these
+helpers are in a dedicated C file. And since we've marked them all
+<code>inline</code>, there's no runtime cost to doing so.</p>
+<h3 id="pyc/context.py">pyc/context.py</h3><p>This file will contain a <code>Context</code> class for managing
+identifiers in scope and for proxying to a <code>Writer</code> class
+that contains helpers for writing lines of C code.</p>
+<p>We'll have two instances of the <code>Writer</code> class in
+<code>Context</code> so that we can write to a body (or
+current/primary) region and an initialization region.</p>
+<p>The initialization region is necessary in case there are any variables
+declared at the top-level. We can't initialize these variables in C
+outside of a function since every <code>PyObject*</code> must be
+created after calling <code>Py_Initialize</code>. This section will be
+written into our C <code>main</code> function before we enter a
+compiled Python <code>main</code> function.</p>
+<pre><code class="hljs python">import copy
+
+
+class Writer():
+    content = &quot;&quot;
+
+    def write(self, exp: str, indent: int = 0):
+        self.content += (&quot;  &quot; * indent) + exp
+
+    def writeln(self, stmt: str, indent: int = 0):
+        self.write(stmt + &quot;\n&quot;, indent)
+
+    def write_statement(self, stmt: str, indent: int = 0):
+        self.writeln(stmt + &quot;;&quot;, indent)
+
+
+class Context():
+    initializations = Writer()
+    body = Writer()
+    indentation = 0
+
+    scope = 0
+    ret = None
+    namings = {}
+    counter = -1
+
+    def __getattr__(self, name: str) -&gt; object:
+        # Helpers to avoid passing in self.indentation every time
+        outputs = [initializations&quot;, &quot;body&quot;]
+        for output in outputs:
+            if name.startswith(output):
+                return lambda s, i=None: getattr(getattr(self, output), name[len(output)+1:])(s, i if i is not None else self.indentation)
+
+        return object.__getattr__(self, name)
+
+    def get_local(self, source_name: str) -&gt; dict:
+        return self.namings[source_name]
+
+    def register_global(self, name: str, loc: str):
+        self.namings[name] = {
+            &quot;name&quot;: loc,
+            &quot;scope&quot;: 0,
+        }
+
+    def register_local(self, local: str = &quot;tmp&quot;) -&gt; str:
+        self.counter += 1
+        self.namings[local] = {
+            &quot;name&quot;: f&quot;{local}_{self.counter}&quot;,
+            # naming dictionary is copied, so we need to capture scope
+            # at declaration
+            &quot;scope&quot;: self.scope,
+        }
+        return self.namings[local][&quot;name&quot;]
+
+    def copy(self):
+        new = copy.copy(self)
+        # For some reason copy.deepcopy doesn&#39;t do this
+        new.namings = dict(new.namings)
+        return new
+
+    def at_toplevel(self):
+        return self.scope == 0
+</code></pre>
+<p>This is all pretty boring boilerplate. Let's move on.</p>
+<h3 id="pyc/<strong>main</strong>.py">pyc/<strong>main</strong>.py</h3><p>The entrypoint is responsible for reading source code, parsing it,
+calling the code generator, writing the source code to a C file, and
+compiling it.</p>
+
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

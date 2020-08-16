@@ -1,0 +1,329 @@
+# Writing a simple Python compiler: 1. hello, fibonacci
+## August 16, 2020
+###### python,compiler,cpython,c
+
+In this post we'll write a Python to C compiler in Python. This is
+especially easy to do since Python has a [builtin parser
+library](https://docs.python.org/3/library/ast.html) and because a
+number of [CPython internals are exposed for extension
+writers](https://docs.python.org/3/c-api/).
+
+By the end of this post, in a few hundred lines of Python, we'll be able to
+compile and run the following program:
+
+```python
+$ cat tests/recursive_fib.py
+def fib(n):
+    if n == 0 or n == 1:
+        return n
+
+    return fib(n - 1) + fib(n - 2)
+
+
+def main():
+    print(fib(40))
+$ python3 pyc.py tests/recursive_fib.py
+$ ./bin/a.out
+102334155
+```
+
+This post implements an extremely small subset of Python and
+**completely gives up on even trying to manage memory**.
+
+### Dependencies
+
+We'll need Python3, GCC, libpython3, and clang-format.
+
+On Fedora-based systems:
+
+```bash
+$ sudo dnf install gcc python3-devel clang-format python3
+```
+
+And on Debian-based systems:
+
+```bash
+$ sudo apt install gcc python3-dev clang-format python3
+```
+
+<p class="note">
+  This program will likely work as well on Windows, Mac, FreeBSD,
+  etc. but I haven't gone through the trouble of testing this (or
+  providing custom compiler directives). Pull requests to do so are
+  welcome!
+</p>
+
+### A hand-written first-pass
+
+Before we get into the compiler, let's write the fibonacci program by
+hand in C using libpython.
+
+As described in the [Python embedding
+guide](https://docs.python.org/3/extending/embedding.html#very-high-level-embedding)
+we'll need to include libpython and initialize it.
+
+```c
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+
+int main(int argc, char *argv[]) {
+  Py_Initialize();
+
+  return 0;
+}
+```
+
+To compile against libpython, we'll use
+[python3-config](https://helpmanual.io/man1/python3-config/) installed
+as part of <code>python3-devel</code> to tell us what should be linked
+at each step during compilation.
+
+```bash
+$ gcc -c -o main.o $(python3-config --cflags) main.c
+$ gcc $(python3-config --ldflags) main.o
+$ ./a.out; echo $?
+0
+```
+
+Cool! Now as we think about translating the fibonacci implementation,
+we want to keep everything as Python objects for as long as
+possible. This means passing and receiving
+[PyObject*](https://docs.python.org/3/c-api/object.html) to and from
+all functions, and converting all C integers to
+[PyLong](https://docs.python.org/3/c-api/long.html), a "subtype" of
+<code>PyObject*</code>. You can imagine that everything in Python is
+an <code>object</code> until you operate on it.
+
+<p class="note>
+  For more information on objects in Python, check out
+  the <a href="https://docs.python.org/3/reference/datamodel.html">Data
+  model</a> page in Python docs.
+</p>
+
+To map a C integer to a <code>PyLong*</code> we use
+[PyLong_FromLong](https://docs.python.org/3/c-api/long.html#c.PyLong_FromLong). To
+map in reverse, we use
+[PyLong_AsLong](https://docs.python.org/3/c-api/long.html#c.PyLong_AsLong).
+
+To compare two <code>PyObject*</code>s we can use
+[PyObject_RichCompareBool](https://docs.python.org/3/c-api/object.html#c.PyObject_RichCompareBool)
+which will handle the comparison regardless of the type of the two
+parameters. Without this helper we'd have to write complex checks to
+make sure that the two sides are the same and if they are, unwrap them
+into their underlying C value and compare the C value.
+
+We can use
+[PyNumber_Add](https://docs.python.org/3/c-api/number.html#c.PyNumber_Add)
+and
+[PyNumber_Subtract](https://docs.python.org/3/c-api/number.html#c.PyNumber_Subtract)
+for basic arithmetic, but there are many similar helpers available to
+us for operations down the line.
+
+Now we can write a translation:
+
+```c
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+
+PyObject* fib(PyObject* n) {
+  PyObject* zero = PyLong_FromLong(0);
+  PyObject* one = PyLong_FromLong(1);
+  if (PyObject_RichCompareBool(n, zero, Py_EQ) || PyObject_RichCompareBool(n, one, Py_EQ)) {
+    return n;
+  }
+  
+  PyObject* left = fib(PyNumber_Subtract(n, one));
+  
+  PyObject* two = PyLong_FromLong(2);
+  PyObject* right = fib(PyNumber_Subtract(n, two));
+  
+  return PyNumber_Add(left, right);
+}
+
+int main(int argc, char *argv[]) {
+  Py_Initialize();
+  
+  PyObject* res = fib(PyLong_FromLong(7)); // Should be 13
+
+  return PyLong_AsLong(res);
+}
+```
+
+Compile and run it:
+
+```bash
+$ gcc -c -o main.o $(python3-config --cflags) main.c
+$ gcc $(python3-config --ldflags) main.o
+$ ./a.out; echo $?
+13
+```
+
+That's great! But we cheated in one place. We assumed that the input
+to the <code>fib</code> function was an integer, and we propagated
+that assumption everywhere we wrote <code>PyNumber_*</code>
+operations. In the compiler we'll need to check that both arguments
+are an integer before we call a numeric helper, otherwise we may need
+to call a string concatenation helper or something else entirely.
+
+### Compiler Architecture
+
+We'll break the code into four major parts:
+
+1. <code>libpyc.c</code>: helper functions for generated code
+1. <code>pyc/context.py</code>: utilities for scope and writing code in memory
+1. <code>pyc/codegenerator.py</code>: for generating C code from a Python AST
+1. <code>pyc/__main__.py</code>: the entrypoint
+
+<p class="note">
+  When I'm writing a new compiler using an existing parser I almost
+  always start with the entrypoint and code generator so I can explore
+  the AST. However, it's easiest to explain the code if we start with
+  the utilities first.
+</p>
+
+### libpyc.c
+
+This C file will contain three helper functions for safely adding,
+subtracting, and printing. We'll only support integers for now but
+this structure sets us up for supporting more types later on.
+
+We'll use
+[PyLong_Check](https://docs.python.org/3/c-api/long.html#c.PyLong_Check)
+before calling number-specific methods.
+
+This file will be concatenated to the top of the generated C file.
+
+```c
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+
+inline PyObject* PYC_Add(PyObject* l, PyObject* r) {
+  // TODO: allow __add__ override
+
+  // Includes ints and bools
+  if (PyLong_Check(l) && PyLong_Check(r)) {
+    return PyNumber_Add(l, r);
+  }
+
+  // TODO: handle str, etc.
+
+  // TODO: throw exception
+  return NULL;
+}
+
+inline PyObject* PYC_Sub(PyObject* l, PyObject* r) {
+  // TODO: allow __add__ override
+
+  // Includes ints and bools
+  if (PyLong_Check(l) && PyLong_Check(r)) {
+    return PyNumber_Subtract(l, r);
+  }
+
+  // TODO: handle str, etc.
+
+  // TODO: throw exception
+  return NULL;
+}
+
+inline PyObject* PYC_Print(PyObject* o) {
+  PyObject_Print(o, stdout, Py_PRINT_RAW);
+  printf("\n");
+  return Py_None;
+}
+```
+
+That's it! We could have generated these as strings in Python but it
+gets hairy to do so. We can take advantage of our text editor if these
+helpers are in a dedicated C file. And since we've marked them all
+<code>inline</code>, there's no runtime cost to doing so.
+
+### pyc/context.py
+
+This file will contain a <code>Context</code> class for managing
+identifiers in scope and for proxying to a <code>Writer</code> class
+that contains helpers for writing lines of C code.
+
+We'll have two instances of the <code>Writer</code> class in
+<code>Context</code> so that we can write to a body (or
+current/primary) region and an initialization region.
+
+The initialization region is necessary in case there are any variables
+declared at the top-level. We can't initialize these variables in C
+outside of a function since every <code>PyObject*</code> must be
+created after calling <code>Py_Initialize</code>. This section will be
+written into our C <code>main</code> function before we enter a
+compiled Python <code>main</code> function.
+
+```python
+import copy
+
+
+class Writer():
+    content = ""
+
+    def write(self, exp: str, indent: int = 0):
+        self.content += ("  " * indent) + exp
+
+    def writeln(self, stmt: str, indent: int = 0):
+        self.write(stmt + "\n", indent)
+
+    def write_statement(self, stmt: str, indent: int = 0):
+        self.writeln(stmt + ";", indent)
+
+
+class Context():
+    initializations = Writer()
+    body = Writer()
+    indentation = 0
+
+    scope = 0
+    ret = None
+    namings = {}
+    counter = -1
+
+    def __getattr__(self, name: str) -> object:
+        # Helpers to avoid passing in self.indentation every time
+        outputs = [initializations", "body"]
+        for output in outputs:
+            if name.startswith(output):
+                return lambda s, i=None: getattr(getattr(self, output), name[len(output)+1:])(s, i if i is not None else self.indentation)
+
+        return object.__getattr__(self, name)
+
+    def get_local(self, source_name: str) -> dict:
+        return self.namings[source_name]
+
+    def register_global(self, name: str, loc: str):
+        self.namings[name] = {
+            "name": loc,
+            "scope": 0,
+        }
+
+    def register_local(self, local: str = "tmp") -> str:
+        self.counter += 1
+        self.namings[local] = {
+            "name": f"{local}_{self.counter}",
+            # naming dictionary is copied, so we need to capture scope
+            # at declaration
+            "scope": self.scope,
+        }
+        return self.namings[local]["name"]
+
+    def copy(self):
+        new = copy.copy(self)
+        # For some reason copy.deepcopy doesn't do this
+        new.namings = dict(new.namings)
+        return new
+
+    def at_toplevel(self):
+        return self.scope == 0
+```
+
+This is all pretty boring boilerplate. Let's move on.
+
+### pyc/__main__.py
+
+The entrypoint is responsible for reading source code, parsing it,
+calling the code generator, writing the source code to a C file, and
+compiling it.
+

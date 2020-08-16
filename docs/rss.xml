@@ -1,5 +1,270 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sat, 25 Jul 2020 23:12:52 +0000</lastBuildDate><item><title>A single-node Kubernetes cluster without virtualization or a container registry</title><link>http://notes.eatonphil.com/a-single-node-kubernetes-cluster-without-virtualization-or-a-container-registry.html</link><description>&lt;p&gt;This post is a recipe for setting up a minimal Kubernetes cluster on
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 16 Aug 2020 21:46:36 +0000</lastBuildDate><item><title>Writing a simple Python compiler: 1. hello, fibonacci</title><link>http://notes.eatonphil.com/writing-a-simple-python-compiler.html</link><description>&lt;p&gt;In this post we'll write a Python to C compiler in Python. This is
+especially easy to do since Python has a &lt;a href="https://docs.python.org/3/library/ast.html"&gt;builtin parser
+library&lt;/a&gt; and because a
+number of &lt;a href="https://docs.python.org/3/c-api/"&gt;CPython internals are exposed for extension
+writers&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;By the end of this post, in a few hundred lines of Python, we'll be able to
+compile and run the following program:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;$ cat tests/recursive_fib.py
+def fib(n):
+    if n == 0 or n == 1:
+        return n
+
+    return fib(n - 1) + fib(n - 2)
+
+
+def main():
+    print(fib(40))
+$ python3 pyc.py tests/recursive_fib.py
+$ ./bin/a.out
+102334155
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This post implements an extremely small subset of Python and
+&lt;strong&gt;completely gives up on even trying to manage memory&lt;/strong&gt;.&lt;/p&gt;
+&lt;h3 id="dependencies"&gt;Dependencies&lt;/h3&gt;&lt;p&gt;We'll need Python3, GCC, libpython3, and clang-format.&lt;/p&gt;
+&lt;p&gt;On Fedora-based systems:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ sudo dnf install gcc python3-devel clang-format python3
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And on Debian-based systems:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ sudo apt install gcc python3-dev clang-format python3
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p class="note"&gt;
+  This program will likely work as well on Windows, Mac, FreeBSD,
+  etc. but I haven't gone through the trouble of testing this (or
+  providing custom compiler directives). Pull requests to do so are
+  welcome!
+&lt;/p&gt;&lt;h3 id="a-hand-written-first-pass"&gt;A hand-written first-pass&lt;/h3&gt;&lt;p&gt;Before we get into the compiler, let's write the fibonacci program by
+hand in C using libpython.&lt;/p&gt;
+&lt;p&gt;As described in the &lt;a href="https://docs.python.org/3/extending/embedding.html#very-high-level-embedding"&gt;Python embedding
+guide&lt;/a&gt;
+we'll need to include libpython and initialize it.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs c"&gt;#define PY_SSIZE_T_CLEAN
+#include &amp;lt;Python.h&amp;gt;
+
+int main(int argc, char *argv[]) {
+  Py_Initialize();
+
+  return 0;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;To compile against libpython, we'll use
+&lt;a href="https://helpmanual.io/man1/python3-config/"&gt;python3-config&lt;/a&gt; installed
+as part of &lt;code&gt;python3-devel&lt;/code&gt; to tell us what should be linked
+at each step during compilation.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ gcc -c -o main.o $(python3-config --cflags) main.c
+$ gcc $(python3-config --ldflags) main.o
+$ ./a.out; echo $?
+0
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Cool! Now as we think about translating the fibonacci implementation,
+we want to keep everything as Python objects for as long as
+possible. This means passing and receiving
+&lt;a href="https://docs.python.org/3/c-api/object.html"&gt;PyObject*&lt;/a&gt; to and from
+all functions, and converting all C integers to
+&lt;a href="https://docs.python.org/3/c-api/long.html"&gt;PyLong&lt;/a&gt;, a "subtype" of
+&lt;code&gt;PyObject*&lt;/code&gt;. You can imagine that everything in Python is
+an &lt;code&gt;object&lt;/code&gt; until you operate on it.&lt;/p&gt;
+&lt;p&gt;&amp;lt;p class="note&amp;gt;
+  For more information on objects in Python, check out
+  the &lt;a href="https://docs.python.org/3/reference/datamodel.html"&gt;Data
+  model&lt;/a&gt; page in Python docs.
+&amp;lt;/p&amp;gt;&lt;/p&gt;
+&lt;p&gt;To map a C integer to a &lt;code&gt;PyLong*&lt;/code&gt; we use
+&lt;a href="https://docs.python.org/3/c-api/long.html#c.PyLong_FromLong"&gt;PyLong_FromLong&lt;/a&gt;. To
+map in reverse, we use
+&lt;a href="https://docs.python.org/3/c-api/long.html#c.PyLong_AsLong"&gt;PyLong_AsLong&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;To compare two &lt;code&gt;PyObject*&lt;/code&gt;s we can use
+&lt;a href="https://docs.python.org/3/c-api/object.html#c.PyObject_RichCompareBool"&gt;PyObject_RichCompareBool&lt;/a&gt;
+which will handle the comparison regardless of the type of the two
+parameters. Without this helper we'd have to write complex checks to
+make sure that the two sides are the same and if they are, unwrap them
+into their underlying C value and compare the C value.&lt;/p&gt;
+&lt;p&gt;We can use
+&lt;a href="https://docs.python.org/3/c-api/number.html#c.PyNumber_Add"&gt;PyNumber_Add&lt;/a&gt;
+and
+&lt;a href="https://docs.python.org/3/c-api/number.html#c.PyNumber_Subtract"&gt;PyNumber_Subtract&lt;/a&gt;
+for basic arithmetic, but there are many similar helpers available to
+us for operations down the line.&lt;/p&gt;
+&lt;p&gt;Now we can write a translation:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs c"&gt;#define PY_SSIZE_T_CLEAN
+#include &amp;lt;Python.h&amp;gt;
+
+PyObject* fib(PyObject* n) {
+  PyObject* zero = PyLong_FromLong(0);
+  PyObject* one = PyLong_FromLong(1);
+  if (PyObject_RichCompareBool(n, zero, Py_EQ) || PyObject_RichCompareBool(n, one, Py_EQ)) {
+    return n;
+  }
+
+  PyObject* left = fib(PyNumber_Subtract(n, one));
+
+  PyObject* two = PyLong_FromLong(2);
+  PyObject* right = fib(PyNumber_Subtract(n, two));
+
+  return PyNumber_Add(left, right);
+}
+
+int main(int argc, char *argv[]) {
+  Py_Initialize();
+
+  PyObject* res = fib(PyLong_FromLong(7)); // Should be 13
+
+  return PyLong_AsLong(res);
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Compile and run it:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ gcc -c -o main.o $(python3-config --cflags) main.c
+$ gcc $(python3-config --ldflags) main.o
+$ ./a.out; echo $?
+13
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That's great! But we cheated in one place. We assumed that the input
+to the &lt;code&gt;fib&lt;/code&gt; function was an integer, and we propagated
+that assumption everywhere we wrote &lt;code&gt;PyNumber_*&lt;/code&gt;
+operations. In the compiler we'll need to check that both arguments
+are an integer before we call a numeric helper, otherwise we may need
+to call a string concatenation helper or something else entirely.&lt;/p&gt;
+&lt;h3 id="compiler-architecture"&gt;Compiler Architecture&lt;/h3&gt;&lt;p&gt;We'll break the code into four major parts:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;libpyc.c&lt;/code&gt;: helper functions for generated code&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;pyc/context.py&lt;/code&gt;: utilities for scope and writing code in memory&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;pyc/codegenerator.py&lt;/code&gt;: for generating C code from a Python AST&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;pyc/__main__.py&lt;/code&gt;: the entrypoint&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p class="note"&gt;
+  When I'm writing a new compiler using an existing parser I almost
+  always start with the entrypoint and code generator so I can explore
+  the AST. However, it's easiest to explain the code if we start with
+  the utilities first.
+&lt;/p&gt;&lt;h3 id="libpyc.c"&gt;libpyc.c&lt;/h3&gt;&lt;p&gt;This C file will contain three helper functions for safely adding,
+subtracting, and printing. We'll only support integers for now but
+this structure sets us up for supporting more types later on.&lt;/p&gt;
+&lt;p&gt;We'll use
+&lt;a href="https://docs.python.org/3/c-api/long.html#c.PyLong_Check"&gt;PyLong_Check&lt;/a&gt;
+before calling number-specific methods.&lt;/p&gt;
+&lt;p&gt;This file will be concatenated to the top of the generated C file.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs c"&gt;#define PY_SSIZE_T_CLEAN
+#include &amp;lt;Python.h&amp;gt;
+
+inline PyObject* PYC_Add(PyObject* l, PyObject* r) {
+  // TODO: allow __add__ override
+
+  // Includes ints and bools
+  if (PyLong_Check(l) &amp;amp;&amp;amp; PyLong_Check(r)) {
+    return PyNumber_Add(l, r);
+  }
+
+  // TODO: handle str, etc.
+
+  // TODO: throw exception
+  return NULL;
+}
+
+inline PyObject* PYC_Sub(PyObject* l, PyObject* r) {
+  // TODO: allow __add__ override
+
+  // Includes ints and bools
+  if (PyLong_Check(l) &amp;amp;&amp;amp; PyLong_Check(r)) {
+    return PyNumber_Subtract(l, r);
+  }
+
+  // TODO: handle str, etc.
+
+  // TODO: throw exception
+  return NULL;
+}
+
+inline PyObject* PYC_Print(PyObject* o) {
+  PyObject_Print(o, stdout, Py_PRINT_RAW);
+  printf(&amp;quot;\n&amp;quot;);
+  return Py_None;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That's it! We could have generated these as strings in Python but it
+gets hairy to do so. We can take advantage of our text editor if these
+helpers are in a dedicated C file. And since we've marked them all
+&lt;code&gt;inline&lt;/code&gt;, there's no runtime cost to doing so.&lt;/p&gt;
+&lt;h3 id="pyc/context.py"&gt;pyc/context.py&lt;/h3&gt;&lt;p&gt;This file will contain a &lt;code&gt;Context&lt;/code&gt; class for managing
+identifiers in scope and for proxying to a &lt;code&gt;Writer&lt;/code&gt; class
+that contains helpers for writing lines of C code.&lt;/p&gt;
+&lt;p&gt;We'll have two instances of the &lt;code&gt;Writer&lt;/code&gt; class in
+&lt;code&gt;Context&lt;/code&gt; so that we can write to a body (or
+current/primary) region and an initialization region.&lt;/p&gt;
+&lt;p&gt;The initialization region is necessary in case there are any variables
+declared at the top-level. We can't initialize these variables in C
+outside of a function since every &lt;code&gt;PyObject*&lt;/code&gt; must be
+created after calling &lt;code&gt;Py_Initialize&lt;/code&gt;. This section will be
+written into our C &lt;code&gt;main&lt;/code&gt; function before we enter a
+compiled Python &lt;code&gt;main&lt;/code&gt; function.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;import copy
+
+
+class Writer():
+    content = &amp;quot;&amp;quot;
+
+    def write(self, exp: str, indent: int = 0):
+        self.content += (&amp;quot;  &amp;quot; * indent) + exp
+
+    def writeln(self, stmt: str, indent: int = 0):
+        self.write(stmt + &amp;quot;\n&amp;quot;, indent)
+
+    def write_statement(self, stmt: str, indent: int = 0):
+        self.writeln(stmt + &amp;quot;;&amp;quot;, indent)
+
+
+class Context():
+    initializations = Writer()
+    body = Writer()
+    indentation = 0
+
+    scope = 0
+    ret = None
+    namings = {}
+    counter = -1
+
+    def __getattr__(self, name: str) -&amp;gt; object:
+        # Helpers to avoid passing in self.indentation every time
+        outputs = [initializations&amp;quot;, &amp;quot;body&amp;quot;]
+        for output in outputs:
+            if name.startswith(output):
+                return lambda s, i=None: getattr(getattr(self, output), name[len(output)+1:])(s, i if i is not None else self.indentation)
+
+        return object.__getattr__(self, name)
+
+    def get_local(self, source_name: str) -&amp;gt; dict:
+        return self.namings[source_name]
+
+    def register_global(self, name: str, loc: str):
+        self.namings[name] = {
+            &amp;quot;name&amp;quot;: loc,
+            &amp;quot;scope&amp;quot;: 0,
+        }
+
+    def register_local(self, local: str = &amp;quot;tmp&amp;quot;) -&amp;gt; str:
+        self.counter += 1
+        self.namings[local] = {
+            &amp;quot;name&amp;quot;: f&amp;quot;{local}_{self.counter}&amp;quot;,
+            # naming dictionary is copied, so we need to capture scope
+            # at declaration
+            &amp;quot;scope&amp;quot;: self.scope,
+        }
+        return self.namings[local][&amp;quot;name&amp;quot;]
+
+    def copy(self):
+        new = copy.copy(self)
+        # For some reason copy.deepcopy doesn&amp;#39;t do this
+        new.namings = dict(new.namings)
+        return new
+
+    def at_toplevel(self):
+        return self.scope == 0
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This is all pretty boring boilerplate. Let's move on.&lt;/p&gt;
+&lt;h3 id="pyc/&lt;strong&gt;main&lt;/strong&gt;.py"&gt;pyc/&lt;strong&gt;main&lt;/strong&gt;.py&lt;/h3&gt;&lt;p&gt;The entrypoint is responsible for reading source code, parsing it,
+calling the code generator, writing the source code to a C file, and
+compiling it.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/writing-a-simple-python-compiler.html</guid><pubDate>Sun, 16 Aug 2020 00:00:00 +0000</pubDate></item><item><title>A single-node Kubernetes cluster without virtualization or a container registry</title><link>http://notes.eatonphil.com/a-single-node-kubernetes-cluster-without-virtualization-or-a-container-registry.html</link><description>&lt;p&gt;This post is a recipe for setting up a minimal Kubernetes cluster on
 Fedora without requiring virtualization or a container registry. These
 two features make the system cloud-agnostic and the cluster entirely
 self-contained. The post will end with us running a simple Flask app
