@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 16 Aug 2020 21:46:36 +0000</lastBuildDate><item><title>Writing a simple Python compiler: 1. hello, fibonacci</title><link>http://notes.eatonphil.com/writing-a-simple-python-compiler.html</link><description>&lt;p&gt;In this post we'll write a Python to C compiler in Python. This is
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 16 Aug 2020 23:00:33 +0000</lastBuildDate><item><title>Writing a simple Python compiler: 1. hello, fibonacci</title><link>http://notes.eatonphil.com/writing-a-simple-python-compiler.html</link><description>&lt;p&gt;In this post we'll write a Python to C compiler in Python. This is
 especially easy to do since Python has a &lt;a href="https://docs.python.org/3/library/ast.html"&gt;builtin parser
 library&lt;/a&gt; and because a
 number of &lt;a href="https://docs.python.org/3/c-api/"&gt;CPython internals are exposed for extension
@@ -16,12 +16,15 @@ def fib(n):
 
 def main():
     print(fib(40))
-$ python3 pyc.py tests/recursive_fib.py
+$ python3 pyc tests/recursive_fib.py
 $ ./bin/a.out
 102334155
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;This post implements an extremely small subset of Python and
-&lt;strong&gt;completely gives up on even trying to manage memory&lt;/strong&gt;.&lt;/p&gt;
+&lt;strong&gt;completely gives up on even trying to manage memory&lt;/strong&gt; because I
+cannot fathom manual reference counting. Maybe some day I'll find a
+way to swap in an easy GC like Boehm.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://github.com/eatonphil/pyc"&gt;Source code for this project is available on Github.&lt;/a&gt;&lt;/p&gt;
 &lt;h3 id="dependencies"&gt;Dependencies&lt;/h3&gt;&lt;p&gt;We'll need Python3, GCC, libpython3, and clang-format.&lt;/p&gt;
 &lt;p&gt;On Fedora-based systems:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ sudo dnf install gcc python3-devel clang-format python3
@@ -32,13 +35,13 @@ $ ./bin/a.out
 &lt;p class="note"&gt;
   This program will likely work as well on Windows, Mac, FreeBSD,
   etc. but I haven't gone through the trouble of testing this (or
-  providing custom compiler directives). Pull requests to do so are
-  welcome!
+  providing custom compiler directives). Pull requests welcome!
 &lt;/p&gt;&lt;h3 id="a-hand-written-first-pass"&gt;A hand-written first-pass&lt;/h3&gt;&lt;p&gt;Before we get into the compiler, let's write the fibonacci program by
 hand in C using libpython.&lt;/p&gt;
 &lt;p&gt;As described in the &lt;a href="https://docs.python.org/3/extending/embedding.html#very-high-level-embedding"&gt;Python embedding
 guide&lt;/a&gt;
-we'll need to include libpython and initialize it.&lt;/p&gt;
+we'll need to include libpython and initialize it in
+our &lt;code&gt;main.c&lt;/code&gt;:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs c"&gt;#define PY_SSIZE_T_CLEAN
 #include &amp;lt;Python.h&amp;gt;
 
@@ -65,12 +68,11 @@ all functions, and converting all C integers to
 &lt;a href="https://docs.python.org/3/c-api/long.html"&gt;PyLong&lt;/a&gt;, a "subtype" of
 &lt;code&gt;PyObject*&lt;/code&gt;. You can imagine that everything in Python is
 an &lt;code&gt;object&lt;/code&gt; until you operate on it.&lt;/p&gt;
-&lt;p&gt;&amp;lt;p class="note&amp;gt;
+&lt;p class="note"&gt;
   For more information on objects in Python, check out
   the &lt;a href="https://docs.python.org/3/reference/datamodel.html"&gt;Data
   model&lt;/a&gt; page in Python docs.
-&amp;lt;/p&amp;gt;&lt;/p&gt;
-&lt;p&gt;To map a C integer to a &lt;code&gt;PyLong*&lt;/code&gt; we use
+&lt;/p&gt;&lt;p&gt;To map a C integer to a &lt;code&gt;PyLong*&lt;/code&gt; we use
 &lt;a href="https://docs.python.org/3/c-api/long.html#c.PyLong_FromLong"&gt;PyLong_FromLong&lt;/a&gt;. To
 map in reverse, we use
 &lt;a href="https://docs.python.org/3/c-api/long.html#c.PyLong_AsLong"&gt;PyLong_AsLong&lt;/a&gt;.&lt;/p&gt;
@@ -84,7 +86,7 @@ into their underlying C value and compare the C value.&lt;/p&gt;
 &lt;a href="https://docs.python.org/3/c-api/number.html#c.PyNumber_Add"&gt;PyNumber_Add&lt;/a&gt;
 and
 &lt;a href="https://docs.python.org/3/c-api/number.html#c.PyNumber_Subtract"&gt;PyNumber_Subtract&lt;/a&gt;
-for basic arithmetic, but there are many similar helpers available to
+for basic arithmetic, and there are many similar helpers available to
 us for operations down the line.&lt;/p&gt;
 &lt;p&gt;Now we can write a translation:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs c"&gt;#define PY_SSIZE_T_CLEAN
@@ -122,14 +124,15 @@ $ ./a.out; echo $?
 &lt;p&gt;That's great! But we cheated in one place. We assumed that the input
 to the &lt;code&gt;fib&lt;/code&gt; function was an integer, and we propagated
 that assumption everywhere we wrote &lt;code&gt;PyNumber_*&lt;/code&gt;
-operations. In the compiler we'll need to check that both arguments
-are an integer before we call a numeric helper, otherwise we may need
-to call a string concatenation helper or something else entirely.&lt;/p&gt;
+operations. When we write the compiler, we'll need to check that both
+arguments are an integer before we call a numeric helper, otherwise we
+may need to call a string concatenation helper or something else
+entirely.&lt;/p&gt;
 &lt;h3 id="compiler-architecture"&gt;Compiler Architecture&lt;/h3&gt;&lt;p&gt;We'll break the code into four major parts:&lt;/p&gt;
 &lt;ol&gt;
 &lt;li&gt;&lt;code&gt;libpyc.c&lt;/code&gt;: helper functions for generated code&lt;/li&gt;
 &lt;li&gt;&lt;code&gt;pyc/context.py&lt;/code&gt;: utilities for scope and writing code in memory&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;pyc/codegenerator.py&lt;/code&gt;: for generating C code from a Python AST&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;pyc/codegen.py&lt;/code&gt;: for generating C code from a Python AST&lt;/li&gt;
 &lt;li&gt;&lt;code&gt;pyc/__main__.py&lt;/code&gt;: the entrypoint&lt;/li&gt;
 &lt;/ol&gt;
 &lt;p class="note"&gt;
@@ -137,13 +140,14 @@ to call a string concatenation helper or something else entirely.&lt;/p&gt;
   always start with the entrypoint and code generator so I can explore
   the AST. However, it's easiest to explain the code if we start with
   the utilities first.
-&lt;/p&gt;&lt;h3 id="libpyc.c"&gt;libpyc.c&lt;/h3&gt;&lt;p&gt;This C file will contain three helper functions for safely adding,
-subtracting, and printing. We'll only support integers for now but
-this structure sets us up for supporting more types later on.&lt;/p&gt;
+&lt;/p&gt;&lt;p&gt;We'll also want an empty &lt;code&gt;pyc/__init__.py&lt;/code&gt;.&lt;/p&gt;
+&lt;h3 id="libpyc.c"&gt;libpyc.c&lt;/h3&gt;&lt;p&gt;This C file will contain three helper functions for safely adding,
+subtracting, and printing. It will be concatenated to the top of the
+generated C file. We'll only support integers for now but this
+structure sets us up for supporting more types later on.&lt;/p&gt;
 &lt;p&gt;We'll use
 &lt;a href="https://docs.python.org/3/c-api/long.html#c.PyLong_Check"&gt;PyLong_Check&lt;/a&gt;
 before calling number-specific methods.&lt;/p&gt;
-&lt;p&gt;This file will be concatenated to the top of the generated C file.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs c"&gt;#define PY_SSIZE_T_CLEAN
 #include &amp;lt;Python.h&amp;gt;
 
@@ -181,10 +185,11 @@ inline PyObject* PYC_Print(PyObject* o) {
   return Py_None;
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;That's it! We could have generated these as strings in Python but it
-gets hairy to do so. We can take advantage of our text editor if these
-helpers are in a dedicated C file. And since we've marked them all
-&lt;code&gt;inline&lt;/code&gt;, there's no runtime cost to doing so.&lt;/p&gt;
+&lt;p&gt;That's it! We could generate these as strings in Python but it gets
+hairy to do so. By using a dedicated C file, we can take advantage of
+syntax highlighting since this file is only C code. And since we've
+marked all functions as &lt;code&gt;inline&lt;/code&gt;, there's no runtime cost
+to using not embedding these as strings in Python.&lt;/p&gt;
 &lt;h3 id="pyc/context.py"&gt;pyc/context.py&lt;/h3&gt;&lt;p&gt;This file will contain a &lt;code&gt;Context&lt;/code&gt; class for managing
 identifiers in scope and for proxying to a &lt;code&gt;Writer&lt;/code&gt; class
 that contains helpers for writing lines of C code.&lt;/p&gt;
@@ -264,6 +269,442 @@ class Context():
 &lt;h3 id="pyc/&lt;strong&gt;main&lt;/strong&gt;.py"&gt;pyc/&lt;strong&gt;main&lt;/strong&gt;.py&lt;/h3&gt;&lt;p&gt;The entrypoint is responsible for reading source code, parsing it,
 calling the code generator, writing the source code to a C file, and
 compiling it.&lt;/p&gt;
+&lt;p&gt;First, we read and parse the source code:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;import ast
+import os
+import subprocess
+import shutil
+import sys
+
+from context import Context
+from codegen import generate
+
+BUILTINS = {
+    &amp;quot;print&amp;quot;: &amp;quot;PYC_Print&amp;quot;,
+}
+
+
+def main():
+    target = sys.argv[1]
+    with open(target) as f:
+        source = f.read()
+    tree = ast.parse(source, target)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Then we write &lt;code&gt;libpyc.c&lt;/code&gt; into the body, register builtins,
+and run code generation:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;
+...
+
+def main()
+    ...
+
+    ctx = Context()
+    with open(&amp;quot;libpyc.c&amp;quot;) as f:
+        ctx.body_write(f.read() + &amp;quot;\n&amp;quot;)
+
+    for builtin, fn in BUILTINS.items():
+        ctx.register_global(builtin, fn)
+
+    generate(ctx, tree)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Next, we create a clean output directory and write
+&lt;code&gt;main.c&lt;/code&gt; with the generated code and a &lt;code&gt;main&lt;/code&gt;
+function to initialization Python and any global variables:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;...
+
+def main():
+   ...
+
+    # Create and move to working directory
+    outdir = &amp;quot;bin&amp;quot;
+    shutil.rmtree(outdir, ignore_errors=True)
+    os.mkdir(outdir)
+    os.chdir(outdir)
+
+    with open(&amp;quot;main.c&amp;quot;, &amp;quot;w&amp;quot;) as f:
+        f.write(ctx.body.content)
+
+        main = ctx.namings.get(&amp;quot;main&amp;quot;)[&amp;quot;name&amp;quot;]
+        f.write(f&amp;quot;&amp;quot;&amp;quot;int main(int argc, char *argv[]) {{
+  Py_Initialize();
+
+  // Initialize globals, if any.
+{ctx.initializations.content}
+  PyObject* r = {main}();
+  return PyLong_AsLong(r);
+}}&amp;quot;&amp;quot;&amp;quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Finally, we run &lt;code&gt;clang-format&lt;/code&gt; and &lt;code&gt;gcc&lt;/code&gt; against
+the generated C code:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;...
+
+def main():
+    ...
+
+    subprocess.run([&amp;quot;clang-format&amp;quot;, &amp;quot;-i&amp;quot;, &amp;quot;main.c&amp;quot;])
+
+    cflags_raw = subprocess.check_output([&amp;quot;python3-config&amp;quot;, &amp;quot;--cflags&amp;quot;])
+    cflags = [f.strip() for f in cflags_raw.decode().split(&amp;quot; &amp;quot;) if f.strip()]
+    cmd = [&amp;quot;gcc&amp;quot;, &amp;quot;-c&amp;quot;, &amp;quot;-o&amp;quot;, &amp;quot;main.o&amp;quot;] + cflags + [&amp;quot;main.c&amp;quot;]
+    subprocess.run(cmd)
+
+    ldflags_raw = subprocess.check_output([&amp;quot;python3-config&amp;quot;, &amp;quot;--ldflags&amp;quot;])
+    ldflags = [f.strip() for f in ldflags_raw.decode().split(&amp;quot; &amp;quot;) if f.strip()]
+    cmd = [&amp;quot;gcc&amp;quot;] + ldflags + [&amp;quot;main.o&amp;quot;]
+    subprocess.run(cmd)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;All together:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;import ast
+import os
+import subprocess
+import shutil
+import sys
+
+from context import Context
+from codegen import generate
+
+BUILTINS = {
+    &amp;quot;print&amp;quot;: &amp;quot;PYC_Print&amp;quot;,
+}
+
+
+def main():
+    target = sys.argv[1]
+    with open(target) as f:
+        source = f.read()
+    tree = ast.parse(source, target)
+
+    ctx = Context()
+    with open(&amp;quot;libpyc.c&amp;quot;) as f:
+        ctx.body_write(f.read() + &amp;quot;\n&amp;quot;)
+
+    for builtin, fn in BUILTINS.items():
+        ctx.register_global(builtin, fn)
+
+    generate(ctx, tree)
+
+    # Create and move to working directory
+    outdir = &amp;quot;bin&amp;quot;
+    shutil.rmtree(outdir, ignore_errors=True)
+    os.mkdir(outdir)
+    os.chdir(outdir)
+
+    with open(&amp;quot;main.c&amp;quot;, &amp;quot;w&amp;quot;) as f:
+        f.write(ctx.body.content)
+
+        main = ctx.namings.get(&amp;quot;main&amp;quot;)[&amp;quot;name&amp;quot;]
+        f.write(f&amp;quot;&amp;quot;&amp;quot;int main(int argc, char *argv[]) {{
+  Py_Initialize();
+
+  // Initialize globals, if any.
+{ctx.initializations.content}
+  PyObject* r = {main}();
+  return PyLong_AsLong(r);
+}}&amp;quot;&amp;quot;&amp;quot;)
+
+    subprocess.run([&amp;quot;clang-format&amp;quot;, &amp;quot;-i&amp;quot;, &amp;quot;main.c&amp;quot;])
+
+    cflags_raw = subprocess.check_output([&amp;quot;python3-config&amp;quot;, &amp;quot;--cflags&amp;quot;])
+    cflags = [f.strip() for f in cflags_raw.decode().split(&amp;quot; &amp;quot;) if f.strip()]
+    cmd = [&amp;quot;gcc&amp;quot;, &amp;quot;-c&amp;quot;, &amp;quot;-o&amp;quot;, &amp;quot;main.o&amp;quot;] + cflags + [&amp;quot;main.c&amp;quot;]
+    subprocess.run(cmd)
+
+    ldflags_raw = subprocess.check_output([&amp;quot;python3-config&amp;quot;, &amp;quot;--ldflags&amp;quot;])
+    ldflags = [f.strip() for f in ldflags_raw.decode().split(&amp;quot; &amp;quot;) if f.strip()]
+    cmd = [&amp;quot;gcc&amp;quot;] + ldflags + [&amp;quot;main.o&amp;quot;]
+    subprocess.run(cmd)
+
+
+main()
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Done!&lt;/p&gt;
+&lt;h3 id="pyc/codegen.py"&gt;pyc/codegen.py&lt;/h3&gt;&lt;p&gt;Lastly we write the translation layer from Python AST to C. We'll
+break this out into 10 helper functions. It is helpful to have the
+&lt;a href="https://docs.python.org/3/library/ast.html#abstract-grammar"&gt;AST
+spec&lt;/a&gt; for
+reference.&lt;/p&gt;
+&lt;h4 id="1/10:-generate"&gt;1/10: generate&lt;/h4&gt;&lt;p&gt;The entrypoint of the code generator is &lt;code&gt;generate(ctx: Context,
+exp)&lt;/code&gt;. It generates code for any object with a &lt;code&gt;body&lt;/code&gt;
+attribute storing a list of statements. This function will generate
+code for objects like modules, function bodies, if bodies, etc.&lt;/p&gt;
+&lt;p&gt;The statements we'll support to begin are:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;ast.Assign&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ast.FunctionDef&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ast.Return&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ast.If&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;and &lt;code&gt;ast.Expr&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;For each statement, we'll simply pass on generation to an associated
+helper function. In the case of expression generation though, we'll
+also add a noop operation on the result of the expression otherwise
+the compiler will complain about an unused variable.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def generate(ctx: Context, module):
+    for stmt in module.body:
+        if isinstance(stmt, ast.Assign):
+            generate_assign(ctx, stmt)
+        elif isinstance(stmt, ast.FunctionDef):
+            generate_function_def(ctx, stmt)
+        elif isinstance(stmt, ast.Return):
+            generate_return(ctx, stmt)
+        elif isinstance(stmt, ast.If):
+            generate_if(ctx, stmt)
+        elif isinstance(stmt, ast.Expr):
+            r = generate_expression(ctx, stmt.value)
+            ctx.body_writeln(&amp;quot;// noop to hide unused warning&amp;quot;)
+            ctx.body_write_statement(f&amp;quot;{r} += 0&amp;quot;)
+        else:
+            raise Exception(f&amp;quot;Unsupported statement type: {type(stmt)}&amp;quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p class="note"&gt;
+  Remember to throw exceptions aggressively otherwise you'll have a
+  bad time debugging programs using new syntax.
+&lt;/p&gt;&lt;p&gt;Let's dig into these helpers.&lt;/p&gt;
+&lt;h4 id="2/10:-generate_assign"&gt;2/10: generate_assign&lt;/h4&gt;&lt;p&gt;To generate assignment code, we need to check if we're at the
+top-level or not. If we're at the top-level we can declare the
+variable but we can't initialize it yet. So we add the initialization
+code to the &lt;code&gt;initialization&lt;/code&gt; section of the program.&lt;/p&gt;
+&lt;p&gt;If we're not at the top-level, we can declare and assign in one
+statement.&lt;/p&gt;
+&lt;p&gt;Before doing either though, we register the variable name so we can
+get a safe local name to use in generated code. Then we compile the
+right-hand side so we can assign it to the left-hand side.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;import ast
+
+from context import Context
+
+
+def initialize_variable(ctx: Context, name: str, val: str):
+    if ctx.at_toplevel():
+        decl = f&amp;quot;PyObject* {name}&amp;quot;
+        ctx.body_write_statement(decl, 0)
+
+        init = f&amp;quot;{name} = {val}&amp;quot;
+        ctx.initializations_write_statement(init)
+    else:
+        ctx.body_write_statement(f&amp;quot;PyObject* {name} = {val}&amp;quot;)
+
+
+def generate_assign(ctx: Context, stmt: ast.Assign):
+    # TODO: support assigning to a tuple
+    local = ctx.register_local(stmt.targets[0].id)
+    val = generate_expression(ctx, stmt.value)
+    initialize_variable(ctx, local, val)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We're going to need to implement &lt;code&gt;generate_expression&lt;/code&gt; to
+make this work.&lt;/p&gt;
+&lt;h4 id="3/10:-generate_expression"&gt;3/10: generate_expression&lt;/h4&gt;&lt;p&gt;Just like for statements in &lt;code&gt;generate&lt;/code&gt;, there are a few
+kinds of expressions we need to implement:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;ast.Num&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ast.BinOp&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ast.BoolOp&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ast.Name&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ast.Compare&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;and &lt;code&gt;ast.Call&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;For &lt;code&gt;ast.Num&lt;/code&gt;, we just need to wrap the literal number as a
+&lt;code&gt;PyLong*&lt;/code&gt;. And for &lt;code&gt;ast.Name&lt;/code&gt; we just need to
+look up the local name in context. Otherwise we delegate to more
+helper functions.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def generate_expression(ctx: Context, exp) -&amp;gt; str:
+    if isinstance(exp, ast.Num):
+        # TODO: deal with non-integers
+        tmp = ctx.register_local(&amp;quot;num&amp;quot;)
+        initialize_variable(ctx, tmp, f&amp;quot;PyLong_FromLong({exp.n})&amp;quot;)
+        return tmp
+    elif isinstance(exp, ast.BinOp):
+        return generate_bin_op(ctx, exp)
+    elif isinstance(exp, ast.BoolOp):
+        return generate_bool_op(ctx, exp)
+    elif isinstance(exp, ast.Name):
+        return ctx.get_local(exp.id)[&amp;quot;name&amp;quot;]
+    elif isinstance(exp, ast.Compare):
+        return generate_compare(ctx, exp)
+    elif isinstance(exp, ast.Call):
+        return generate_call(ctx, exp)
+
+    raise Exception(f&amp;quot;Unsupported expression: {type(exp)}&amp;quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;For every code generation helper that is an expression, we store the
+expression in a local variable and return the variable's name so that
+parent nodes in the AST can refer to the child. This can result in
+inefficient code generation (useless assignment) but that's not really
+a big deal for a project like this and will likely be optimized away
+by GCC anyway. The more annoying aspect is that useless assignment
+just makes the generated code harder to read.&lt;/p&gt;
+&lt;h4 id="4/10:-generate_bin_op"&gt;4/10: generate_bin_op&lt;/h4&gt;&lt;p&gt;For binary operators we need to support addition and
+subtraction. Other binary operators like equality or and/or are
+represented in &lt;code&gt;ast.Compare&lt;/code&gt; and &lt;code&gt;ast.BoolOp&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;This is easy to write because we already prepared helpers in
+&lt;code&gt;libpyc.c&lt;/code&gt;: &lt;code&gt;PYC_Sub&lt;/code&gt; and &lt;code&gt;PYC_Add&lt;/code&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def generate_bin_op(ctx: Context, binop: ast.BinOp) -&amp;gt; str:
+    result = ctx.register_local(&amp;quot;binop&amp;quot;)
+
+    l = generate_expression(ctx, binop.left)
+    r = generate_expression(ctx, binop.right)
+
+    if isinstance(binop.op, ast.Add):
+        ctx.body_write_statement(f&amp;quot;PyObject* {result} = PYC_Add({l}, {r})&amp;quot;)
+    elif isinstance(binop.op, ast.Sub):
+        ctx.body_write_statement(f&amp;quot;PyObject* {result} = PYC_Sub({l}, {r})&amp;quot;)
+    else:
+        raise Exception(f&amp;quot;Unsupported binary operator: {type(binop.op)}&amp;quot;)
+
+    return result
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Easy enough.&lt;/p&gt;
+&lt;h4 id="5/10:-generate_bool_op"&gt;5/10: generate_bool_op&lt;/h4&gt;&lt;p&gt;We only need to support &lt;code&gt;or&lt;/code&gt; for the fibonacci program, but
+&lt;code&gt;or&lt;/code&gt; in Python is more complicated than in C. In Python,
+the first value to be truthy short-circuits the expression and the
+result is its value, not &lt;code&gt;True&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;We'll use &lt;code&gt;goto&lt;/code&gt; to short-circuit and we'll use
+&lt;a href="https://docs.python.org/3/c-api/object.html#c.PyObject_IsTrue"&gt;PyObject_IsTrue&lt;/a&gt;
+to do the truthy check:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def generate_bool_op(ctx: Context, boolop: ast.BoolOp) -&amp;gt; str:
+    result = ctx.register_local(&amp;quot;boolop&amp;quot;)
+    ctx.body_write_statement(f&amp;quot;PyObject* {result}&amp;quot;)
+
+    if isinstance(boolop.op, ast.Or):
+        done_or = ctx.register_local(&amp;quot;done_or&amp;quot;)
+
+        for exp in boolop.values:
+            v = generate_expression(ctx, exp)
+            ctx.body_write_statement(f&amp;quot;{result} = {v}&amp;quot;)
+            ctx.body_writeln(f&amp;quot;if (PyObject_IsTrue({v})) {{&amp;quot;)
+            ctx.body_write_statement(f&amp;quot;goto {done_or}&amp;quot;, ctx.indentation+1)
+            ctx.body_writeln(&amp;quot;}&amp;quot;)
+
+        ctx.body_writeln(f&amp;quot;{done_or}:\n&amp;quot;, 0)
+
+    return result
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p class="note"&gt;
+  Now that I write this down I see we could probably move this
+  function into &lt;code&gt;libpyc.c&lt;/code&gt; if we used a loop. Maybe in
+  the next iteration.
+&lt;/p&gt;&lt;p&gt;We move on.&lt;/p&gt;
+&lt;h4 id="6/10:-generate_compare"&gt;6/10: generate_compare&lt;/h4&gt;&lt;p&gt;This function handles equality and inequality checks. We'll adapt the
+&lt;code&gt;PyObject_RichCompareBool&lt;/code&gt; helper we used in the
+hand-written translation.&lt;/p&gt;
+&lt;p&gt;The only additional thing to keep in mind is that the right-hand side
+is passed as an array. So we have to iterate through it and apply the
+equality/inequality check on all objects in the list.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def generate_compare(ctx: Context, exp: ast.Compare) -&amp;gt; str:
+    result = ctx.register_local(&amp;quot;compare&amp;quot;)
+    left = generate_expression(ctx, exp.left)
+    ctx.body_write_statement(f&amp;quot;PyObject* {result} = {left}&amp;quot;)
+
+    for i, op in enumerate(exp.ops):
+        v = generate_expression(ctx, exp.comparators[i])
+
+        if isinstance(op, ast.Eq):
+            ctx.body_write_statement(f&amp;quot;{result} = PyObject_RichCompare({result}, {v}, Py_EQ)&amp;quot;)
+        elif isinstance(op, ast.NotEq):
+            ctx.body_write_statement(f&amp;quot;{result} = PyObject_RichCompare({result}, {v}, Py_NE)&amp;quot;)
+        else:
+            raise Exception(f&amp;quot;Unsupported comparison: {type(op)}&amp;quot;)
+
+    return result
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="7/10:-generate_call"&gt;7/10: generate_call&lt;/h4&gt;&lt;p&gt;The last expression is simple enough. We compile the call's arguments
+first, then the function itself, then we call the function with the
+arguments like any C function. Calling the C function directly will
+have ramifications for interacting with Python libraries (basically,
+we won't be able to interact with any) but it's the easiest way to get
+started.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def generate_call(ctx: Context, exp: ast.Call) -&amp;gt; str:
+    args = &amp;#39;, &amp;#39;.join([generate_expression(ctx, a) for a in exp.args])
+    fun = generate_expression(ctx, exp.func)
+    res = ctx.register_local(&amp;quot;call_result&amp;quot;)
+
+    # TODO: lambdas and closures need additional work
+    ctx.body_write_statement(
+        f&amp;quot;PyObject* {res} = {fun}({args})&amp;quot;)
+    return res
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And that's it for expressions! Just a few more statement helpers to
+support.&lt;/p&gt;
+&lt;h4 id="8/10:-generate_function_def"&gt;8/10: generate_function_def&lt;/h4&gt;&lt;p&gt;This is a fun one. First we register the function name in scope. Then
+we copy the context so variables within the function body are
+contained within the function body. We increment &lt;code&gt;scope&lt;/code&gt; so
+we know we've left the top-level. Finally, we compile the body.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def generate_function_def(ctx: Context, fd: ast.FunctionDef):
+    name = ctx.register_local(fd.name)
+
+    childCtx = ctx.copy()
+    args = &amp;quot;, &amp;quot;.join([f&amp;quot;PyObject* {childCtx.register_local(a.arg)}&amp;quot; for a in fd.args.args])
+    ctx.body_writeln(f&amp;quot;PyObject* {name}({args}) {{&amp;quot;, 0)
+
+    childCtx.scope += 1
+    childCtx.indentation += 1
+    generate(childCtx, fd)
+
+    if not childCtx.ret:
+        childCtx.body_write_statement(&amp;quot;return Py_None&amp;quot;)
+
+    ctx.body_writeln(&amp;quot;}\n&amp;quot;, 0)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The check for &lt;code&gt;childCtx.ret&lt;/code&gt; isn't strictly necessary
+because we could just emit a return even if there already was
+one. Asking &lt;code&gt;generate_return&lt;/code&gt; to set this attribute and
+having &lt;code&gt;generate_function_def&lt;/code&gt; check it just makes the
+generate code a little prettier.&lt;/p&gt;
+&lt;h4 id="9/10:-generate_return"&gt;9/10: generate_return&lt;/h4&gt;&lt;p&gt;Very straightforward, we just compile the value to be returned and
+then we emit a &lt;code&gt;return&lt;/code&gt; statement.&lt;/p&gt;
+&lt;p&gt;We store the return value so that the function definition can know
+whether to add a &lt;code&gt;return PyNone&lt;/code&gt; statement.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def generate_return(ctx: Context, r: ast.Return):
+    ctx.ret = generate_expression(ctx, r.value)
+    ctx.body_writeln(&amp;quot;&amp;quot;)
+    ctx.body_write_statement(f&amp;quot;return {ctx.ret}&amp;quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And we've got one last statement to support!&lt;/p&gt;
+&lt;h4 id="10/10:-generate_if"&gt;10/10: generate_if&lt;/h4&gt;&lt;p&gt;You know the deal: compile the test and if the test is truthy, enter
+the compiled body. We'll deal with the else body another time.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def generate_if(ctx: Context, exp: ast.If):
+    test = generate_expression(ctx, exp.test)
+    ctx.body_writeln(f&amp;quot;if (PyObject_IsTrue({test})) {{&amp;quot;)
+    ctx.indentation += 1
+    generate(ctx, exp)
+    # TODO: handle exp.orelse
+    ctx.indentation -= 1
+    ctx.body_writeln(&amp;quot;}\n&amp;quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And we're done the compiler!&lt;/p&gt;
+&lt;h3 id="trying-it-out"&gt;Trying it out&lt;/h3&gt;&lt;p&gt;As promised:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ cat tests/recursive_fib.py
+def fib(n):
+    if n == 0 or n == 1:
+        return n
+
+    return fib(n - 1) + fib(n - 2)
+
+
+def main():
+    print(fib(40))
+$ python3 pyc tests/recursive_fib.py
+$ ./bin/a.out
+102334155
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="microbenchmarking,-or-making-compiler-twitter-unhappy"&gt;Microbenchmarking, or making compiler Twitter unhappy&lt;/h4&gt;&lt;p&gt;Keep in mind this implementation does a small fraction of what CPython
+is doing.&lt;/p&gt;
+&lt;p&gt;If you time the generated code:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ python3 pyc tests/recursive_fib.py
+$ time ./bin/a.out
+102334155
+./bin/a.out  18.69s user 0.03s system 99% cpu 18.854 total
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And CPython (with &lt;code&gt;main()&lt;/code&gt; append to the source):&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;time python3 tests/recursive_fib.py
+102334155
+python3 tests/recursive_fib.py  76.24s user 0.11s system 99% cpu 1:16.81 total
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The only reason I mention this is because when I did a &lt;a href="/compiling-dynamic-programming-languages.html#next-steps-with-jsc"&gt;similar
+compiler project for JavaScript targeting
+C++/libV8&lt;/a&gt;,
+the generated code was about the same or a little slower in speed.&lt;/p&gt;
+&lt;p&gt;I haven't gotten &lt;em&gt;that much&lt;/em&gt; better at writing these compilers.&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/writing-a-simple-python-compiler.html</guid><pubDate>Sun, 16 Aug 2020 00:00:00 +0000</pubDate></item><item><title>A single-node Kubernetes cluster without virtualization or a container registry</title><link>http://notes.eatonphil.com/a-single-node-kubernetes-cluster-without-virtualization-or-a-container-registry.html</link><description>&lt;p&gt;This post is a recipe for setting up a minimal Kubernetes cluster on
 Fedora without requiring virtualization or a container registry. These
 two features make the system cloud-agnostic and the cluster entirely
