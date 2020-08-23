@@ -110,7 +110,7 @@ we want to keep everything as Python objects for as long as
 possible. This means passing and receiving
 <a href="https://docs.python.org/3/c-api/object.html">PyObject*</a> to and from
 all functions, and converting all C integers to
-<a href="https://docs.python.org/3/c-api/long.html">PyLong</a>, a "subtype" of
+<a href="https://docs.python.org/3/c-api/long.html">PyLong*</a>, a "subtype" of
 <code>PyObject*</code>. You can imagine that everything in Python is
 an <code>object</code> until you operate on it.</p>
 <p class="note">
