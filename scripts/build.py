@@ -201,7 +201,7 @@ def main():
     home_page = HOME_PAGE
     home_page += "\n".join([POST_SUMMARY.format(*args[:2], args[5], *args[2:3]) for args in post_data])
     with open('docs/index.html', 'w') as f:
-        meta = '<meta name="google-site-verification" content="s-Odt0Dj7WZzEk6hLV28wLyR5LeGQFoopUV3IDNO6bM" />'
+        meta = '<meta name="google-site-verification" content="s-Odt0Dj7WZzEk6hLV28wLyR5LeGQFoopUV3IDNO6bM" />\n    '
         f.write(TEMPLATE.format(post=home_page, title="", tag=TAG, subtitle="", tags="", meta=meta))
 
     with open('docs/style.css', 'w') as fw:
