@@ -1,0 +1,67 @@
+# The case for comments in code
+## September 7, 2020
+###### development,teams
+
+When I first started programming, especially when asked for code
+samples, my comments lacked purpose and would often duplicate in
+English what the code clearly indicated. I knew that "commenting is
+good" but as a beginner I had no further insight.
+
+Over time with the help of books like Clean Code, I grew disdainful of
+comments. Good code should be self-documenting. Whenever I needed to
+write a comment to explain something, I'd realize I could easily
+rename some key variable or function. I grew more comfortable with
+variables and functions with a few words in the title. Better to spend
+time on good code structure and naming.
+
+<p class="note">
+  I have always left TODOs though, since TODOs can't so easily be
+  expressed in variable names. But even these TODOs concerned me
+  because they existed in my issue tracker, or maybe should have.
+</p>
+
+As I watched mature open source projects and mature engineers, I came
+to value well-documented pull requests. Solid pull requests include or
+link to all necessary background, opportunities failed or ignored, how
+to use, links to external bugs requiring workarounds and the results
+of performance evaluation.
+
+Beyond pull request descriptions, when I really wanted to grease a
+pull request I'd use the pull request UI to add comments calling
+reviewer attention to key changes in lines of the diff.
+
+Both kinds of guidance are a massive aid to reviewers, saving a lot of
+time.
+
+But when I'd find a bug in code -- and I knew there was good pull
+request documentation, even for pull requests as recent as six months
+ago -- I've been repeatedly failed by the pull request and _pull
+request comment_ search exposed by Github and Gitlab.
+
+I _knew_ there were links to documented oddities or bug reports in
+pull request threads. But practically speaking, for historic pull
+requests, pull request comments are useless.
+
+This is the single biggest reason I've started to push for more
+comments in code. More so than all other tools (issue tracker, code
+management system, etc.) comments in code have the greatest chance of
+still being around and _easily searchable_ if they haven't been
+deleted.
+
+<p class="note">
+  Don't get me started on pull request documentation in an external
+  medium like Slack. It's so rewarding to get or give instant feedback
+  on changes on instant messengers, but good luck finding that
+  discussion 3 months later.
+</p>
+
+Every time I have to call out a line of code in a pull request, that's
+immediate cause for that code to be modified with comments.
+
+Maybe I wouldn't do this if Github/Gitlab exposed a Google Docs-like
+interface for browsing code line by line with links to all pull
+request comment threads.
+
+#### Comments
+
+Please reply on Twitter with questions or comments.

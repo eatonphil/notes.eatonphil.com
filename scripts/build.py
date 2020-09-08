@@ -194,14 +194,15 @@ def main():
 
         title = title[1]
         with open('docs/' + out_file, 'w') as f:
-            f.write(TEMPLATE.format(post=output, title=title, subtitle=date, tag=title, tags=tags_html))
+            f.write(TEMPLATE.format(post=output, title=title, subtitle=date, tag=title, tags=tags_html, meta=""))
 
     post_data.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
     post_data.reverse()
     home_page = HOME_PAGE
     home_page += "\n".join([POST_SUMMARY.format(*args[:2], args[5], *args[2:3]) for args in post_data])
     with open('docs/index.html', 'w') as f:
-        f.write(TEMPLATE.format(post=home_page, title="", tag=TAG, subtitle="", tags=""))
+        meta = '<meta name="google-site-verification" content="s-Odt0Dj7WZzEk6hLV28wLyR5LeGQFoopUV3IDNO6bM" />\n    '
+        f.write(TEMPLATE.format(post=home_page, title="", tag=TAG, subtitle="", tags="", meta=meta))
 
     with open('docs/style.css', 'w') as fw:
         with open('style.css') as fr:
@@ -233,7 +234,7 @@ def main():
             posts.reverse()
             tag_page = TAG_PAGE.format(tag)
             tag_page += "\n".join([TAG_SUMMARY.format(*args) for args in posts])
-            f.write(TEMPLATE.format(post=tag_page, title="", tag=TAG, subtitle="", tags=""))
+            f.write(TEMPLATE.format(post=tag_page, title="", tag=TAG, subtitle="", tags="", meta=""))
 
 
 if __name__ == '__main__':
