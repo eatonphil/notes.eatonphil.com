@@ -1,5 +1,52 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 23 Aug 2020 22:52:25 +0000</lastBuildDate><item><title>Writing a simple Python compiler: 1. hello, fibonacci</title><link>http://notes.eatonphil.com/writing-a-simple-python-compiler.html</link><description>&lt;p&gt;In this post we'll write a Python to C compiler in Python. This is
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 08 Sep 2020 00:31:43 +0000</lastBuildDate><item><title>The case for comments in code</title><link>http://notes.eatonphil.com/the-case-for-comments-in-code.html</link><description>&lt;p&gt;When I first started programming, especially when asked for code
+samples, my comments lacked purpose and would often duplicate in
+English what the code clearly indicated. I knew that "commenting is
+good" but as a beginner I had no further insight.&lt;/p&gt;
+&lt;p&gt;Over time with the help of books like Clean Code, I grew disdainful of
+comments. Good code should be self-documenting. Whenever I needed to
+write a comment to explain something, I'd realize I could easily
+rename some key variable or function. I grew more comfortable with
+variables and functions with a few words in the title. Better to spend
+time on good code structure and naming.&lt;/p&gt;
+&lt;p class="note"&gt;
+  I have always left TODOs though, since TODOs can't so easily be
+  expressed in variable names. But even these TODOs concerned me
+  because they existed in my issue tracker, or maybe should have.
+&lt;/p&gt;&lt;p&gt;As I watched mature open source projects and mature engineers, I came
+to value well-documented pull requests. Solid pull requests include or
+link to all necessary background, opportunities failed or ignored, how
+to use, links to external bugs requiring workarounds and the results
+of performance evaluation.&lt;/p&gt;
+&lt;p&gt;Beyond pull request descriptions, when I really wanted to grease a
+pull request I'd use the pull request UI to add comments calling
+reviewer attention to key changes in lines of the diff.&lt;/p&gt;
+&lt;p&gt;Both kinds of guidance are a massive aid to reviewers, saving a lot of
+time.&lt;/p&gt;
+&lt;p&gt;But when I'd find a bug in code -- and I knew there was good pull
+request documentation, even for pull requests as recent as six months
+ago -- I've been repeatedly failed by the pull request and &lt;em&gt;pull
+request comment&lt;/em&gt; search exposed by Github and Gitlab.&lt;/p&gt;
+&lt;p&gt;I &lt;em&gt;knew&lt;/em&gt; there were links to documented oddities or bug reports in
+pull request threads. But practically speaking, for historic pull
+requests, pull request comments are useless.&lt;/p&gt;
+&lt;p&gt;This is the single biggest reason I've started to push for more
+comments in code. More so than all other tools (issue tracker, code
+management system, etc.) comments in code have the greatest chance of
+still being around and &lt;em&gt;easily searchable&lt;/em&gt; if they haven't been
+deleted.&lt;/p&gt;
+&lt;p class="note"&gt;
+  Don't get me started on pull request documentation in an external
+  medium like Slack. It's so rewarding to get or give instant feedback
+  on changes on instant messengers, but good luck finding that
+  discussion 3 months later.
+&lt;/p&gt;&lt;p&gt;Every time I have to call out a line of code in a pull request, that's
+immediate cause for that code to be modified with comments.&lt;/p&gt;
+&lt;p&gt;Maybe I wouldn't do this if Github/Gitlab exposed a Google Docs-like
+interface for browsing code line by line with links to all pull
+request comment threads.&lt;/p&gt;
+&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/the-case-for-comments-in-code.html</guid><pubDate>Mon, 07 Sep 2020 00:00:00 +0000</pubDate></item><item><title>Writing a simple Python compiler: 1. hello, fibonacci</title><link>http://notes.eatonphil.com/writing-a-simple-python-compiler.html</link><description>&lt;p&gt;In this post we'll write a Python to C compiler in Python. This is
 especially easy to do since Python has a &lt;a href="https://docs.python.org/3/library/ast.html"&gt;builtin parser
 library&lt;/a&gt; and because a
 number of &lt;a href="https://docs.python.org/3/c-api/"&gt;CPython internals are exposed for extension

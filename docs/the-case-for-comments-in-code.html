@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>The case for comments in code | notes.eatonphil.com</title>
+    <meta name="description" content="The case for comments in code" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>September 7, 2020</h2>
+          <h1>The case for comments in code</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/development.html" class="tag">development</a><a href="/tags/teams.html" class="tag">teams</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>When I first started programming, especially when asked for code
+samples, my comments lacked purpose and would often duplicate in
+English what the code clearly indicated. I knew that "commenting is
+good" but as a beginner I had no further insight.</p>
+<p>Over time with the help of books like Clean Code, I grew disdainful of
+comments. Good code should be self-documenting. Whenever I needed to
+write a comment to explain something, I'd realize I could easily
+rename some key variable or function. I grew more comfortable with
+variables and functions with a few words in the title. Better to spend
+time on good code structure and naming.</p>
+<p class="note">
+  I have always left TODOs though, since TODOs can't so easily be
+  expressed in variable names. But even these TODOs concerned me
+  because they existed in my issue tracker, or maybe should have.
+</p><p>As I watched mature open source projects and mature engineers, I came
+to value well-documented pull requests. Solid pull requests include or
+link to all necessary background, opportunities failed or ignored, how
+to use, links to external bugs requiring workarounds and the results
+of performance evaluation.</p>
+<p>Beyond pull request descriptions, when I really wanted to grease a
+pull request I'd use the pull request UI to add comments calling
+reviewer attention to key changes in lines of the diff.</p>
+<p>Both kinds of guidance are a massive aid to reviewers, saving a lot of
+time.</p>
+<p>But when I'd find a bug in code -- and I knew there was good pull
+request documentation, even for pull requests as recent as six months
+ago -- I've been repeatedly failed by the pull request and <em>pull
+request comment</em> search exposed by Github and Gitlab.</p>
+<p>I <em>knew</em> there were links to documented oddities or bug reports in
+pull request threads. But practically speaking, for historic pull
+requests, pull request comments are useless.</p>
+<p>This is the single biggest reason I've started to push for more
+comments in code. More so than all other tools (issue tracker, code
+management system, etc.) comments in code have the greatest chance of
+still being around and <em>easily searchable</em> if they haven't been
+deleted.</p>
+<p class="note">
+  Don't get me started on pull request documentation in an external
+  medium like Slack. It's so rewarding to get or give instant feedback
+  on changes on instant messengers, but good luck finding that
+  discussion 3 months later.
+</p><p>Every time I have to call out a line of code in a pull request, that's
+immediate cause for that code to be modified with comments.</p>
+<p>Maybe I wouldn't do this if Github/Gitlab exposed a Google Docs-like
+interface for browsing code line by line with links to all pull
+request comment threads.</p>
+<h4 id="comments">Comments</h4><p>Please reply on Twitter with questions or comments.</p>
+
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>
