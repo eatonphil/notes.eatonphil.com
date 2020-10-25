@@ -1,5 +1,41 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 08 Sep 2020 00:38:43 +0000</lastBuildDate><item><title>The case for comments in code</title><link>http://notes.eatonphil.com/the-case-for-comments-in-code.html</link><description>&lt;p&gt;When I first started programming, especially when asked for code
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 25 Oct 2020 22:04:31 +0000</lastBuildDate><item><title>Standard ML in 2020</title><link>http://notes.eatonphil.com/standard-ml-in-2020.html</link><description>&lt;p&gt;Incredibly, Standard ML implementations are still actively
+developed. &lt;a href="http://mlton.org/"&gt;MLton&lt;/a&gt;, &lt;a href="https://polyml.org"&gt;Poly/ML&lt;/a&gt;,
+and &lt;a href="https://elsman.com/mlkit/"&gt;MLKit&lt;/a&gt; are the most prominent.
+Discussion on the future direction of Standard ML &lt;a href="https://github.com/SMLFamily/Successor-ML/issues"&gt;remains healthy as
+well&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;And somehow OCaml's lesser known cousin still beats out OCaml for
+multicore threading support (in Poly/ML).&lt;/p&gt;
+&lt;p&gt;While MLton hasn't merged with
+&lt;a href="https://github.com/kayceesrk/multiMLton"&gt;MultiMLton&lt;/a&gt; or
+&lt;a href="https://github.com/UBMLtonGroup/RTMLton"&gt;RTMLton&lt;/a&gt; to support
+multicore, a &lt;a href="https://github.com/mpllang/mpl"&gt;new fork of MLton with
+parallelism&lt;/a&gt; is pretty far along and
+in active development at CMU.&lt;/p&gt;
+&lt;p&gt;Furthermore, the last few years have welcomed some entirely new
+implementations. &lt;a href="https://github.com/KeenS/webml"&gt;WebML&lt;/a&gt;, by a
+prominent open source hacker, is written in Rust and compiles Standard
+ML to WebAssembly. &lt;a href="https://sosml.org/"&gt;SOSML&lt;/a&gt; is an interpreter
+written in TypeScript by former students of Saarland University. It
+features &lt;a href="https://sosml.org/editor"&gt;a nifty online IDE&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;There have also been some new experimental spins on Standard ML in
+the last few years. &lt;a href="https://github.com/julianhyde/morel"&gt;Morel&lt;/a&gt; is an
+interpreter with some nice syntax extensions written in Java by the
+author of Apache Calcite. And &lt;a href="https://github.com/elpinal/bright-ml"&gt;Bright
+ML&lt;/a&gt; is a spin on Standard ML and
+OCaml written in Standard ML (and using the abandoned &lt;a href="https://mosml.org/"&gt;Moscow
+ML&lt;/a&gt; compiler of all implementations).&lt;/p&gt;
+&lt;p&gt;So if you're looking for an easy intro to the ML family of languages,
+I still recommend the simplicity and performance of Standard ML and
+its small but definitely, surprisingly, not dead community. :)&lt;/p&gt;
+&lt;p&gt;Additional resources:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://smlfamily.github.io/"&gt;SML Family Site&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://smlfamily.github.io/Basis/index.html"&gt;SML Standard Library (Basis Library) Documentation&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://reddit.com/r/sml"&gt;/r/sml&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Are you using Standard ML? &lt;a href="mailto:me@eatonphil.com"&gt;Let me know how/why!&lt;/a&gt;&lt;/p&gt;
+&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;</description><guid isPermaLink="false">http://notes.eatonphil.com/standard-ml-in-2020.html</guid><pubDate>Sun, 25 Oct 2020 00:00:00 +0000</pubDate></item><item><title>The case for comments in code</title><link>http://notes.eatonphil.com/the-case-for-comments-in-code.html</link><description>&lt;p&gt;When I first started programming, especially when asked for code
 samples, my comments lacked purpose and would often duplicate in
 English what the code clearly indicated. I knew that "commenting is
 good" but as a beginner I had no further insight.&lt;/p&gt;
