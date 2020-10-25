@@ -31,7 +31,8 @@ HOME_PAGE = """
 <p>
     Hello! I'm Phil, an Engineering Manager at a <a
     href="https://www.linkedin.com/in/phil-e-97a490178/">software
-    company</a> in New York City.
+    company</a> in New York City. I'm [hiring senior engineers in
+    Canada](mailto:philip.eaton@oracle.com)!
   </p>
   <p>
     As an engineer I'm big on compilers, databases, networks, and
