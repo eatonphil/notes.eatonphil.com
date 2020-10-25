@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Standard ML in 2020 | notes.eatonphil.com</title>
+    <meta name="description" content="Standard ML in 2020" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+ 
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <a href="/" class="notes">Notes</a>
+          <h2>October 25, 2020</h2>
+          <h1>Standard ML in 2020</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/sml.html" class="tag">sml</a><a href="/tags/ocaml.html" class="tag">ocaml</a></div>
+          </div>
+          
+          <div>
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+	  </div>
+          <a class="subscribe" href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+            Subscribe to blog updates.
+          </a>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="col-6">
+        <p>Incredibly, Standard ML implementations are still actively
+developed. <a href="http://mlton.org/">MLton</a>, <a href="https://polyml.org">Poly/ML</a>,
+and <a href="https://elsman.com/mlkit/">MLKit</a> are the most prominent.
+Discussion on the future direction of Standard ML <a href="https://github.com/SMLFamily/Successor-ML/issues">remains healthy as
+well</a>.</p>
+<p>And somehow OCaml's lesser known cousin still beats out OCaml for
+multicore threading support (in Poly/ML).</p>
+<p>While MLton hasn't merged with
+<a href="https://github.com/kayceesrk/multiMLton">MultiMLton</a> or
+<a href="https://github.com/UBMLtonGroup/RTMLton">RTMLton</a> to support
+multicore, a <a href="https://github.com/mpllang/mpl">new fork of MLton with
+parallelism</a> is pretty far along and
+in active development at CMU.</p>
+<p>Furthermore, the last few years have welcomed some entirely new
+implementations. <a href="https://github.com/KeenS/webml">WebML</a>, by a
+prominent open source hacker, is written in Rust and compiles Standard
+ML to WebAssembly. <a href="https://sosml.org/">SOSML</a> is an interpreter
+written in TypeScript by former students of Saarland University. It
+features <a href="https://sosml.org/editor">a nifty online IDE</a>.</p>
+<p>There have also been some new experimental spins on Standard ML in
+the last few years. <a href="https://github.com/julianhyde/morel">Morel</a> is an
+interpreter with some nice syntax extensions written in Java by the
+author of Apache Calcite. And <a href="https://github.com/elpinal/bright-ml">Bright
+ML</a> is a spin on Standard ML and
+OCaml written in Standard ML (and using the abandoned <a href="https://mosml.org/">Moscow
+ML</a> compiler of all implementations).</p>
+<p>So if you're looking for an easy intro to the ML family of languages,
+I still recommend the simplicity and performance of Standard ML and
+its small but definitely, surprisingly, not dead community. :)</p>
+<p>Additional resources:</p>
+<ul>
+<li><a href="https://smlfamily.github.io/">SML Family Site</a></li>
+<li><a href="https://smlfamily.github.io/Basis/index.html">SML Standard Library (Basis Library) Documentation</a></li>
+<li><a href="https://reddit.com/r/sml">/r/sml</a></li>
+</ul>
+<p>Are you using Standard ML? <a href="mailto:me@eatonphil.com">Let me know how/why!</a></p>
+<h4 id="comments">Comments</h4>
+      </div>
+    </div>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>
