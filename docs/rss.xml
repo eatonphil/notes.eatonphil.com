@@ -1,8 +1,11 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 25 Oct 2020 22:31:07 +0000</lastBuildDate><item><title>Standard ML in 2020</title><link>http://notes.eatonphil.com/standard-ml-in-2020.html</link><description>&lt;p&gt;Incredibly, Standard ML implementations are still actively
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 25 Oct 2020 23:26:40 +0000</lastBuildDate><item><title>Standard ML in 2020</title><link>http://notes.eatonphil.com/standard-ml-in-2020.html</link><description>&lt;p&gt;Incredibly, Standard ML implementations are still actively
 developed. &lt;a href="http://mlton.org/"&gt;MLton&lt;/a&gt;, &lt;a href="https://polyml.org"&gt;Poly/ML&lt;/a&gt;,
-and &lt;a href="https://elsman.com/mlkit/"&gt;MLKit&lt;/a&gt; are the most prominent.
-Discussion on the future direction of Standard ML &lt;a href="https://github.com/SMLFamily/Successor-ML/issues"&gt;remains healthy as
+&lt;a href="https://elsman.com/mlkit/"&gt;MLKit&lt;/a&gt;,
+&lt;a href="https://www.pllab.riec.tohoku.ac.jp/smlsharp/"&gt;SML#&lt;/a&gt; and
+&lt;a href="http://smlnj-gforge.cs.uchicago.edu/scm/viewvc.php/?root=smlnj"&gt;SML/NJ&lt;/a&gt;
+are the most prominent. Discussion on the future direction of Standard
+ML &lt;a href="https://github.com/SMLFamily/Successor-ML/issues"&gt;remains healthy as
 well&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;And somehow OCaml's lesser known cousin still beats out OCaml for
 multicore threading support (in Poly/ML).&lt;/p&gt;
@@ -12,13 +15,23 @@ multicore threading support (in Poly/ML).&lt;/p&gt;
 multicore, a &lt;a href="https://github.com/mpllang/mpl"&gt;new fork of MLton with
 parallelism&lt;/a&gt; is pretty far along and
 in active development at CMU.&lt;/p&gt;
-&lt;p&gt;Furthermore, the last few years have welcomed some entirely new
+&lt;p class="note"&gt;
+  A commentor shared
+  &lt;a href="https://github.com/ManticoreProject/manticore"&gt;Manticore&lt;/a&gt;,
+  another implementation with parallelism support in active
+  development at UChicago.
+&lt;/p&gt;&lt;p&gt;Furthermore, the last few years have welcomed some entirely new
 implementations. &lt;a href="https://github.com/KeenS/webml"&gt;WebML&lt;/a&gt;, by a
 prominent open source hacker, is written in Rust and compiles Standard
 ML to WebAssembly. &lt;a href="https://sosml.org/"&gt;SOSML&lt;/a&gt; is an interpreter
 written in TypeScript by former students of Saarland University. It
-features &lt;a href="https://sosml.org/editor"&gt;a nifty online IDE&lt;/a&gt;.&lt;/p&gt;
-&lt;p&gt;There have also been some new experimental spins on Standard ML in
+features &lt;a href="https://sosml.org/editor"&gt;a nifty online
+IDE&lt;/a&gt;.&lt;/p&gt;
+&lt;p class="note"&gt;
+  A commenter
+  shared &lt;a href="https://github.com/SomewhatML/sml-compiler"&gt;SomewhatML&lt;/a&gt;,
+  an actively developing compiler for Standard ML written in Rust.
+&lt;/p&gt;&lt;p&gt;There have also been some new experimental spins on Standard ML in
 the last few years. &lt;a href="https://github.com/julianhyde/morel"&gt;Morel&lt;/a&gt; is an
 interpreter with some nice syntax extensions written in Java by the
 author of Apache Calcite. And &lt;a href="https://github.com/elpinal/bright-ml"&gt;Bright
