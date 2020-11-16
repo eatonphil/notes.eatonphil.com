@@ -1,5 +1,32 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 25 Oct 2020 23:26:40 +0000</lastBuildDate><item><title>Standard ML in 2020</title><link>http://notes.eatonphil.com/standard-ml-in-2020.html</link><description>&lt;p&gt;Incredibly, Standard ML implementations are still actively
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 16 Nov 2020 23:33:08 +0000</lastBuildDate><item><title>The impact of management teams in startups and enterprise</title><link>http://notes.eatonphil.com/the-impact-of-management-teams-on-startups-and-enterprises.html</link><description>&lt;p&gt;Ambitious companies form management teams at every level above you,
+sometimes including you. Management teams meet periodically and have
+private chat rooms. They discuss customers, product and organizational
+direction. Sometimes discussions are well documented and periodically
+public. Sometimes decisions are poorly telegraphed out.&lt;/p&gt;
+&lt;p&gt;Management teams do no inherent harm in a company with customers;
+employees outside of the management team can unearth customer usage
+data to discover meaningful places to contribute. For example,
+graphing historic server logs to discover slowest requests, figure out
+why and how to fix. Or even just paying attention to the most frequent
+questions sales asks and finding ways to clarify. (All of this under
+the assumption that even when there is solid product direction, good
+employees tend to have extra time at work and want to make good use of
+it.)&lt;/p&gt;
+&lt;p&gt;For the first few years even in a well-funded startup with solid
+founders, there are few customers. Even under a solid product team,
+the product direction is not yet completely clear. The management team
+includes founders and non-engineering executives. Employees
+outside the management team face a barrier in finding ways to
+meaningful contribute. And then they leave.&lt;/p&gt;
+&lt;h3 id="so-what?"&gt;So what?&lt;/h3&gt;&lt;p&gt;It is not clear to me how the natural (and not inherently bad) concept
+of management teams attracts and retains ambitious, dedicated
+non-founders at small companies. Maybe disenfranchisement is not
+important, or even necessary.&lt;/p&gt;
+&lt;p&gt;Or maybe management teams are too easily a substitute for developing a
+grassroots culture of collaboration and trust between marketing,
+sales, product and development.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/the-impact-of-management-teams-on-startups-and-enterprises.html</guid><pubDate>Wed, 11 Nov 2020 00:00:00 +0000</pubDate></item><item><title>Standard ML in 2020</title><link>http://notes.eatonphil.com/standard-ml-in-2020.html</link><description>&lt;p&gt;Incredibly, Standard ML implementations are still actively
 developed. &lt;a href="http://mlton.org/"&gt;MLton&lt;/a&gt;, &lt;a href="https://polyml.org"&gt;Poly/ML&lt;/a&gt;,
 &lt;a href="https://elsman.com/mlkit/"&gt;MLKit&lt;/a&gt;,
 &lt;a href="https://www.pllab.riec.tohoku.ac.jp/smlsharp/"&gt;SML#&lt;/a&gt; and
