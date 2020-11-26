@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 26 Nov 2020 22:57:18 +0000</lastBuildDate><item><title>Emulating AMD64: interpreting an ELF binary</title><link>http://notes.eatonphil.com/emulating-amd64-starting-with-elf.html</link><description>&lt;p&gt;In this post we'll stumble toward a working emulator for a barebones C
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 26 Nov 2020 23:53:43 +0000</lastBuildDate><item><title>Emulating AMD64: interpreting an ELF binary</title><link>http://notes.eatonphil.com/emulating-amd64-starting-with-elf.html</link><description>&lt;p&gt;In this post we'll stumble toward a working emulator for a barebones C
 program compiled for linux/AMD64. The approach will be slightly more
 so based on observation than by following a spec. This is a great way
 to quickly become familiar with a topic, and a bad way to guarantee
@@ -253,9 +253,9 @@ func newCPU(memory uint64) cpu {
     }
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;The &lt;code&gt;tick&lt;/code&gt; channel is so that we can wrap the emulator in a
-step-debugger. But by default we'll just set up a goroutine to tick
-forever.&lt;/p&gt;
+&lt;p&gt;The &lt;code&gt;tick&lt;/code&gt; channel is so that later on we can wrap the
+emulator in a terminal debugger. But by default we'll just set up a
+goroutine to tick forever.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs go"&gt;func repl(c *cpu) {
   // TODO
 }
@@ -294,7 +294,10 @@ func main() {
 }
 &lt;/code&gt;&lt;/pre&gt;
 &lt;h3 id="registers"&gt;Registers&lt;/h3&gt;&lt;p&gt;To emulate a simple program like our &lt;code&gt;tests/simple.c&lt;/code&gt;,
-we'll only need to support a few common registers.&lt;/p&gt;
+we'll only need to support a few common registers. The order is
+important so that we can use the Go identifiers when we want to refer
+to the &lt;a href="https://wiki.osdev.org/X86-64_Instruction_Encoding#Registers"&gt;encoded integer value of the
+register&lt;/a&gt;.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs go"&gt;type register int
 
 const (
@@ -381,6 +384,7 @@ func (c *cpu) loop(entryReturnAddress uint64) {
 
         // TODO: deal with instructions
 
+        // move to next instruction
         c.regfile.set(rip, ip+1)
     }
 }
@@ -388,14 +392,19 @@ func (c *cpu) loop(entryReturnAddress uint64) {
 func (c *cpu) run(proc *process) {
     copy(c.mem[proc.startAddress:proc.startAddress+uint64(len(proc.bin))], proc.bin)
     c.regfile.set(rip, proc.entryPoint)
-    initialStackPointer := uint64(len(c.mem))
+    initialStackPointer := uint64(len(c.mem)-8)
+    writeBytes(c.mem, initialStackPointer, 8, initialStackPointer)
     c.regfile.set(rsp, initialStackPointer)
     c.loop(initialStackPointer)
     os.Exit(int(c.regfile.get(rax)))
 }
 &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We write the initial stack pointer address into the stack so that when
+the program final returns, it will return to this address at which
+pointer we can exit the program.&lt;/p&gt;
 &lt;p&gt;And now we're ready to start interpreting instructions.&lt;/p&gt;
-&lt;h3 id="instruction-decoding"&gt;Instruction decoding&lt;/h3&gt;&lt;p&gt;Using &lt;code&gt;objdump&lt;/code&gt; we already got a sense for what the program decodes to.&lt;/p&gt;
+&lt;h3 id="instruction-decoding"&gt;Instruction decoding&lt;/h3&gt;&lt;p&gt;Using &lt;code&gt;objdump&lt;/code&gt; we get a sense for what the program decodes
+to.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ objdump -d a.out | grep -A10 &amp;#39;&amp;lt;main&amp;gt;&amp;#39;
 0000000000401106 &amp;lt;main&amp;gt;:
   401106:       55                      push   %rbp
@@ -409,7 +418,7 @@ func (c *cpu) run(proc *process) {
 
 0000000000401120 &amp;lt;__libc_csu_init&amp;gt;:
 &lt;/code&gt;&lt;/pre&gt;
-&lt;h4 id="push"&gt;push&lt;/h4&gt;&lt;p&gt;We see that &lt;code&gt;0x55&lt;/code&gt; means &lt;code&gt;push
+&lt;p&gt;We see that &lt;code&gt;0x55&lt;/code&gt; means &lt;code&gt;push
 %rbp&lt;/code&gt;. And we also see that instructions aren't a fixed number
 of bytes. Some are one byte, some are 7. Some (not shown) are &lt;a href="https://stackoverflow.com/questions/14698350/x86-64-asm-maximum-bytes-for-an-instruction"&gt;even
 longer&lt;/a&gt;.&lt;/p&gt;
@@ -418,16 +427,15 @@ a set of prefix instructions and a set of real instructions. So far we
 should be able to tell on the first byte whether the instruction is a
 prefix instruction and, if not, how many bytes the instruction will
 take up on the whole.&lt;/p&gt;
-&lt;p&gt;Ignoring prefix instructions for now though, the first thing to do is
-look up &lt;code&gt;0x55&lt;/code&gt; in an opcode table like
-&lt;a href="http://ref.x86asm.net/coder64.html"&gt;this&lt;/a&gt;. Clicking on
-&lt;a href="http://ref.x86asm.net/coder64.html#x50"&gt;55&lt;/a&gt; in the opcode index we
+&lt;h4 id="push"&gt;push&lt;/h4&gt;&lt;p&gt;To support a new instruction, we'll look up &lt;code&gt;0x55&lt;/code&gt; in an
+opcode table like &lt;a href="http://ref.x86asm.net/coder64.html"&gt;this&lt;/a&gt;. Clicking
+on &lt;a href="http://ref.x86asm.net/coder64.html#x50"&gt;55&lt;/a&gt; in the opcode index we
 see that this is indeed a push instruction. &lt;code&gt;50+r&lt;/code&gt; means
 that we have to subtract &lt;code&gt;0x50&lt;/code&gt; from the opcode to
 determine the register we should push.&lt;/p&gt;
 &lt;p&gt;The register will be &lt;code&gt;5&lt;/code&gt; which if we look up in a &lt;a href="https://wiki.osdev.org/X86-64_Instruction_Encoding#Registers"&gt;register
 table&lt;/a&gt;
-is RBP. Since we set up our register enum in code in this order, we'll
+is &lt;code&gt;rbp&lt;/code&gt;. Since we set up our register enum in code in this order, we'll
 be able to just use the constant &lt;code&gt;rbp&lt;/code&gt; in Go code.&lt;/p&gt;
 &lt;p&gt;Finally, since the next instruction numerically is &lt;code&gt;0x58&lt;/code&gt;
 we know that this instruction is identified by being between
@@ -500,7 +508,365 @@ instruction. Some instructions like &lt;code&gt;pop&lt;/code&gt; and
 case, this just means we'll have to have a size flag that switches
 from 32-bit to 64-bit mode on seeing this instruction. This flag will
 be reset each time we start reading an instruction.&lt;/p&gt;
-&lt;p&gt;Looking up &lt;a href="http://ref.x86asm.net/coder64.html#x89"&gt;0x89&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;To deal with prefixes in general we'll loop through bytes when
+processing an instruction until we no longer see a prefix bytes. As we
+see prefix bytes we'll handle them accordingly.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;var prefixBytes = []byte{0x48}
+
+func (c *cpu) loop(entryReturnAddress uint64) {
+    for {
+        &amp;lt;-c.tick
+
+        ip := c.regfile.get(rip)
+        if ip == entryReturnAddress {
+            break
+        }
+
+        inb1 := c.mem[ip]
+
+        widthPrefix := 32
+        for {
+            isPrefixByte := false
+            for _, prefixByte := range prefixBytes {
+                if prefixByte == inb1 {
+                    isPrefixByte = true
+                    break
+                }
+            }
+
+            if !isPrefixByte {
+                break
+            }
+
+            // 64 bit prefix signifier
+            if inb1 == 0x48 {
+                widthPrefix = 64
+            } else {
+                hbdebug(&amp;quot;prog&amp;quot;, c.mem[ip:ip+10])
+                panic(&amp;quot;Unknown prefix instruction&amp;quot;)
+            }
+
+            ip++
+            inb1 = c.mem[ip]
+        }
+
+        if inb1 &amp;gt;= 0x50 &amp;amp;&amp;amp; inb1 &amp;lt; 0x58 { // push
+
+...
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Moving past this prefix we get to
+&lt;a href="http://ref.x86asm.net/coder64.html#x89"&gt;0x89&lt;/a&gt;. This instruction is
+for copying one register into another. The register operands are
+&lt;a href="http://www.c-jump.com/CIS77/CPU/x86/X77_0270_modrm_byte.htm"&gt;encoded in the second
+byte&lt;/a&gt;,
+&lt;code&gt;0xe5&lt;/code&gt;, called the ModR/M byte. Pulling out the two
+registers is just a matter of shifting and bitmasking the right 3 bits
+for each.&lt;/p&gt;
+&lt;p&gt;With this knowledge we can expand the instruction handling code.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;        if inb1 &amp;gt;= 0x50 &amp;amp;&amp;amp; inb1 &amp;lt; 0x58 { // push
+            regvalue := c.regfile.get(register(inb1 - 0x50))
+            sp := c.regfile.get(rsp)
+            writeBytes(c.mem, sp-8, 8, regvalue)
+            c.regfile.set(rsp, uint64(sp-8))
+        }  else if inb1 == 0x89 { // mov r/m16/32/64, r/m16/32/64
+            ip++
+            inb2 := c.mem[ip]
+            rhs := register((inb2 &amp;amp; 0b00111000) &amp;gt;&amp;gt; 3)
+            lhs := register(inb2 &amp;amp; 0b111)
+            c.regfile.set(lhs, c.regfile.get(rhs))
+        } else {
+            hbdebug(&amp;quot;prog&amp;quot;, c.mem[ip:ip+10])
+            panic(&amp;quot;Unknown instruction&amp;quot;)
+        }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Try emulating &lt;code&gt;a.out&lt;/code&gt; again now. It will panic on the next
+unknown instruction, &lt;code&gt;0xb8&lt;/code&gt;. From &lt;code&gt;objdump&lt;/code&gt;
+disassembly we see this is another &lt;code&gt;mov&lt;/code&gt; instruction.&lt;/p&gt;
+&lt;p&gt;Hurray! There are apparantly multiple ways the same instruction can be
+encoded. Looking it up in the opcode table, we see
+&lt;a href="http://ref.x86asm.net/coder64.html#xB8"&gt;0xb8&lt;/a&gt; is for when the value
+to be copied is a literal number. The operand will be 32-bits, or four
+bytes, presumably because it doesn't have the &lt;code&gt;0x48&lt;/code&gt;
+prefix.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;// helper for converting up to 8 bytes into a single integer
+func readBytes(from []byte, start uint64, bytes int) uint64 {
+    val := uint64(0)
+    for i := 0; i &amp;lt; bytes; i++ {
+        val |= uint64(from[start+uint64(i)]) &amp;lt;&amp;lt; (8 * i)
+    }
+
+    return val
+}
+
+func (c *cpu) loop(entryReturnAddress uint64) {
+
+    ...
+
+    for {
+
+        ...
+
+        } else if inb1 &amp;gt;= 0xB8 &amp;amp;&amp;amp; inb1 &amp;lt; 0xC0 { // mov r16/32/64, imm16/32/64
+            lreg := register(inb1 - 0xB8)
+            val := readBytes(c.mem, ip+uint64(1), widthPrefix/8)
+            ip += uint64(widthPrefix / 8)
+            c.regfile.set(lreg, val)
+        }
+
+        ...
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Two more instructions to go: &lt;code&gt;pop&lt;/code&gt; and &lt;code&gt;ret&lt;/code&gt;.&lt;/p&gt;
+&lt;h3 id="a-terminal-debugger"&gt;A terminal debugger&lt;/h3&gt;&lt;p&gt;Taking a break for a moment, our system is already too complex to
+understand. It would be helpful to have a REPL so we can step through
+instructions and print register and memory values.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;func (c *cpu) resolveDebuggerValue(dval string) (uint64, error) {
+    for reg, val := range registerMap {
+        if val == dval {
+            return c.regfile.get(reg), nil
+        }
+    }
+
+    if len(dval) &amp;gt; 2 &amp;amp;&amp;amp; (dval[:2] == &amp;quot;0x&amp;quot; || dval[:2] == &amp;quot;0X&amp;quot;) {
+        return strconv.ParseUint(dval[2:], 16, 64)
+    }
+
+    return strconv.ParseUint(dval, 10, 64)
+}
+
+func repl(c *cpu) {
+    fmt.Println(&amp;quot;go-amd64-emulator REPL&amp;quot;)
+    help := `commands:
+    s/step:             continue to next instruction
+    r/registers [$reg]:     print all register values or just $reg
+    d/decimal:          toggle hex/decimal printing
+    m/memory $from $count:      print memory values starting at $from until $from+$count
+    h/help:             print this`
+    fmt.Println(help)
+    scanner := bufio.NewScanner(os.Stdin)
+
+    intFormat := &amp;quot;%d&amp;quot;
+    for {
+        fmt.Printf(&amp;quot;&amp;gt; &amp;quot;)
+        if !scanner.Scan() {
+            break
+        }
+        input := scanner.Text()
+        parts := strings.Split(input, &amp;quot; &amp;quot;)
+
+        switch parts[0] {
+        case &amp;quot;h&amp;quot;:
+            fallthrough
+        case &amp;quot;help&amp;quot;:
+            fmt.Println(help)
+
+        case &amp;quot;m&amp;quot;:
+            fallthrough
+        case &amp;quot;memory&amp;quot;:
+            msg := &amp;quot;Invalid arguments: m/memory $from $to; use hex (0x10), decimal (10), or register name (rsp)&amp;quot;
+            if len(parts) != 3 {
+                fmt.Println(msg)
+                continue
+            }
+
+            from, err := c.resolveDebuggerValue(parts[1])
+            if err != nil {
+                fmt.Println(msg)
+                continue
+            }
+
+            to, err := c.resolveDebuggerValue(parts[2])
+            if err != nil {
+                fmt.Println(msg)
+                continue
+            }
+
+            hbdebug(fmt.Sprintf(&amp;quot;memory[&amp;quot;+intFormat+&amp;quot;:&amp;quot;+intFormat+&amp;quot;]&amp;quot;, from, from+to), c.mem[from:from+to])
+
+        case &amp;quot;d&amp;quot;:
+            fallthrough
+        case &amp;quot;decimal&amp;quot;:
+            if intFormat == &amp;quot;%d&amp;quot; {
+                intFormat = &amp;quot;0x%x&amp;quot;
+                fmt.Println(&amp;quot;Numbers displayed as hex&amp;quot;)
+            } else {
+                intFormat = &amp;quot;%d&amp;quot;
+                fmt.Println(&amp;quot;Numbers displayed as decimal&amp;quot;)
+            }
+
+        case &amp;quot;r&amp;quot;:
+            fallthrough
+        case &amp;quot;registers&amp;quot;:
+            filter := &amp;quot;&amp;quot;
+            if len(parts) &amp;gt; 1 {
+                filter = parts[1]
+            }
+
+            for i := 0; i &amp;lt; len(registerMap); i++ {
+                reg := register(i)
+                name := registerMap[reg]
+                if filter != &amp;quot;&amp;quot; &amp;amp;&amp;amp; filter != name {
+                    continue
+                }
+
+                fmt.Printf(&amp;quot;%s:\t&amp;quot;+intFormat+&amp;quot;\n&amp;quot;, name, c.regfile.get(reg))
+            }
+
+        case &amp;quot;s&amp;quot;:
+            fallthrough
+        case &amp;quot;step&amp;quot;:
+            c.tick &amp;lt;- true
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Let's try it out:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ go build -o main
+$ ./main a.out --debug
+go-amd64-emulator REPL
+commands:
+        s/step:                         continue to next instruction
+        r/registers [$reg]:             print all register values or just $reg
+        d/decimal:                      toggle hex/decimal printing
+        m/memory $from $count:          print memory values starting at $from until $from+$count
+        h/help:                         print this
+&amp;gt; r
+rax:    0
+rcx:    0
+rdx:    0
+rbx:    0
+rsp:    41943040
+rbp:    0
+rsi:    0
+rdi:    0
+r8:     0
+r9:     0
+r10:    0
+r11:    0
+r12:    0
+r13:    0
+r14:    0
+r15:    0
+rip:    4198662
+rflags: 0
+&amp;gt; m rip 10
+memory[4198662:4198672]: 55 48 89 e5 b8 4 0 0 0 5d
+&amp;gt; s
+&amp;gt; m rip 10
+memory[4198663:4198673]: 48 89 e5 b8 4 0 0 0 5d c3
+&amp;gt; r
+rax:    0
+rcx:    0
+rdx:    0
+rbx:    0
+rsp:    41943032
+rbp:    0
+rsi:    0
+rdi:    0
+r8:     0
+r9:     0
+r10:    0
+r11:    0
+r12:    0
+r13:    0
+r14:    0
+r15:    0
+rip:    4198663
+rflags: 0
+&amp;gt; ^D
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now we can inspect the system interactively.&lt;/p&gt;
+&lt;h3 id="pop"&gt;pop&lt;/h3&gt;&lt;p&gt;Reemersing in the state of things, we now panic on &lt;code&gt;0x5d&lt;/code&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;./main a.out
+prog: 5d c3 66 2e f 1f 84 0 0 0
+panic: Unknown instruction
+
+goroutine 5 [running]:
+main.(*cpu).loop(0xc000098ae0, 0x2800000)
+        /home/phil/tmp/goamd/main.go:219 +0x2c5
+main.(*cpu).run(0xc000098ae0, 0xc000098ab0)
+        /home/phil/tmp/goamd/main.go:231 +0xac
+created by main.main
+        /home/phil/tmp/goamd/main.go:358 +0x286
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Looking &lt;a href="http://ref.x86asm.net/coder64.html#x5D"&gt;this up&lt;/a&gt; we see this
+is part of &lt;code&gt;58+r&lt;/code&gt;, &lt;code&gt;pop&lt;/code&gt;. Similar to
+&lt;code&gt;push&lt;/code&gt; we subtract &lt;code&gt;0x58&lt;/code&gt; from the byte to get
+the register to pop onto. The stack operation is the reverse of
+&lt;code&gt;push&lt;/code&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;func (c *cpu) loop(entryReturnAddress uint64) {
+
+    ...
+
+    for {
+
+        ...
+
+        } else if inb1 &amp;gt;= 0x58 &amp;amp;&amp;amp; inb1 &amp;lt; 0x60 { // pop
+            lhs := register(inb1 - 0x58)
+            sp := c.regfile.get(rsp)
+            c.regfile.set(lhs, readBytes(c.mem, sp, 8))
+            c.regfile.set(rsp, uint64(sp+8))
+        }
+        ...
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Build and run for the final panic:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ go build -o main
+$ ./main a.out
+prog: c3 66 2e f 1f 84 0 0 0 0
+panic: Unknown instruction
+
+goroutine 8 [running]:
+main.(*cpu).loop(0xc000060c30, 0x2800000)
+        /home/phil/tmp/goamd/main.go:224 +0x345
+main.(*cpu).run(0xc000060c30, 0xc000060c00)
+        /home/phil/tmp/goamd/main.go:236 +0xac
+created by main.main
+        /home/phil/tmp/goamd/main.go:363 +0x286
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id="ret"&gt;ret&lt;/h3&gt;&lt;p&gt;Looking up &lt;a href="http://ref.x86asm.net/coder64.html#xC3"&gt;0xC3&lt;/a&gt; we see that
+it is indeed &lt;code&gt;ret&lt;/code&gt;. This function's responsibilty is to pop
+the stack onto rip, jumping back to caller.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;        } else if inb1 == 0xC3 { // ret
+            sp := c.regfile.get(rsp)
+            retAddress := readBytes(c.mem, sp, 8)
+            c.regfile.set(rsp, uint64(sp+8))
+            c.regfile.set(rip, retAddress)
+            continue
+        }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Build and run:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ go build -o main
+$ ./main a.out
+$ echo $?
+4
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If we modify &lt;code&gt;tests/simple.c&lt;/code&gt;?&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ cat tests/simple.c
+int main() {
+  return 254;
+}
+$ gcc tests/simple.c
+$ ./main a.out &amp;amp;&amp;amp; echo $?
+254
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Not bad!&lt;/p&gt;
+&lt;h3 id="process-and-next-steps"&gt;Process and next steps&lt;/h3&gt;&lt;p&gt;Getting this far took a lot of trial and error, much of it hidden in
+this post. Setting up the REPL was critical to debugging mistakes. But
+aggressively unit testing would probably have been similarly
+fruitful. In the end, the most bug-prone aspects are basic arithmetic
+(off by one errors and converting bytes to/from integers). The part
+that's not terribly hard is actually interpreting instructions! But
+it's made easier by greatly simplifying the problem and ignoring
+legion cases.&lt;/p&gt;
+&lt;p&gt;Along the way it would have been helpful to also disassemble so that
+instead of just dumping memory at the instruction pointer we print the
+instructions we thought we were going to process. That may be a next
+goal.&lt;/p&gt;
+&lt;p&gt;Otherwise the typical goals are around getting syscall support,
+function call support, and porting these simple examples to Windows
+and macOS for the experience.&lt;/p&gt;
+&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
+questions or ideas.&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/emulating-amd64-starting-with-elf.html</guid><pubDate>Tue, 01 Dec 2020 00:00:00 +0000</pubDate></item><item><title>The impact of management teams as a decision-making group, in startups and enterprise</title><link>http://notes.eatonphil.com/the-impact-of-management-teams-on-startups-and-enterprises.html</link><description>&lt;p&gt;Ambitious companies form management teams at every level above you,
 sometimes including you. Management teams meet periodically and have
 private chat rooms. They discuss customers, product and organizational
