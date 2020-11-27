@@ -88,7 +88,11 @@ HOME_PAGE = """
   </a>
   <a href="https://github.com/eatonphil/dbcore" class="fp-project">
     <div>dbcore</div>
-    <p>A code generation tool and API specification powered by your database</p>
+    <p>A code generation tool and API specification powered by your database.</p>
+  </a>
+  <a href="https://github.com/eatonphil/go-amd64-emulator" class="fp-project">
+    <div>go-amd64-emulator</div>
+    <p>A userland linux/amd64 emulator and terminal debugger in Go.</p>
   </a>
 </div>
 <div class="fp-section fp-section--talks">
