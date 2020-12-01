@@ -107,7 +107,7 @@ and search for <code>main</code> we can find its address.</p>
 0000000000401120 &lt;__libc_csu_init&gt;:
 </code></pre>
 <p>This means that the function, <code>main</code>, starts at
-address <code>0x401106</code> in memory. Furthermore, this implies is
+address <code>0x401106</code> in memory. Furthermore, this implies
 that the binary must be loaded into CPU memory such that the CPU can
 jump here to execute our program.</p>
 <p>In truth, <code>main</code> is not this program's entrypoint. If we
@@ -630,7 +630,7 @@ for each.</p>
 <p>Try emulating <code>a.out</code> again now. It will panic on the next
 unknown instruction, <code>0xb8</code>. From <code>objdump</code>
 disassembly we see this is another <code>mov</code> instruction.</p>
-<p>Hurray! There are apparantly multiple ways the same instruction can be
+<p>Hurray! There are apparently multiple ways the same instruction can be
 encoded. Looking it up in the opcode table, we see
 <a href="http://ref.x86asm.net/coder64.html#xB8">0xB8</a> is for when the value
 to be copied is a literal number. The operand will be 32-bits, or four

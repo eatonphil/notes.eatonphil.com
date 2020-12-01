@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Fri, 27 Nov 2020 16:34:28 +0000</lastBuildDate><item><title>Emulating linux/AMD64 userland: interpreting an ELF binary</title><link>http://notes.eatonphil.com/emulating-amd64-starting-with-elf.html</link><description>&lt;p&gt;In this post we'll stumble toward a working emulator for a barebones C
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 01 Dec 2020 18:42:26 +0000</lastBuildDate><item><title>Emulating linux/AMD64 userland: interpreting an ELF binary</title><link>http://notes.eatonphil.com/emulating-amd64-starting-with-elf.html</link><description>&lt;p&gt;In this post we'll stumble toward a working emulator for a barebones C
 program compiled for linux/AMD64. The approach will be slightly more
 so based on observation than by following a spec; a great way
 to quickly become familiar with a topic, and a bad way to guarantee
@@ -62,7 +62,7 @@ and search for &lt;code&gt;main&lt;/code&gt; we can find its address.&lt;/p&gt;
 0000000000401120 &amp;lt;__libc_csu_init&amp;gt;:
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;This means that the function, &lt;code&gt;main&lt;/code&gt;, starts at
-address &lt;code&gt;0x401106&lt;/code&gt; in memory. Furthermore, this implies is
+address &lt;code&gt;0x401106&lt;/code&gt; in memory. Furthermore, this implies
 that the binary must be loaded into CPU memory such that the CPU can
 jump here to execute our program.&lt;/p&gt;
 &lt;p&gt;In truth, &lt;code&gt;main&lt;/code&gt; is not this program's entrypoint. If we
@@ -585,7 +585,7 @@ for each.&lt;/p&gt;
 &lt;p&gt;Try emulating &lt;code&gt;a.out&lt;/code&gt; again now. It will panic on the next
 unknown instruction, &lt;code&gt;0xb8&lt;/code&gt;. From &lt;code&gt;objdump&lt;/code&gt;
 disassembly we see this is another &lt;code&gt;mov&lt;/code&gt; instruction.&lt;/p&gt;
-&lt;p&gt;Hurray! There are apparantly multiple ways the same instruction can be
+&lt;p&gt;Hurray! There are apparently multiple ways the same instruction can be
 encoded. Looking it up in the opcode table, we see
 &lt;a href="http://ref.x86asm.net/coder64.html#xB8"&gt;0xB8&lt;/a&gt; is for when the value
 to be copied is a literal number. The operand will be 32-bits, or four

@@ -85,7 +85,7 @@ $ objdump -d a.out | grep -A10 '<main>'
 ```
 
 This means that the function, <code>main</code>, starts at
-address <code>0x401106</code> in memory. Furthermore, this implies is
+address <code>0x401106</code> in memory. Furthermore, this implies
 that the binary must be loaded into CPU memory such that the CPU can
 jump here to execute our program.
 
@@ -690,7 +690,7 @@ Try emulating <code>a.out</code> again now. It will panic on the next
 unknown instruction, <code>0xb8</code>. From <code>objdump</code>
 disassembly we see this is another <code>mov</code> instruction.
 
-Hurray! There are apparantly multiple ways the same instruction can be
+Hurray! There are apparently multiple ways the same instruction can be
 encoded. Looking it up in the opcode table, we see
 [0xB8](http://ref.x86asm.net/coder64.html#xB8) is for when the value
 to be copied is a literal number. The operand will be 32-bits, or four
