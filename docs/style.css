@@ -71,7 +71,12 @@ img {
 }
 
 footer {
-    margin-top: 50px;
+    margin-bottom: 50px;
+}
+
+.row {
+    display: flex;
+    align-items: center;
 }
 
 .container {
@@ -81,6 +86,10 @@ footer {
     padding: 0 15px;
     display: flex;
     justify-content: space-between;
+}
+
+.container > * {
+    width: 100%;
 }
 
 header .container > div {
@@ -93,19 +102,24 @@ header .notes {
     color: #777;
 }
 
-header .notes::before {
-    display: inline-block;
-    content: '';
-    padding-right: 5px;
-    font-size: .6rem;
-}
-
 header .container {
     padding: 30px 15px 0 15px;
 }
 
-header .subscribe {
+.subscribe {
+    flex: 1;
+    text-align: right;    
+}
+
+.subscribe a {
     font-size: 1rem;
+    border: 1px solid rgb(0, 95, 255);
+    padding: 5px;
+}
+
+.subscribe a:hover {
+    background: rgb(0, 95, 255);
+    color: white;
 }
 
 aside {
