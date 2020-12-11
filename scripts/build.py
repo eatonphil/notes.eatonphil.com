@@ -25,10 +25,9 @@ TAG_PAGE = """
 </div>
 """
 HOME_PAGE = """
-<style>header, footer { display: none !important; }</style>
 <div class="fp-section fp-section--about">
-<h2 class="fp-h2">Bio</h2>
-<p>
+  <h2 class="fp-h2">Bio</h2>
+  <p>
     Hello! I'm Phil, a Software Development Manager at a <a
     href="https://www.linkedin.com/in/phil-e-97a490178/">software
     company</a> in New York City. I'm <a
@@ -51,9 +50,23 @@ HOME_PAGE = """
     href="https://twitter.com/phil_eaton">Twitter</a>, and <a
     href="https://www.goodreads.com/user/show/50930981-phil-eaton">Goodreads</a>.
   </p>
+</div>
+<div class="fp-section fp-section--projects">
+  <h2 id="commissioned-writing" class="fp-h2">Commissioned Writing</h2>
   <p>
-    <a href="mailto:me@eatonphil.com">Talk to me about opportunities
-    in engineering leadership.</a>
+    I am most interested in high-quality educational content that
+    explains complex software development and management concepts to a
+    general tech audience. My writing is frequently well-received on
+    the front page of <a
+    href="https://news.ycombinator.com/from?site=eatonphil.com">Hacker
+    News</a>, <a
+    href="https://www.reddit.com/domain/eatonphil.com/">/r/programming</a>,
+    and <a
+    href="https://lobste.rs/domain/notes.eatonphil.com">lobste.rs</a>.
+  </p>
+  <p>
+    Get <a href="mailto:me@eatonphil.com">in touch</a> if I can help
+    you with a commissioned piece.
   </p>
 </div>
 <div class="fp-section fp-section--projects">
@@ -121,6 +134,8 @@ HOME_PAGE = """
 </div>
 <div class="fp-section fp-section--notes">
   <h2 class="fp-h2">Notes</h2>
+  {notes}
+</div>
 """
 TEMPLATE = open('template.html').read()
 TAG = "My notes"
@@ -204,8 +219,8 @@ def main():
 
     post_data.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
     post_data.reverse()
-    home_page = HOME_PAGE
-    home_page += "\n".join([POST_SUMMARY.format(*args[:2], args[5], *args[2:3]) for args in post_data])
+    home_page = HOME_PAGE.format(
+        notes="\n".join([POST_SUMMARY.format(*args[:2], args[5], *args[2:3]) for args in post_data]))
     with open('docs/index.html', 'w') as f:
         meta = '<meta name="google-site-verification" content="s-Odt0Dj7WZzEk6hLV28wLyR5LeGQFoopUV3IDNO6bM" />\n    '
         f.write(TEMPLATE.format(post=home_page, title="", tag=TAG, subtitle="", tags="", meta=meta))
