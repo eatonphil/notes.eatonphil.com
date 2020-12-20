@@ -1,5 +1,268 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Fri, 11 Dec 2020 00:06:43 +0000</lastBuildDate><item><title>Emulating linux/AMD64 userland: interpreting an ELF binary</title><link>http://notes.eatonphil.com/emulating-amd64-starting-with-elf.html</link><description>&lt;p&gt;In this post we'll stumble toward a working emulator for a barebones C
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 20 Dec 2020 22:20:37 +0000</lastBuildDate><item><title>Static analysis with semgrep: basic examples with Docker</title><link>http://notes.eatonphil.com/static-analysis-with-semgrep.html</link><description>&lt;p&gt;In this post we'll get a basic semgrep environment set up in Docker
+running some custom rules against our code.&lt;/p&gt;
+&lt;h3 id="existing-linters"&gt;Existing linters&lt;/h3&gt;&lt;p&gt;Linters like &lt;a href="https://www.pylint.org/"&gt;pylint&lt;/a&gt; for Python or
+&lt;a href="https://eslint.org/"&gt;eslint&lt;/a&gt; for JavaScript are great for general,
+broad language standards. But what about common nits in code review
+like using print statements instead of a logger, or using a defer
+statement inside a for loop (Go specific), or the existence of
+multiple nested loops.&lt;/p&gt;
+&lt;p&gt;Most developers don't have experience working with language
+parsing. So it's fairly uncommon in small- and medium-sized teams to
+see custom linting rules. And while no single linter or language is
+that much more complex than the other (it's all just AST operations),
+there is a small penalty to learning the AST and framework for each
+language linter.&lt;/p&gt;
+&lt;h3 id="semgrep"&gt;Semgrep&lt;/h3&gt;&lt;p&gt;&lt;a href="https://semgrep.dev/"&gt;Semgrep&lt;/a&gt; is a generic tool for finding patterns
+in source code. Unlike traditional regex (and traditional grep) it can
+find recursive patterns. This makes it especially useful as a tool to
+learn for finding patterns in any language.&lt;/p&gt;
+&lt;p&gt;An advantage of semgrep rules is that you can learn the semgrep
+pattern matching syntax (which is surprisingly easy) and then you can
+write rules for any language you'd like to write rules for.&lt;/p&gt;
+&lt;p&gt;And while the &lt;a href="https://semgrep.dev/editor"&gt;online rule tester&lt;/a&gt; is
+awesome, I had a hard time going from that to a working sample on my
+own laptop with Docker. We'll do just that.&lt;/p&gt;
+&lt;h3 id="catching-print-statements-in-python"&gt;Catching print statements in Python&lt;/h3&gt;&lt;p&gt;Let's say we want a script to fail on any use of print statements in
+Python:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;$ cat test/python/simple-print.py
+def main():
+  print(&amp;quot;DEBUG: here&amp;quot;)
+  print(&amp;quot;DEBUG: &amp;quot;, &amp;quot;now here&amp;quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The current &lt;a href="https://semgrep.dev/editor"&gt;default example&lt;/a&gt; shown in the
+online editor happens to be for just this. Click the Advanced tab and
+you'll see the following:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs yaml"&gt;rules:
+- id: fail-on-print
+  pattern: |
+    print(&amp;quot;...&amp;quot;)
+  message: |
+    Semgrep found a match
+  severity: WARNING
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Copy this into &lt;code&gt;config.yml&lt;/code&gt;. Let's modify the pattern to
+warn on all print calls, not just print calls with a single string
+argument:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs yaml"&gt;rules:
+- id: fail-on-print
+  pattern: |
+    print(...)
+  message: |
+    Semgrep found a match
+  severity: WARNING
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The editor doesn't mention it (nor do any docs I can find) but we also
+need to include two keys in the individual rule
+object: &lt;code&gt;mode&lt;/code&gt; and &lt;code&gt;languages&lt;/code&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs yaml"&gt;rules:
+- id: fail-on-print
+  pattern: |
+    print(...)
+  message: |
+    Semgrep found a match
+  severity: WARNING
+  mode: search
+  languages: [&amp;quot;generic&amp;quot;]
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Semgrep fails really weirdly if you set &lt;code&gt;mode&lt;/code&gt; to
+anything other than &lt;code&gt;search&lt;/code&gt;, but it won't warn you that
+what you set is garbage. The &lt;code&gt;languages&lt;/code&gt; setting is
+similarly fickle and doesn't give you much feedback if you set it
+incorrectly.&lt;/p&gt;
+&lt;p class="note"&gt;
+  Also, I'm using the "generic" language here because I don't
+  understand the difference between languages and as far as I'm
+  concerned the syntax I'm using here is already pretty generic.
+&lt;/p&gt;&lt;p&gt;We run the semgrep Docker image:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ docker run -v &amp;quot;${PWD}:/src&amp;quot; returntocorp/semgrep --config=config.yml test/python
+A new version of Semgrep is available. Please see https://github.com/returntocorp/semgrep#upgrading for more information.
+running 1 rules...
+test/python/simple-print.py
+severity:warning rule:fail-on-print: Semgrep found a match
+
+2:print(&amp;quot;DEBUG: here&amp;quot;)
+ran 1 rules on 1 files: 1 findings&amp;quot;&amp;quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And there we've got our warning!&lt;/p&gt;
+&lt;p class="note"&gt;
+  Not completely clear to me why we're getting warned about a new
+  version when we've pulled &lt;code&gt;latest&lt;/code&gt; as the linked docs
+  suggest. Maybe there's a newer version that hasn't made it into a
+  Docker image yet.
+&lt;/p&gt;&lt;h3 id="catching-fmt.print*-statements-in-go"&gt;Catching fmt.Print* statements in Go&lt;/h3&gt;&lt;p&gt;Let's say we also want to fail on print statements in Go (because we
+should use a logger instead):&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;$ cat test/golang/simple-print.go
+package main
+
+import &amp;quot;fmt&amp;quot;
+
+func main() {
+  a := fmt.Sprintf(&amp;quot;here&amp;quot;)
+  fmt.Println(a)
+  fmt.Printf(&amp;quot;%s\n&amp;quot;, a)
+  e := fmt.Errorf(&amp;quot;My crazy error&amp;quot;)
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We could try to look for any &lt;code&gt;import "fmt"&lt;/code&gt; code in a file
+but that would fail on uses of &lt;code&gt;fmt.Sprintf&lt;/code&gt;
+or &lt;code&gt;fmt.Errorf&lt;/code&gt; which are fine. Instead we'll just focus on
+uses of &lt;code&gt;fmt.Printf&lt;/code&gt; or &lt;code&gt;fmt.Println&lt;/code&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs yaml"&gt;$ cat go-config.yml
+rules:
+- id: fail-on-print
+  pattern-either:
+    - pattern: fmt.Printf(...)
+    - pattern: fmt.Println(...)
+  message: |
+    Semgrep found a match
+  severity: WARNING
+  mode: search
+  languages: [&amp;quot;generic&amp;quot;]
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Run the Go config against the Go files:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ docker run -v &amp;quot;${PWD}:/src&amp;quot; returntocorp/semgrep --config=go-config.yml test/golang
+A new version of Semgrep is available. Please see https://github.com/returntocorp/semgrep#upgrading for more information.
+running 1 rules...
+test/golang/simple-print.go
+severity:warning rule:fail-on-print: Semgrep found a match
+
+8:fmt.Printf(&amp;quot;%s\n&amp;quot;, a)
+--------------------------------------------------------------------------------
+7:fmt.Println(a)
+ran 1 rules on 1 files: 2 findings
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Cool! Making some sense. Now let's try a harder pattern.&lt;/p&gt;
+&lt;h3 id="catching-triple-nested-for-loops"&gt;Catching triple-nested for loops&lt;/h3&gt;&lt;p&gt;Let's try to warn on the triple-nested loop in this code:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;$ cat test/golang/loopy.go
+package main
+
+import &amp;quot;log&amp;quot;
+
+func main() {
+  doneFirst := false
+  for i := 0; i &amp;lt; 10; i++ {
+    log.Print(i)
+
+    for j := 0; j &amp;lt; 100; j++ {
+      c := i * j
+
+      going := true
+      k := 0
+      for going {
+        if k == c {
+          break
+        }
+
+        k++
+        log.Print(k)
+      }
+    }
+
+    doneFirst = true
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If we want to catch the use of nested for loops here then we'll need
+to search for the loops surrounded by arbitrary
+syntax. Semgrep's &lt;code&gt;...&lt;/code&gt; syntax makes this easy.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs yaml"&gt;$ cat go-config2.yml
+rules:
+- id: fail-on-3-loop
+  pattern: |
+    for ... {
+      ...
+      for ... {
+        ...
+
+        for ... {
+          ...
+        }
+        ...
+      }
+      ...
+    }
+  message: |
+    Semgrep found a match
+  severity: WARNING
+  mode: search
+  languages: [&amp;quot;generic&amp;quot;]
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And run semgrep:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ docker run -v &amp;quot;${PWD}:/src&amp;quot; returntocorp/semgrep --config=go-config2.yml test/golang
+A new version of Semgrep is available. Please see https://github.com/returntocorp/semgrep#upgrading for more information.
+running 1 rules...
+test/golang/loopy.go
+severity:warning rule:fail-on-3-loop: Semgrep found a match
+
+7:for i := 0; i &amp;lt; 10; i++ {
+8:              log.Print(i)
+9:
+10:             for j := 0; j &amp;lt; 100; j++ {
+11:                     c := i * j
+12:
+13:                     going := true
+14:                     k := 0
+15:                     for going {
+16:                             if k == c {
+-------- [hid 10 additional lines, adjust with --max-lines-per-finding] --------
+ran 1 rules on 2 files: 1 findings
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That's just swell.&lt;/p&gt;
+&lt;h3 id="limits-of-static-analysis"&gt;Limits of static analysis&lt;/h3&gt;&lt;p&gt;Now let's say we refactor one of the inner loops into its own
+function.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;$ cat test/golang/loopy.go
+package main
+
+import &amp;quot;log&amp;quot;
+
+func inner(i, j int) {
+  c := i * j
+
+  going := true
+  k := 0
+  for going {
+    if k == c {
+      break
+    }
+
+    k++
+    log.Print(k)
+  }
+}
+
+func main() {
+  doneFirst := false
+  for i := 0; i &amp;lt; 10; i++ {
+    log.Print(i)
+
+    for j := 0; j &amp;lt; 100; j++ {
+      inner(i, j)
+    }
+
+    doneFirst = true
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And run semgrep again:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ docker run -v &amp;quot;${PWD}:/src&amp;quot; returntocorp/semgrep --config=go-config2.yml test/golang
+ A new version of Semgrep is available. Please see https://github.com/returntocorp/semgrep#upgrading for more information.
+ running 1 rules...
+ ran 1 rules on 2 files: 0 findings
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Well great. The 3-nested loop still exists but we can't find it
+anymore because it's not syntactically obvious anymore.&lt;/p&gt;
+&lt;p&gt;At this point we'd need to start getting into linting based on runtime
+analysis. If you know of a tool that does this and lets you write
+rules like semgrep for it, please tell me!&lt;/p&gt;
+&lt;h3 id="in-summary"&gt;In summary&lt;/h3&gt;&lt;p&gt;In the end though, it's still very useful to be able to learn a single
+language for writing syntax rules at a high level to enforce behavior
+in code. Furthermore, a generic syntax matcher helps you write easily
+write rules for things that don't already have linters like YAML
+or JSON configuration or Vagrantfiles.&lt;/p&gt;
+&lt;p&gt;It can be annoying to work around some missing docs in semgrep but
+overall it's a great tool for the kit.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/static-analysis-with-semgrep.html</guid><pubDate>Sun, 20 Dec 2020 00:00:00 +0000</pubDate></item><item><title>Emulating linux/AMD64 userland: interpreting an ELF binary</title><link>http://notes.eatonphil.com/emulating-amd64-starting-with-elf.html</link><description>&lt;p&gt;In this post we'll stumble toward a working emulator for a barebones C
 program compiled for linux/AMD64. The approach will be slightly more
 so based on observation than by following a spec; a great way
 to quickly become familiar with a topic, and a bad way to guarantee
