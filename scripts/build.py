@@ -52,7 +52,7 @@ HOME_PAGE = """
   </p>
 </div>
 <div class="fp-section fp-section--projects">
-  <h2 id="commissioned-writing" class="fp-h2">Commissioned Writing</h2>
+  <h2 id="guest-writing" class="fp-h2">Guest Writing</h2>
   <p>
     I am most interested in high-quality educational content that
     explains complex software development and management concepts to a
@@ -65,8 +65,7 @@ HOME_PAGE = """
     href="https://lobste.rs/domain/notes.eatonphil.com">lobste.rs</a>.
   </p>
   <p>
-    Get <a href="mailto:me@eatonphil.com">in touch</a> if I can help
-    you with a commissioned piece.
+    Get <a href="mailto:me@eatonphil.com">in touch</a> if I can write for you.
   </p>
 </div>
 <div class="fp-section fp-section--projects">
