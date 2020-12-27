@@ -29,16 +29,17 @@ HOME_PAGE = """
   <h2 class="fp-h2">Bio</h2>
   <p>
     Hello! I'm Phil, a Software Development Manager at a <a
-    href="https://www.linkedin.com/in/phil-e-97a490178/">software
+    href="https://www.linkedin.com/in/phil-e-97a490178/">
     company</a> in New York City. I'm <a
-    href="mailto:philip.eaton@oracle.com">hiring senior engineers in
+    href="mailto:philip.eaton@oracle.com">hiring senior developers in
     Canada</a>!
   </p>
   <p>
-    As an engineer I'm big on compilers, databases, networks, and
-    operating systems. As an engineering leader I value market-driven
-    decisions and an aggressive, but patient and pragmatic approach to
-    finding and solving business problems.
+    As a developer I'm big on compilers, databases, networks, and
+    emulators. As a manager I'm big on analyzing historic customer
+    data and working with sales, product, and customers to understand
+    the market so we can steer our product in a direction that meets
+    customer and market needs.
   </p>
   <p>
     Having studied Chinese and Japanese in school, and with family in
@@ -54,10 +55,9 @@ HOME_PAGE = """
 <div class="fp-section fp-section--projects">
   <h2 id="guest-writing" class="fp-h2">Guest Writing</h2>
   <p>
-    I am most interested in high-quality educational content that
-    explains complex software development and management concepts to a
-    general tech audience. My writing is frequently well-received on
-    the front page of <a
+    I write educational content that explains intermediate software
+    development and management concepts to a general tech audience. My
+    writing is frequently well-received on the front page of <a
     href="https://news.ycombinator.com/from?site=eatonphil.com">Hacker
     News</a>, <a
     href="https://www.reddit.com/domain/eatonphil.com/">/r/programming</a>,
@@ -67,6 +67,10 @@ HOME_PAGE = """
   <p>
     Get <a href="mailto:me@eatonphil.com">in touch</a> if I can write for you.
   </p>
+</div>
+<div class="fp-section fp-section--notes">
+  <h2 class="fp-h2">Notes</h2>
+  {notes}
 </div>
 <div class="fp-section fp-section--projects">
   <h2 class="fp-h2">Fun</h2>
@@ -130,10 +134,6 @@ HOME_PAGE = """
     </div>
     <p>December 20, 2018</p>
   </div>
-</div>
-<div class="fp-section fp-section--notes">
-  <h2 class="fp-h2">Notes</h2>
-  {notes}
 </div>
 """
 TEMPLATE = open('template.html').read()
