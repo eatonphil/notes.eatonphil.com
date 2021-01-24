@@ -1,5 +1,263 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 27 Dec 2020 21:03:28 +0000</lastBuildDate><item><title>The year in books: 20 to recommend in 2020</title><link>http://notes.eatonphil.com/year-in-books-2020.html</link><description>&lt;p&gt;This year I finished 47 books, up from last year but not a personal
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 24 Jan 2021 03:46:38 +0000</lastBuildDate><item><title>Extending gosql to supporting LIMIT and OFFSET</title><link>http://notes.eatonphil.com/extending-gosql-to-support-limit-and-offset.html</link><description>&lt;p&gt;It's been a few months since I picked up
+&lt;a href="https://github.com/eatonphil/gosql"&gt;gosql&lt;/a&gt; and I wanted to use it to
+prototype a SQL interface for data stored in S3. But one missing
+critical feature in gosql is &lt;code&gt;LIMIT&lt;/code&gt; and &lt;code&gt;OFFSET&lt;/code&gt; support. This post walks
+through the few key changes to gosql to support &lt;code&gt;LIMIT&lt;/code&gt; and &lt;code&gt;OFFSET&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;You can find &lt;a href="https://github.com/eatonphil/gosql/commit/9405e433ec51f8f1d72c9b2e8f45109d738edec4"&gt;this commit in full on
+Github&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id="lexing"&gt;Lexing&lt;/h3&gt;&lt;p&gt;The first step is to update the lexer to know about the
+&lt;code&gt;LIMIT&lt;/code&gt; and &lt;code&gt;OFFSET&lt;/code&gt; keywords. Since we already
+have a generalized method of lexing any keywords from an array (see
+&lt;code&gt;lexer.go:lexKeyword&lt;/code&gt;), this is really easy. Just add a new
+&lt;code&gt;Keyword&lt;/code&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;@@ -37,6 +37,8 @@ const (
+        OnKeyword         Keyword = &amp;quot;on&amp;quot;
+        PrimarykeyKeyword Keyword = &amp;quot;primary key&amp;quot;
+        NullKeyword       Keyword = &amp;quot;null&amp;quot;
++       LimitKeyword      Keyword = &amp;quot;limit&amp;quot;
++       OffsetKeyword     Keyword = &amp;quot;offset&amp;quot;
+ )
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And then add these two new enums to the list of &lt;code&gt;Keyword&lt;/code&gt;s
+to lex:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;@@ -261,6 +263,8 @@ func lexKeyword(source string, ic cursor) (*Token, cursor, bool) {
+                OnKeyword,
+                PrimarykeyKeyword,
+                NullKeyword,
++               LimitKeyword,
++               OffsetKeyword,
+        }
+
+        var options []string
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That's it for the lexer.&lt;/p&gt;
+&lt;h3 id="parsing"&gt;Parsing&lt;/h3&gt;&lt;p&gt;Before we can parse limit and offset into the AST, we have to modify
+our AST struct to support these two fields in ast.go:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;@@ -54,9 +54,11 @@ type SelectItem struct {
+ }
+
+ type SelectStatement struct {
+-       Item  *[]*SelectItem
+-       From  *Token
+-       Where *Expression
++       Item   *[]*SelectItem
++       From   *Token
++       Where  *Expression
++       Limit  *Expression
++       Offset *Expression
+ }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And to be a good citizen, we'll fix up the &lt;code&gt;GenerateCode&lt;/code&gt;
+helper function (for pretty-printing the AST) to
+show &lt;code&gt;LIMIT&lt;/code&gt; and &lt;code&gt;OFFSET&lt;/code&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;@@ -73,17 +75,24 @@ func (ss SelectStatement) GenerateCode() string {
+                item = append(item, s)
+        }
+
+-       from := &amp;quot;&amp;quot;
++       code := &amp;quot;SELECT\n&amp;quot; + strings.Join(item, &amp;quot;,\n&amp;quot;)
+        if ss.From != nil {
+-               from = fmt.Sprintf(&amp;quot;\nFROM\n\t\&amp;quot;%s\&amp;quot;&amp;quot;, ss.From.Value)
++               code += fmt.Sprintf(&amp;quot;\nFROM\n\t\&amp;quot;%s\&amp;quot;&amp;quot;, ss.From.Value)
+        }
+
+-       where := &amp;quot;&amp;quot;
+        if ss.Where != nil {
+-               where = fmt.Sprintf(&amp;quot;\nWHERE\n\t%s&amp;quot;, ss.Where.GenerateCode())
++               code += &amp;quot;\nWHERE\n\t&amp;quot; + ss.Where.GenerateCode()
+        }
+
+-       return fmt.Sprintf(&amp;quot;SELECT\n%s%s%s;&amp;quot;, strings.Join(item, &amp;quot;,\n&amp;quot;), from, where)
++       if ss.Limit != nil {
++               code += &amp;quot;\nLIMIT\n\t&amp;quot; + ss.Limit.GenerateCode()
++       }
++
++       if ss.Offset != nil {
++               code += &amp;quot;\nOFFSET\n\t&amp;quot; + ss.Limit.GenerateCode()
++       }
++
++       return code + &amp;quot;;&amp;quot;
+ }
+
+ type ColumnDefinition struct {
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That's it for modifying the AST itself. Now we can modify the select
+statement parser to look for these two new sections. It's pretty
+simple: for both &lt;code&gt;LIMIT&lt;/code&gt; and &lt;code&gt;OFFSET&lt;/code&gt; first
+check if they exist in the current statement and then try to parse the
+expression after them, in parser.go:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;@@ -285,6 +288,30 @@ func (p Parser) parseSelectStatement(tokens []*Token, initialCursor uint, delimi
+                cursor = newCursor
+        }
+
++       _, cursor, ok = p.parseToken(tokens, cursor, limitToken)
++       if ok {
++               limit, newCursor, ok := p.parseExpression(tokens, cursor, []Token{offsetToken, delimiter}, 0)
++               if !ok {
++                       p.helpMessage(tokens, cursor, &amp;quot;Expected LIMIT value&amp;quot;)
++                       return nil, initialCursor, false
++               }
++
++               slct.Limit = limit
++               cursor = newCursor
++       }
++
++       _, cursor, ok = p.parseToken(tokens, cursor, offsetToken)
++       if ok {
++               offset, newCursor, ok := p.parseExpression(tokens, cursor, []Token{delimiter}, 0)
++               if !ok {
++                       p.helpMessage(tokens, cursor, &amp;quot;Expected OFFSET value&amp;quot;)
++                       return nil, initialCursor, false
++               }
++
++               slct.Offset = offset
++               cursor = newCursor
++       }
++
+        return &amp;amp;slct, cursor, true
+ }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And the last tricky bit is to make sure that previous
+optional &lt;code&gt;parseExpression&lt;/code&gt; know that they can be delimited
+by &lt;code&gt;OFFSET&lt;/code&gt; and &lt;code&gt;LIMIT&lt;/code&gt; (this delimiter
+awareness is just how the parser works):&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;@@ -273,9 +273,12 @@ func (p Parser) parseSelectStatement(tokens []*Token, initialCursor uint, delimi
+                cursor = newCursor
+        }
+
++       limitToken := tokenFromKeyword(LimitKeyword)
++       offsetToken := tokenFromKeyword(OffsetKeyword)
++
+        _, cursor, ok = p.parseToken(tokens, cursor, whereToken)
+        if ok {
+-               where, newCursor, ok := p.parseExpression(tokens, cursor, []Token{delimiter}, 0)
++               where, newCursor, ok := p.parseExpression(tokens, cursor, []Token{limitToken, offsetToken, delimiter}, 0)
+                if !ok {
+                        p.helpMessage(tokens, cursor, &amp;quot;Expected WHERE conditionals&amp;quot;)
+                        return nil, initialCursor, false
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That's it for parsing!&lt;/p&gt;
+&lt;h3 id="runtime"&gt;Runtime&lt;/h3&gt;&lt;p&gt;Gosql has just one storage backend currently: an in-memory store. To
+support &lt;code&gt;LIMIT&lt;/code&gt; and &lt;code&gt;OFFSET&lt;/code&gt; we need to evaluate
+both expressions if they exist. Then while we're iterating through
+table rows, after testing whether each row passes
+the &lt;code&gt;WHERE&lt;/code&gt; filter, we'll check if the number of rows
+passing the &lt;code&gt;WHERE&lt;/code&gt; filter falls within the range
+of &lt;code&gt;OFFSET&lt;/code&gt; and &lt;code&gt;LIMIT + OFFSET&lt;/code&gt; otherwise we'll
+skip the row, in memory.go:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;@@ -587,6 +587,33 @@ func (mb *MemoryBackend) Select(slct *SelectStatement) (*Results, error) {
+                }
+        }
+
++       limit := len(t.rows)
++       if slct.Limit != nil {
++               v, _, _, err := t.evaluateCell(0, *slct.Limit)
++               if err != nil {
++                       return nil, err
++               }
++
++               limit = int(*v.AsInt())
++       }
++       if limit &amp;lt; 0 {
++               return nil, fmt.Errorf(&amp;quot;Invalid, negative limit&amp;quot;)
++       }
++
++       offset := 0
++       if slct.Offset != nil {
++               v, _, _, err := t.evaluateCell(0, *slct.Offset)
++               if err != nil {
++                       return nil, err
++               }
++
++               offset = int(*v.AsInt())
++       }
++       if offset &amp;lt; 0 {
++               return nil, fmt.Errorf(&amp;quot;Invalid, negative limit&amp;quot;)
++       }
++
++       rowIndex := -1
+        for i := range t.rows {
+                result := []Cell{}
+                isFirstRow := len(results) == 0
+@@ -602,6 +629,13 @@ func (mb *MemoryBackend) Select(slct *SelectStatement) (*Results, error) {
+                        }
+                }
+
++               rowIndex++
++               if rowIndex &amp;lt; offset {
++                       continue
++               } else if rowIndex &amp;gt; offset+limit-1 {
++                       break
++               }
++
+                for _, col := range finalItems {
+                        value, columnName, columnType, err := t.evaluateCell(uint(i), *col.Exp)
+                        if err != nil {
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p class="note"&gt;
+  Just to call explicitly, with &lt;code&gt;LIMIT&lt;/code&gt;
+  and &lt;code&gt;OFFSET&lt;/code&gt; we still have to check every single row in
+  the table (at least until we've reached the offset). This should
+  clearly illustrate why paginating based on &lt;code&gt;LIMIT&lt;/code&gt;
+  and &lt;code&gt;OFFSET&lt;/code&gt; is not a great idea for big datasets
+  &lt;a href="https://use-the-index-luke.com/sql/partial-results/fetch-next-page"&gt;compared
+  to index-based pagination&lt;/a&gt;.
+&lt;/p&gt;&lt;p&gt;That's all!&lt;/p&gt;
+&lt;h3 id="trying-it-out"&gt;Trying it out&lt;/h3&gt;&lt;pre&gt;&lt;code class="hljs bash"&gt;$ go build cmd/main.go
+$ ./main
+Welcome to gosql.
+# create table user (name text, age int);
+ok
+# insert into user values (&amp;#39;meg&amp;#39;, 2);
+ok
+# insert into user values (&amp;#39;jerry&amp;#39;, 2);
+ok
+# insert into user values (&amp;#39;phil&amp;#39;, 1);
+ok
+# select * from user;
+  name  | age
+--------+------
+  meg   |   2
+  jerry |   2
+  phil  |   1
+(3 results)
+ok
+# select * from user limit 1;
+  name | age
+-------+------
+  meg  |   2
+(1 result)
+ok
+# select * from user where age=1 limit 1;
+  name | age
+-------+------
+  phil |   1
+(1 result)
+ok
+# select * from user where age=1 limit 4;
+  name | age
+-------+------
+  phil |   1
+(1 result)
+ok
+# select * from user where age=2 limit 1;
+  name | age
+-------+------
+  meg  |   2
+(1 result)
+ok
+# select * from user where age=2 limit 1 offset 1;
+  name  | age
+--------+------
+  jerry |   2
+(1 result)
+ok
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Not so hard to hack is it? Make sure to include some tests!&lt;/p&gt;
+&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
+questions or ideas.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/extending-gosql-to-support-limit-and-offset.html</guid><pubDate>Sat, 23 Jan 2021 00:00:00 +0000</pubDate></item><item><title>The year in books: 20 to recommend in 2020</title><link>http://notes.eatonphil.com/year-in-books-2020.html</link><description>&lt;p&gt;This year I finished 47 books, up from last year but not a personal
 best. The breakdown was 17 non-fiction and 30 fiction. Another 20-30
 remain started but unfinished this year.&lt;/p&gt;
 &lt;h3 id="non-fiction"&gt;Non-fiction&lt;/h3&gt;&lt;p&gt;The 8 non-fiction books I most recommend are:&lt;/p&gt;
