@@ -1,12 +1,23 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 24 Jan 2021 03:46:38 +0000</lastBuildDate><item><title>Extending gosql to supporting LIMIT and OFFSET</title><link>http://notes.eatonphil.com/extending-gosql-to-support-limit-and-offset.html</link><description>&lt;p&gt;It's been a few months since I picked up
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 24 Jan 2021 16:00:42 +0000</lastBuildDate><item><title>Extending gosql to supporting LIMIT and OFFSET</title><link>http://notes.eatonphil.com/extending-gosql-to-support-limit-and-offset.html</link><description>&lt;p&gt;It's been a few months since I picked up
 &lt;a href="https://github.com/eatonphil/gosql"&gt;gosql&lt;/a&gt; and I wanted to use it to
 prototype a SQL interface for data stored in S3. But one missing
 critical feature in gosql is &lt;code&gt;LIMIT&lt;/code&gt; and &lt;code&gt;OFFSET&lt;/code&gt; support. This post walks
 through the few key changes to gosql to support &lt;code&gt;LIMIT&lt;/code&gt; and &lt;code&gt;OFFSET&lt;/code&gt;.&lt;/p&gt;
 &lt;p&gt;You can find &lt;a href="https://github.com/eatonphil/gosql/commit/9405e433ec51f8f1d72c9b2e8f45109d738edec4"&gt;this commit in full on
 Github&lt;/a&gt;.&lt;/p&gt;
-&lt;h3 id="lexing"&gt;Lexing&lt;/h3&gt;&lt;p&gt;The first step is to update the lexer to know about the
+&lt;p class="note"&gt;
+  This post builds on top of a series on building a SQL database from scratch in Golang.
+  &lt;! forgive me, for I have sinned &gt;
+  &lt;br /&gt;
+  &lt;a href="/database-basics.html"&gt;1. SELECT, INSERT, CREATE and a REPL&lt;/a&gt;
+  &lt;br /&gt;
+  &lt;a href="/database-basics-expressions-and-where.html"&gt;2. binary expressions and WHERE filters&lt;/a&gt;
+  &lt;br /&gt;
+  &lt;a href="/database-basics-indexes.html"&gt;3. indexes&lt;/a&gt;
+  &lt;br /&gt;
+  &lt;a href="/database-basics-a-database-sql-driver.html"&gt;4. a database/sql driver&lt;/a&gt;
+&lt;/p&gt;&lt;h3 id="lexing"&gt;Lexing&lt;/h3&gt;&lt;p&gt;The first step is to update the lexer to know about the
 &lt;code&gt;LIMIT&lt;/code&gt; and &lt;code&gt;OFFSET&lt;/code&gt; keywords. Since we already
 have a generalized method of lexing any keywords from an array (see
 &lt;code&gt;lexer.go:lexKeyword&lt;/code&gt;), this is really easy. Just add a new
@@ -257,6 +268,7 @@ ok
 &lt;p&gt;Not so hard to hack is it? Make sure to include some tests!&lt;/p&gt;
 &lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
 questions or ideas.&lt;/p&gt;
+&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Working on a prototype SQL-based explorer for data stored in S3 and I needed OFFSET/LIMIT support in the gosql parser. Wrote up a short post on how you can hack in additional syntax and functionality into this SQL engine written in Go.&lt;a href="https://t.co/PyVozTPZ5S"&gt;https://t.co/PyVozTPZ5S&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1353372050023456768?ref_src=twsrc%5Etfw"&gt;January 24, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/extending-gosql-to-support-limit-and-offset.html</guid><pubDate>Sat, 23 Jan 2021 00:00:00 +0000</pubDate></item><item><title>The year in books: 20 to recommend in 2020</title><link>http://notes.eatonphil.com/year-in-books-2020.html</link><description>&lt;p&gt;This year I finished 47 books, up from last year but not a personal
 best. The breakdown was 17 non-fiction and 30 fiction. Another 20-30
 remain started but unfinished this year.&lt;/p&gt;

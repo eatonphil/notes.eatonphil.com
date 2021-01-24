@@ -11,6 +11,19 @@ through the few key changes to gosql to support <code>LIMIT</code> and <code>OFF
 You can find [this commit in full on
 Github](https://github.com/eatonphil/gosql/commit/9405e433ec51f8f1d72c9b2e8f45109d738edec4).
 
+<p class="note">
+  This post builds on top of a series on building a SQL database from scratch in Golang.
+  <! forgive me, for I have sinned >
+  <br />
+  <a href="/database-basics.html">1. SELECT, INSERT, CREATE and a REPL</a>
+  <br />
+  <a href="/database-basics-expressions-and-where.html">2. binary expressions and WHERE filters</a>
+  <br />
+  <a href="/database-basics-indexes.html">3. indexes</a>
+  <br />
+  <a href="/database-basics-a-database-sql-driver.html">4. a database/sql driver</a>
+</p>
+
 ### Lexing
 
 The first step is to update the lexer to know about the
@@ -301,3 +314,5 @@ Not so hard to hack is it? Make sure to include some tests!
 
 As always, I'd love to [hear from you](mailto:me@eatonphil.com) with
 questions or ideas.
+
+<blockquote class="twitter-tweet"><p lang="en" dir="ltr">Working on a prototype SQL-based explorer for data stored in S3 and I needed OFFSET/LIMIT support in the gosql parser. Wrote up a short post on how you can hack in additional syntax and functionality into this SQL engine written in Go.<a href="https://t.co/PyVozTPZ5S">https://t.co/PyVozTPZ5S</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1353372050023456768?ref_src=twsrc%5Etfw">January 24, 2021</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
