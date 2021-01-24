@@ -1,0 +1,303 @@
+# Extending gosql to supporting LIMIT and OFFSET
+## January 23, 2021
+###### sql,oss,hacking,golang
+
+It's been a few months since I picked up
+[gosql](https://github.com/eatonphil/gosql) and I wanted to use it to
+prototype a SQL interface for data stored in S3. But one missing
+critical feature in gosql is <code>LIMIT</code> and <code>OFFSET</code> support. This post walks
+through the few key changes to gosql to support <code>LIMIT</code> and <code>OFFSET</code>.
+
+You can find [this commit in full on
+Github](https://github.com/eatonphil/gosql/commit/9405e433ec51f8f1d72c9b2e8f45109d738edec4).
+
+### Lexing
+
+The first step is to update the lexer to know about the
+<code>LIMIT</code> and <code>OFFSET</code> keywords. Since we already
+have a generalized method of lexing any keywords from an array (see
+<code>lexer.go:lexKeyword</code>), this is really easy. Just add a new
+<code>Keyword</code>:
+
+```golang
+@@ -37,6 +37,8 @@ const (
+        OnKeyword         Keyword = "on"
+        PrimarykeyKeyword Keyword = "primary key"
+        NullKeyword       Keyword = "null"
++       LimitKeyword      Keyword = "limit"
++       OffsetKeyword     Keyword = "offset"
+ )
+```
+
+And then add these two new enums to the list of <code>Keyword</code>s
+to lex:
+
+```golang
+@@ -261,6 +263,8 @@ func lexKeyword(source string, ic cursor) (*Token, cursor, bool) {
+                OnKeyword,
+                PrimarykeyKeyword,
+                NullKeyword,
++               LimitKeyword,
++               OffsetKeyword,
+        }
+
+        var options []string
+```
+
+That's it for the lexer.
+
+### Parsing
+
+Before we can parse limit and offset into the AST, we have to modify
+our AST struct to support these two fields in ast.go:
+
+```golang
+@@ -54,9 +54,11 @@ type SelectItem struct {
+ }
+
+ type SelectStatement struct {
+-       Item  *[]*SelectItem
+-       From  *Token
+-       Where *Expression
++       Item   *[]*SelectItem
++       From   *Token
++       Where  *Expression
++       Limit  *Expression
++       Offset *Expression
+ }
+```
+
+And to be a good citizen, we'll fix up the <code>GenerateCode</code>
+helper function (for pretty-printing the AST) to
+show <code>LIMIT</code> and <code>OFFSET</code>.
+
+```golang
+@@ -73,17 +75,24 @@ func (ss SelectStatement) GenerateCode() string {
+                item = append(item, s)
+        }
+
+-       from := ""
++       code := "SELECT\n" + strings.Join(item, ",\n")
+        if ss.From != nil {
+-               from = fmt.Sprintf("\nFROM\n\t\"%s\"", ss.From.Value)
++               code += fmt.Sprintf("\nFROM\n\t\"%s\"", ss.From.Value)
+        }
+
+-       where := ""
+        if ss.Where != nil {
+-               where = fmt.Sprintf("\nWHERE\n\t%s", ss.Where.GenerateCode())
++               code += "\nWHERE\n\t" + ss.Where.GenerateCode()
+        }
+
+-       return fmt.Sprintf("SELECT\n%s%s%s;", strings.Join(item, ",\n"), from, where)
++       if ss.Limit != nil {
++               code += "\nLIMIT\n\t" + ss.Limit.GenerateCode()
++       }
++
++       if ss.Offset != nil {
++               code += "\nOFFSET\n\t" + ss.Limit.GenerateCode()
++       }
++
++       return code + ";"
+ }
+
+ type ColumnDefinition struct {
+```
+
+That's it for modifying the AST itself. Now we can modify the select
+statement parser to look for these two new sections. It's pretty
+simple: for both <code>LIMIT</code> and <code>OFFSET</code> first
+check if they exist in the current statement and then try to parse the
+expression after them, in parser.go:
+
+```golang
+@@ -285,6 +288,30 @@ func (p Parser) parseSelectStatement(tokens []*Token, initialCursor uint, delimi
+                cursor = newCursor
+        }
+
++       _, cursor, ok = p.parseToken(tokens, cursor, limitToken)
++       if ok {
++               limit, newCursor, ok := p.parseExpression(tokens, cursor, []Token{offsetToken, delimiter}, 0)
++               if !ok {
++                       p.helpMessage(tokens, cursor, "Expected LIMIT value")
++                       return nil, initialCursor, false
++               }
++
++               slct.Limit = limit
++               cursor = newCursor
++       }
++
++       _, cursor, ok = p.parseToken(tokens, cursor, offsetToken)
++       if ok {
++               offset, newCursor, ok := p.parseExpression(tokens, cursor, []Token{delimiter}, 0)
++               if !ok {
++                       p.helpMessage(tokens, cursor, "Expected OFFSET value")
++                       return nil, initialCursor, false
++               }
++
++               slct.Offset = offset
++               cursor = newCursor
++       }
++
+        return &slct, cursor, true
+ }
+```
+
+And the last tricky bit is to make sure that previous
+optional <code>parseExpression</code> know that they can be delimited
+by <code>OFFSET</code> and <code>LIMIT</code> (this delimiter
+awareness is just how the parser works):
+
+```golang
+@@ -273,9 +273,12 @@ func (p Parser) parseSelectStatement(tokens []*Token, initialCursor uint, delimi
+                cursor = newCursor
+        }
+
++       limitToken := tokenFromKeyword(LimitKeyword)
++       offsetToken := tokenFromKeyword(OffsetKeyword)
++
+        _, cursor, ok = p.parseToken(tokens, cursor, whereToken)
+        if ok {
+-               where, newCursor, ok := p.parseExpression(tokens, cursor, []Token{delimiter}, 0)
++               where, newCursor, ok := p.parseExpression(tokens, cursor, []Token{limitToken, offsetToken, delimiter}, 0)
+                if !ok {
+                        p.helpMessage(tokens, cursor, "Expected WHERE conditionals")
+                        return nil, initialCursor, false
+```
+
+That's it for parsing!
+
+### Runtime
+
+Gosql has just one storage backend currently: an in-memory store. To
+support <code>LIMIT</code> and <code>OFFSET</code> we need to evaluate
+both expressions if they exist. Then while we're iterating through
+table rows, after testing whether each row passes
+the <code>WHERE</code> filter, we'll check if the number of rows
+passing the <code>WHERE</code> filter falls within the range
+of <code>OFFSET</code> and <code>LIMIT + OFFSET</code> otherwise we'll
+skip the row, in memory.go:
+
+```golang
+@@ -587,6 +587,33 @@ func (mb *MemoryBackend) Select(slct *SelectStatement) (*Results, error) {
+                }
+        }
+
++       limit := len(t.rows)
++       if slct.Limit != nil {
++               v, _, _, err := t.evaluateCell(0, *slct.Limit)
++               if err != nil {
++                       return nil, err
++               }
++
++               limit = int(*v.AsInt())
++       }
++       if limit < 0 {
++               return nil, fmt.Errorf("Invalid, negative limit")
++       }
++
++       offset := 0
++       if slct.Offset != nil {
++               v, _, _, err := t.evaluateCell(0, *slct.Offset)
++               if err != nil {
++                       return nil, err
++               }
++
++               offset = int(*v.AsInt())
++       }
++       if offset < 0 {
++               return nil, fmt.Errorf("Invalid, negative limit")
++       }
++
++       rowIndex := -1
+        for i := range t.rows {
+                result := []Cell{}
+                isFirstRow := len(results) == 0
+@@ -602,6 +629,13 @@ func (mb *MemoryBackend) Select(slct *SelectStatement) (*Results, error) {
+                        }
+                }
+
++               rowIndex++
++               if rowIndex < offset {
++                       continue
++               } else if rowIndex > offset+limit-1 {
++                       break
++               }
++
+                for _, col := range finalItems {
+                        value, columnName, columnType, err := t.evaluateCell(uint(i), *col.Exp)
+                        if err != nil {
+```
+
+<p class="note">
+  Just to call explicitly, with <code>LIMIT</code>
+  and <code>OFFSET</code> we still have to check every single row in
+  the table (at least until we've reached the offset). This should
+  clearly illustrate why paginating based on <code>LIMIT</code>
+  and <code>OFFSET</code> is not a great idea for big datasets
+  <a href="https://use-the-index-luke.com/sql/partial-results/fetch-next-page">compared
+  to index-based pagination</a>.
+</p>
+
+That's all!
+
+### Trying it out
+
+```bash
+$ go build cmd/main.go
+$ ./main
+Welcome to gosql.
+# create table user (name text, age int);
+ok
+# insert into user values ('meg', 2);
+ok
+# insert into user values ('jerry', 2);
+ok
+# insert into user values ('phil', 1);
+ok
+# select * from user;
+  name  | age
+--------+------
+  meg   |   2
+  jerry |   2
+  phil  |   1
+(3 results)
+ok
+# select * from user limit 1;
+  name | age
+-------+------
+  meg  |   2
+(1 result)
+ok
+# select * from user where age=1 limit 1;
+  name | age
+-------+------
+  phil |   1
+(1 result)
+ok
+# select * from user where age=1 limit 4;
+  name | age
+-------+------
+  phil |   1
+(1 result)
+ok
+# select * from user where age=2 limit 1;
+  name | age
+-------+------
+  meg  |   2
+(1 result)
+ok
+# select * from user where age=2 limit 1 offset 1;
+  name  | age
+--------+------
+  jerry |   2
+(1 result)
+ok
+```
+
+Not so hard to hack is it? Make sure to include some tests!
+
+#### Feedback
+
+As always, I'd love to [hear from you](mailto:me@eatonphil.com) with
+questions or ideas.

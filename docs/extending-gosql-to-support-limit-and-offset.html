@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Extending gosql to supporting LIMIT and OFFSET | notes.eatonphil.com</title>
+    <meta name="description" content="Extending gosql to supporting LIMIT and OFFSET" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+    
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <div class="row">
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+
+	  <div class="row">
+            <a href="/" class="notes">Home</a>
+	    <a style="font-size: .9rem; padding-left: 15px" href="/#guest-writing">Guest Writing</a>
+	  </div>
+          <h2>January 23, 2021</h2>
+          <h1>Extending gosql to supporting LIMIT and OFFSET</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/sql.html" class="tag">sql</a><a href="/tags/oss.html" class="tag">oss</a><a href="/tags/hacking.html" class="tag">hacking</a><a href="/tags/golang.html" class="tag">golang</a></div>
+          </div>
+	</div>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="col-6">
+        <p>It's been a few months since I picked up
+<a href="https://github.com/eatonphil/gosql">gosql</a> and I wanted to use it to
+prototype a SQL interface for data stored in S3. But one missing
+critical feature in gosql is <code>LIMIT</code> and <code>OFFSET</code> support. This post walks
+through the few key changes to gosql to support <code>LIMIT</code> and <code>OFFSET</code>.</p>
+<p>You can find <a href="https://github.com/eatonphil/gosql/commit/9405e433ec51f8f1d72c9b2e8f45109d738edec4">this commit in full on
+Github</a>.</p>
+<h3 id="lexing">Lexing</h3><p>The first step is to update the lexer to know about the
+<code>LIMIT</code> and <code>OFFSET</code> keywords. Since we already
+have a generalized method of lexing any keywords from an array (see
+<code>lexer.go:lexKeyword</code>), this is really easy. Just add a new
+<code>Keyword</code>:</p>
+<pre><code class="hljs golang">@@ -37,6 +37,8 @@ const (
+        OnKeyword         Keyword = &quot;on&quot;
+        PrimarykeyKeyword Keyword = &quot;primary key&quot;
+        NullKeyword       Keyword = &quot;null&quot;
++       LimitKeyword      Keyword = &quot;limit&quot;
++       OffsetKeyword     Keyword = &quot;offset&quot;
+ )
+</code></pre>
+<p>And then add these two new enums to the list of <code>Keyword</code>s
+to lex:</p>
+<pre><code class="hljs golang">@@ -261,6 +263,8 @@ func lexKeyword(source string, ic cursor) (*Token, cursor, bool) {
+                OnKeyword,
+                PrimarykeyKeyword,
+                NullKeyword,
++               LimitKeyword,
++               OffsetKeyword,
+        }
+
+        var options []string
+</code></pre>
+<p>That's it for the lexer.</p>
+<h3 id="parsing">Parsing</h3><p>Before we can parse limit and offset into the AST, we have to modify
+our AST struct to support these two fields in ast.go:</p>
+<pre><code class="hljs golang">@@ -54,9 +54,11 @@ type SelectItem struct {
+ }
+
+ type SelectStatement struct {
+-       Item  *[]*SelectItem
+-       From  *Token
+-       Where *Expression
++       Item   *[]*SelectItem
++       From   *Token
++       Where  *Expression
++       Limit  *Expression
++       Offset *Expression
+ }
+</code></pre>
+<p>And to be a good citizen, we'll fix up the <code>GenerateCode</code>
+helper function (for pretty-printing the AST) to
+show <code>LIMIT</code> and <code>OFFSET</code>.</p>
+<pre><code class="hljs golang">@@ -73,17 +75,24 @@ func (ss SelectStatement) GenerateCode() string {
+                item = append(item, s)
+        }
+
+-       from := &quot;&quot;
++       code := &quot;SELECT\n&quot; + strings.Join(item, &quot;,\n&quot;)
+        if ss.From != nil {
+-               from = fmt.Sprintf(&quot;\nFROM\n\t\&quot;%s\&quot;&quot;, ss.From.Value)
++               code += fmt.Sprintf(&quot;\nFROM\n\t\&quot;%s\&quot;&quot;, ss.From.Value)
+        }
+
+-       where := &quot;&quot;
+        if ss.Where != nil {
+-               where = fmt.Sprintf(&quot;\nWHERE\n\t%s&quot;, ss.Where.GenerateCode())
++               code += &quot;\nWHERE\n\t&quot; + ss.Where.GenerateCode()
+        }
+
+-       return fmt.Sprintf(&quot;SELECT\n%s%s%s;&quot;, strings.Join(item, &quot;,\n&quot;), from, where)
++       if ss.Limit != nil {
++               code += &quot;\nLIMIT\n\t&quot; + ss.Limit.GenerateCode()
++       }
++
++       if ss.Offset != nil {
++               code += &quot;\nOFFSET\n\t&quot; + ss.Limit.GenerateCode()
++       }
++
++       return code + &quot;;&quot;
+ }
+
+ type ColumnDefinition struct {
+</code></pre>
+<p>That's it for modifying the AST itself. Now we can modify the select
+statement parser to look for these two new sections. It's pretty
+simple: for both <code>LIMIT</code> and <code>OFFSET</code> first
+check if they exist in the current statement and then try to parse the
+expression after them, in parser.go:</p>
+<pre><code class="hljs golang">@@ -285,6 +288,30 @@ func (p Parser) parseSelectStatement(tokens []*Token, initialCursor uint, delimi
+                cursor = newCursor
+        }
+
++       _, cursor, ok = p.parseToken(tokens, cursor, limitToken)
++       if ok {
++               limit, newCursor, ok := p.parseExpression(tokens, cursor, []Token{offsetToken, delimiter}, 0)
++               if !ok {
++                       p.helpMessage(tokens, cursor, &quot;Expected LIMIT value&quot;)
++                       return nil, initialCursor, false
++               }
++
++               slct.Limit = limit
++               cursor = newCursor
++       }
++
++       _, cursor, ok = p.parseToken(tokens, cursor, offsetToken)
++       if ok {
++               offset, newCursor, ok := p.parseExpression(tokens, cursor, []Token{delimiter}, 0)
++               if !ok {
++                       p.helpMessage(tokens, cursor, &quot;Expected OFFSET value&quot;)
++                       return nil, initialCursor, false
++               }
++
++               slct.Offset = offset
++               cursor = newCursor
++       }
++
+        return &amp;slct, cursor, true
+ }
+</code></pre>
+<p>And the last tricky bit is to make sure that previous
+optional <code>parseExpression</code> know that they can be delimited
+by <code>OFFSET</code> and <code>LIMIT</code> (this delimiter
+awareness is just how the parser works):</p>
+<pre><code class="hljs golang">@@ -273,9 +273,12 @@ func (p Parser) parseSelectStatement(tokens []*Token, initialCursor uint, delimi
+                cursor = newCursor
+        }
+
++       limitToken := tokenFromKeyword(LimitKeyword)
++       offsetToken := tokenFromKeyword(OffsetKeyword)
++
+        _, cursor, ok = p.parseToken(tokens, cursor, whereToken)
+        if ok {
+-               where, newCursor, ok := p.parseExpression(tokens, cursor, []Token{delimiter}, 0)
++               where, newCursor, ok := p.parseExpression(tokens, cursor, []Token{limitToken, offsetToken, delimiter}, 0)
+                if !ok {
+                        p.helpMessage(tokens, cursor, &quot;Expected WHERE conditionals&quot;)
+                        return nil, initialCursor, false
+</code></pre>
+<p>That's it for parsing!</p>
+<h3 id="runtime">Runtime</h3><p>Gosql has just one storage backend currently: an in-memory store. To
+support <code>LIMIT</code> and <code>OFFSET</code> we need to evaluate
+both expressions if they exist. Then while we're iterating through
+table rows, after testing whether each row passes
+the <code>WHERE</code> filter, we'll check if the number of rows
+passing the <code>WHERE</code> filter falls within the range
+of <code>OFFSET</code> and <code>LIMIT + OFFSET</code> otherwise we'll
+skip the row, in memory.go:</p>
+<pre><code class="hljs golang">@@ -587,6 +587,33 @@ func (mb *MemoryBackend) Select(slct *SelectStatement) (*Results, error) {
+                }
+        }
+
++       limit := len(t.rows)
++       if slct.Limit != nil {
++               v, _, _, err := t.evaluateCell(0, *slct.Limit)
++               if err != nil {
++                       return nil, err
++               }
++
++               limit = int(*v.AsInt())
++       }
++       if limit &lt; 0 {
++               return nil, fmt.Errorf(&quot;Invalid, negative limit&quot;)
++       }
++
++       offset := 0
++       if slct.Offset != nil {
++               v, _, _, err := t.evaluateCell(0, *slct.Offset)
++               if err != nil {
++                       return nil, err
++               }
++
++               offset = int(*v.AsInt())
++       }
++       if offset &lt; 0 {
++               return nil, fmt.Errorf(&quot;Invalid, negative limit&quot;)
++       }
++
++       rowIndex := -1
+        for i := range t.rows {
+                result := []Cell{}
+                isFirstRow := len(results) == 0
+@@ -602,6 +629,13 @@ func (mb *MemoryBackend) Select(slct *SelectStatement) (*Results, error) {
+                        }
+                }
+
++               rowIndex++
++               if rowIndex &lt; offset {
++                       continue
++               } else if rowIndex &gt; offset+limit-1 {
++                       break
++               }
++
+                for _, col := range finalItems {
+                        value, columnName, columnType, err := t.evaluateCell(uint(i), *col.Exp)
+                        if err != nil {
+</code></pre>
+<p class="note">
+  Just to call explicitly, with <code>LIMIT</code>
+  and <code>OFFSET</code> we still have to check every single row in
+  the table (at least until we've reached the offset). This should
+  clearly illustrate why paginating based on <code>LIMIT</code>
+  and <code>OFFSET</code> is not a great idea for big datasets
+  <a href="https://use-the-index-luke.com/sql/partial-results/fetch-next-page">compared
+  to index-based pagination</a>.
+</p><p>That's all!</p>
+<h3 id="trying-it-out">Trying it out</h3><pre><code class="hljs bash">$ go build cmd/main.go
+$ ./main
+Welcome to gosql.
+# create table user (name text, age int);
+ok
+# insert into user values (&#39;meg&#39;, 2);
+ok
+# insert into user values (&#39;jerry&#39;, 2);
+ok
+# insert into user values (&#39;phil&#39;, 1);
+ok
+# select * from user;
+  name  | age
+--------+------
+  meg   |   2
+  jerry |   2
+  phil  |   1
+(3 results)
+ok
+# select * from user limit 1;
+  name | age
+-------+------
+  meg  |   2
+(1 result)
+ok
+# select * from user where age=1 limit 1;
+  name | age
+-------+------
+  phil |   1
+(1 result)
+ok
+# select * from user where age=1 limit 4;
+  name | age
+-------+------
+  phil |   1
+(1 result)
+ok
+# select * from user where age=2 limit 1;
+  name | age
+-------+------
+  meg  |   2
+(1 result)
+ok
+# select * from user where age=2 limit 1 offset 1;
+  name  | age
+--------+------
+  jerry |   2
+(1 result)
+ok
+</code></pre>
+<p>Not so hard to hack is it? Make sure to include some tests!</p>
+<h4 id="feedback">Feedback</h4><p>As always, I'd love to <a href="mailto:me@eatonphil.com">hear from you</a> with
+questions or ideas.</p>
+
+      </div>
+    </div>
+
+    <footer>
+      <div class="container">
+	<div>
+	  <div class="row">
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+	</div>
+      </div>
+    </footer>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>
