@@ -1,5 +1,33 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 27 Jan 2021 15:07:27 +0000</lastBuildDate><item><title>Extending gosql to supporting LIMIT and OFFSET</title><link>http://notes.eatonphil.com/extending-gosql-to-support-limit-and-offset.html</link><description>&lt;p&gt;It's been a few months since I picked up
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 01 Feb 2021 23:56:46 +0000</lastBuildDate><item><title>Four books professional developers should read (and a few you don't need to)</title><link>http://notes.eatonphil.com/books-developers-should-read.html</link><description>&lt;p&gt;These are the books I recommend to developers wanting to improve their
+skills as professional programmers because of high information
+density, believable premises/examples, and being well edited.&lt;/p&gt;
+&lt;p&gt;You don't need to read books to improve as a developer but
+they are unparalleled in quickly helping you gain depth in a subject.&lt;/p&gt;
+&lt;h3 id="effective-python:-90-specific-ways-to-write-better-python"&gt;Effective Python: 90 Specific Ways to Write Better Python&lt;/h3&gt;&lt;p&gt;If you're a Python developer wanting to improve your craft you should
+read this. Good Python starts with a deep understanding of the
+standard library and language.&lt;/p&gt;
+&lt;h3 id="high-performance-browser-networking"&gt;High Performance Browser Networking&lt;/h3&gt;&lt;p&gt;If your code is triggered by a desktop or mobile browser you should
+read this. It is a thorough high level introduction to mobile
+networks, browser network protocols, and fundementals of networking.&lt;/p&gt;
+&lt;h3 id="designing-data-intensive-applications"&gt;Designing Data-Intensive Applications&lt;/h3&gt;&lt;p&gt;If your databases and APIs are a bottleneck you should read this. A
+solid introduction to distributed computing, data transfer, indexing,
+etc.&lt;/p&gt;
+&lt;h3 id="site-reliability-engineering:-how-google-runs-production-services"&gt;Site Reliability Engineering: How Google Runs Production Services&lt;/h3&gt;&lt;p&gt;If you are responsible for services in production you should read
+this. It's Google specific but is an excellent background on practices
+for monitoring and maintaining production environments.&lt;/p&gt;
+&lt;h3 id="that's-it!"&gt;That's it!&lt;/h3&gt;&lt;p&gt;Generic software books conspicuously not on this list for
+me:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Clean Code&lt;/li&gt;
+&lt;li&gt;JavaScript the Good Parts&lt;/li&gt;
+&lt;li&gt;Design Patterns/Gang of Four&lt;/li&gt;
+&lt;li&gt;Structure and Interpretation of Computer Programs&lt;/li&gt;
+&lt;li&gt;A Philosophy of Software Design&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;They're not all bad but give nowhere near as much return for the
+investment of your time.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/books-developers-should-read.html</guid><pubDate>Mon, 01 Feb 2021 00:00:00 +0000</pubDate></item><item><title>Extending gosql to supporting LIMIT and OFFSET</title><link>http://notes.eatonphil.com/extending-gosql-to-support-limit-and-offset.html</link><description>&lt;p&gt;It's been a few months since I picked up
 &lt;a href="https://github.com/eatonphil/gosql"&gt;gosql&lt;/a&gt; and I wanted to use it to
 prototype a SQL interface for data stored in S3. But one missing
 critical feature in gosql is &lt;code&gt;LIMIT&lt;/code&gt; and &lt;code&gt;OFFSET&lt;/code&gt; support. This post walks
