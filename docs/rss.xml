@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 01 Feb 2021 23:56:46 +0000</lastBuildDate><item><title>Four books professional developers should read (and a few you don't need to)</title><link>http://notes.eatonphil.com/books-developers-should-read.html</link><description>&lt;p&gt;These are the books I recommend to developers wanting to improve their
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 02 Feb 2021 00:03:09 +0000</lastBuildDate><item><title>Four books professional developers should read (and a few you don't need to)</title><link>http://notes.eatonphil.com/books-developers-should-read.html</link><description>&lt;p&gt;These are the books I recommend to developers wanting to improve their
 skills as professional programmers because of high information
 density, believable premises/examples, and being well edited.&lt;/p&gt;
 &lt;p&gt;You don't need to read books to improve as a developer but
@@ -27,6 +27,9 @@ me:&lt;/p&gt;
 &lt;/ul&gt;
 &lt;p&gt;They're not all bad but give nowhere near as much return for the
 investment of your time.&lt;/p&gt;
+&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
+questions or ideas.&lt;/p&gt;
+&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Four books I recommend to professional developers wanting to improve their craft, and a few I&amp;#39;d not&lt;a href="https://t.co/1aTrfqZ9bd"&gt;https://t.co/1aTrfqZ9bd&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1356391931274756096?ref_src=twsrc%5Etfw"&gt;February 2, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/books-developers-should-read.html</guid><pubDate>Mon, 01 Feb 2021 00:00:00 +0000</pubDate></item><item><title>Extending gosql to supporting LIMIT and OFFSET</title><link>http://notes.eatonphil.com/extending-gosql-to-support-limit-and-offset.html</link><description>&lt;p&gt;It's been a few months since I picked up
 &lt;a href="https://github.com/eatonphil/gosql"&gt;gosql&lt;/a&gt; and I wanted to use it to
 prototype a SQL interface for data stored in S3. But one missing

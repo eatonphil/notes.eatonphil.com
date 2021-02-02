@@ -52,22 +52,6 @@ HOME_PAGE = """
     href="https://www.goodreads.com/user/show/50930981-phil-eaton">Goodreads</a>.
   </p>
 </div>
-<div class="fp-section fp-section--projects">
-  <h2 id="guest-writing" class="fp-h2">Guest Writing</h2>
-  <p>
-    I write educational content that explains intermediate software
-    development and management concepts to a general tech audience. My
-    writing is frequently well-received on the front page of <a
-    href="https://news.ycombinator.com/from?site=eatonphil.com">Hacker
-    News</a>, <a
-    href="https://www.reddit.com/domain/eatonphil.com/">/r/programming</a>,
-    and <a
-    href="https://lobste.rs/domain/notes.eatonphil.com">lobste.rs</a>.
-  </p>
-  <p>
-    Get <a href="mailto:me@eatonphil.com">in touch</a> if I can write for you.
-  </p>
-</div>
 <div class="fp-section fp-section--notes">
   <h2 class="fp-h2">Notes</h2>
   {notes}
@@ -185,7 +169,7 @@ def get_html_tags(all_tags):
         if not tag:
             continue
         #if i < 3:
-        tags += '<a href="/tags/{}.html" class="tag">{}</a>'.format(tag, tag)
+        tags += '<a href="/tags/{}.html" class="tag">{}</a>'.format(tag.replace(' ', '-'), tag)
         #else:
         #    tags += '<span style="display: none;">{}</span>'.format(tag)
     if tags:
@@ -249,7 +233,7 @@ def main():
         os.makedirs('docs/tags')
     for tag in all_tags:
         posts = all_tags[tag]
-        with open('docs/tags/%s.html' % tag, 'w') as f:
+        with open('docs/tags/%s.html' % tag.replace(' ', '-'), 'w') as f:
             posts.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
             posts.reverse()
             tag_page = TAG_PAGE.format(tag)
