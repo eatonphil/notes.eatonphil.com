@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 03 Feb 2021 14:34:15 +0000</lastBuildDate><item><title>Four books professional developers should read (and a few you don't need to)</title><link>http://notes.eatonphil.com/books-developers-should-read.html</link><description>&lt;p&gt;These are the books I recommend to developers wanting to improve their
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Fri, 19 Feb 2021 14:12:03 +0000</lastBuildDate><item><title>Four books professional developers should read (and a few you don't need to)</title><link>http://notes.eatonphil.com/books-developers-should-read.html</link><description>&lt;p&gt;These are the books I recommend to developers wanting to improve their
 skills as professional programmers because of high information
 density, believable premises/examples, and being well edited.&lt;/p&gt;
 &lt;p&gt;You don't need to read books to improve as a developer but
@@ -11587,81 +11587,7 @@ team's work up to your stakeholders. This is the best position to be
 in.&lt;/p&gt;
 &lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;tldr; don&amp;#39;t let your folks overwork unnecessarily when you could be reporting more frequently/honestly on understood priorities and accomplishments achieved/not achieved &lt;a href="https://t.co/PeTe2Bq0Xz"&gt;https://t.co/PeTe2Bq0Xz&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1087722536236957697?ref_src=twsrc%5Etfw"&gt;January 22, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/transparency-and-communication-on-small-teams.html</guid><pubDate>Tue, 22 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Windows</title><link>http://notes.eatonphil.com/windows.html</link><description>&lt;p&gt;It has been six years since I last used Windows for any remotely
-serious software development. I've used Ubuntu, Arch, or FreeBSD
-since. But eventually I spent so much time working around common
-workplace tasks that I decided to put Windows 10 Pro on my work
-laptop.&lt;/p&gt;
-&lt;h3 id="windows-subsystem-for-linux"&gt;Windows Subsystem for Linux&lt;/h3&gt;&lt;p&gt;Introduced in 2016, this technology allows Windows to run unmodified
-Linux binaries. The core feat being &lt;a href="https://blogs.msdn.microsoft.com/wsl/2016/06/08/wsl-system-calls/"&gt;syscall
-translation&lt;/a&gt;.&lt;/p&gt;
-&lt;p&gt;It works nearly flawlessly. This means I can do all my Go, Node,
-PostgreSQL development on Windows without a virtual machine using
-bash, tmux, git, emacs, etc.&lt;/p&gt;
-&lt;p&gt;I've seen a few minor exceptions over the course of regular software
-development in WSL:&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;&lt;a href="https://github.com/Microsoft/WSL/issues/2249"&gt;ss/netstat does not work&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="https://github.com/hashicorp/vagrant/issues/8700"&gt;vagrant does not work&lt;/a&gt;&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;More generally, Linux programs are heavily file-oriented. And Windows
-I/O &lt;a href="https://github.com/Microsoft/WSL/issues/873#issuecomment-425272829"&gt;is not designed well for
-that&lt;/a&gt;.
-In the worst cases (installing/adding Node packages) it can take
-minutes to do operations that would take Linux seconds.&lt;/p&gt;
-&lt;h3 id="vagrant"&gt;Vagrant&lt;/h3&gt;&lt;p&gt;Vagrant-Windows interoperability is abysmal.&lt;/p&gt;
-&lt;p&gt;As noted above, you cannot manage Hyper-V from vagrant within WSL. So
-you're stuck using Powershell. Even then, managing synced files from
-vagrant is a nightmare. The default sync method requires you to sign
-in using your &lt;strong&gt;Windows Live&lt;/strong&gt; username and password on every
-reboot. But Node package installation attempts some file operations
-that are not supported over the default synced, network filesystem.&lt;/p&gt;
-&lt;p&gt;When I switched to rsync vagrant wouldn't reliable sync when the
-virtual machine went down and came back up.&lt;/p&gt;
-&lt;p&gt;After hours of trying to get some files synced with vagrant I gave up.&lt;/p&gt;
-&lt;h3 id="hyper-v"&gt;Hyper-V&lt;/h3&gt;&lt;p&gt;Hyper-V's GUI is much more complex/feature-complete than VirtualBox.
-It even provides a Ubuntu-quick-install that I used to jump right in.
-I don't recommend using this though because it gives you no option but
-an 11GB hard disk. I didn't realize this until I went through an hour
-or two of post-install customization only to run out of space. Too
-lazy to boot into a live CD to grow the root filesystem I reinstalled
-with a more suitable 64GB drive and went through the hour-long
-post-install customization process again.&lt;/p&gt;
-&lt;p&gt;Networking in Hyper-V is more complex/feature-complete than VirtualBox
-as well. To access a Hyper-V machine you must create a new virtual
-network interface manually and associate it. Static IP address appear
-to be controlled at the host networking level (e.g. Control Panel)
-instead of within the Hyper-V interface. This highlights how these
-virtual interfaces are first-class, but overcomplicates the process of
-getting started.&lt;/p&gt;
-&lt;p&gt;Ultimately I gave up on a static IP address and decided to reboot less
-frequently.&lt;/p&gt;
-&lt;p&gt;Performance-wise Hyper-V machines are exactly as expected: excellent.&lt;/p&gt;
-&lt;h3 id="misc"&gt;Misc&lt;/h3&gt;&lt;p&gt;Docker support on Windows needs work. It took me a while to understand
-how Docker interacts with the WSL filesystem and what I needed to do
-to allow Docker to mount. The complexity is similar on macOS when you
-want to mount privileged directories like /var, but the experience is
-worse on Windows.&lt;/p&gt;
-&lt;p&gt;Apparently Windows does have tiling window managers, but I have not
-tried one out yet.&lt;/p&gt;
-&lt;p&gt;Powershell, a language with real types, is pretty compelling. But I
-have not spent enough time with it to be efficient. And since WSL is
-mostly good enough I don't really plan to.&lt;/p&gt;
-&lt;p&gt;Windows doesn't allow you to delete any files that are "in use". This
-is kinda cool except for that the errors you get when trying to delete
-files that are in use are useless. They are even more useless when you
-get the plain "could not delete directory" when you try to delete a
-directory with some file inside it that is in use. I had to start
-deleting files within by hand until I found the one I realized was in
-use.&lt;/p&gt;
-&lt;h3 id="conclusion"&gt;Conclusion&lt;/h3&gt;&lt;p&gt;If you have never run Linux or FreeBSD, don't use this post as an
-excuse not to. You should run Linux or FreeBSD for the experience. But
-if you've reached diminishing returns in your Linux/FreeBSD use,
-Windows as a development environment has come a long way. It may be
-the best platform available for software development, the profession.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
-&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Some notes on my experience having replaced Arch Linux with Windows on my work laptop &lt;a href="https://t.co/8asxZmspwR"&gt;https://t.co/8asxZmspwR&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1086994000182153222?ref_src=twsrc%5Etfw"&gt;January 20, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/windows.html</guid><pubDate>Sun, 20 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Writing a lisp compiler from scratch in JavaScript: 2. user-defined functions and variables</title><link>http://notes.eatonphil.com/compiler-basics-functions.html</link><description>&lt;p class="note"&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/transparency-and-communication-on-small-teams.html</guid><pubDate>Tue, 22 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Writing a lisp compiler from scratch in JavaScript: 2. user-defined functions and variables</title><link>http://notes.eatonphil.com/compiler-basics-functions.html</link><description>&lt;p class="note"&gt;
   Previously in compiler basics:
   &lt;! forgive me, for I have sinned &gt;
   &lt;br /&gt;
@@ -12081,7 +12007,81 @@ $ echo $?
 conditionals and tail-call optimization.&lt;/p&gt;
 &lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Part two on compiler basics using JavaScript: user-defined functions and variables &lt;a href="https://t.co/XOam67HO8h"&gt;https://t.co/XOam67HO8h&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1087103061590446083?ref_src=twsrc%5Etfw"&gt;January 20, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/compiler-basics-functions.html</guid><pubDate>Sun, 20 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Make small changes and solve the problems you have</title><link>http://notes.eatonphil.com/make-small-changes-and-solve-the-problems-you-have.html</link><description>&lt;p&gt;Two frustrating things that can happen in an organization are 1) big
+</description><guid isPermaLink="false">http://notes.eatonphil.com/compiler-basics-functions.html</guid><pubDate>Sun, 20 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Windows</title><link>http://notes.eatonphil.com/windows.html</link><description>&lt;p&gt;It has been six years since I last used Windows for any remotely
+serious software development. I've used Ubuntu, Arch, or FreeBSD
+since. But eventually I spent so much time working around common
+workplace tasks that I decided to put Windows 10 Pro on my work
+laptop.&lt;/p&gt;
+&lt;h3 id="windows-subsystem-for-linux"&gt;Windows Subsystem for Linux&lt;/h3&gt;&lt;p&gt;Introduced in 2016, this technology allows Windows to run unmodified
+Linux binaries. The core feat being &lt;a href="https://blogs.msdn.microsoft.com/wsl/2016/06/08/wsl-system-calls/"&gt;syscall
+translation&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;It works nearly flawlessly. This means I can do all my Go, Node,
+PostgreSQL development on Windows without a virtual machine using
+bash, tmux, git, emacs, etc.&lt;/p&gt;
+&lt;p&gt;I've seen a few minor exceptions over the course of regular software
+development in WSL:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://github.com/Microsoft/WSL/issues/2249"&gt;ss/netstat does not work&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/hashicorp/vagrant/issues/8700"&gt;vagrant does not work&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;More generally, Linux programs are heavily file-oriented. And Windows
+I/O &lt;a href="https://github.com/Microsoft/WSL/issues/873#issuecomment-425272829"&gt;is not designed well for
+that&lt;/a&gt;.
+In the worst cases (installing/adding Node packages) it can take
+minutes to do operations that would take Linux seconds.&lt;/p&gt;
+&lt;h3 id="vagrant"&gt;Vagrant&lt;/h3&gt;&lt;p&gt;Vagrant-Windows interoperability is abysmal.&lt;/p&gt;
+&lt;p&gt;As noted above, you cannot manage Hyper-V from vagrant within WSL. So
+you're stuck using Powershell. Even then, managing synced files from
+vagrant is a nightmare. The default sync method requires you to sign
+in using your &lt;strong&gt;Windows Live&lt;/strong&gt; username and password on every
+reboot. But Node package installation attempts some file operations
+that are not supported over the default synced, network filesystem.&lt;/p&gt;
+&lt;p&gt;When I switched to rsync vagrant wouldn't reliable sync when the
+virtual machine went down and came back up.&lt;/p&gt;
+&lt;p&gt;After hours of trying to get some files synced with vagrant I gave up.&lt;/p&gt;
+&lt;h3 id="hyper-v"&gt;Hyper-V&lt;/h3&gt;&lt;p&gt;Hyper-V's GUI is much more complex/feature-complete than VirtualBox.
+It even provides a Ubuntu-quick-install that I used to jump right in.
+I don't recommend using this though because it gives you no option but
+an 11GB hard disk. I didn't realize this until I went through an hour
+or two of post-install customization only to run out of space. Too
+lazy to boot into a live CD to grow the root filesystem I reinstalled
+with a more suitable 64GB drive and went through the hour-long
+post-install customization process again.&lt;/p&gt;
+&lt;p&gt;Networking in Hyper-V is more complex/feature-complete than VirtualBox
+as well. To access a Hyper-V machine you must create a new virtual
+network interface manually and associate it. Static IP address appear
+to be controlled at the host networking level (e.g. Control Panel)
+instead of within the Hyper-V interface. This highlights how these
+virtual interfaces are first-class, but overcomplicates the process of
+getting started.&lt;/p&gt;
+&lt;p&gt;Ultimately I gave up on a static IP address and decided to reboot less
+frequently.&lt;/p&gt;
+&lt;p&gt;Performance-wise Hyper-V machines are exactly as expected: excellent.&lt;/p&gt;
+&lt;h3 id="misc"&gt;Misc&lt;/h3&gt;&lt;p&gt;Docker support on Windows needs work. It took me a while to understand
+how Docker interacts with the WSL filesystem and what I needed to do
+to allow Docker to mount. The complexity is similar on macOS when you
+want to mount privileged directories like /var, but the experience is
+worse on Windows.&lt;/p&gt;
+&lt;p&gt;Apparently Windows does have tiling window managers, but I have not
+tried one out yet.&lt;/p&gt;
+&lt;p&gt;Powershell, a language with real types, is pretty compelling. But I
+have not spent enough time with it to be efficient. And since WSL is
+mostly good enough I don't really plan to.&lt;/p&gt;
+&lt;p&gt;Windows doesn't allow you to delete any files that are "in use". This
+is kinda cool except for that the errors you get when trying to delete
+files that are in use are useless. They are even more useless when you
+get the plain "could not delete directory" when you try to delete a
+directory with some file inside it that is in use. I had to start
+deleting files within by hand until I found the one I realized was in
+use.&lt;/p&gt;
+&lt;h3 id="conclusion"&gt;Conclusion&lt;/h3&gt;&lt;p&gt;If you have never run Linux or FreeBSD, don't use this post as an
+excuse not to. You should run Linux or FreeBSD for the experience. But
+if you've reached diminishing returns in your Linux/FreeBSD use,
+Windows as a development environment has come a long way. It may be
+the best platform available for software development, the profession.&lt;/p&gt;
+&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
+&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Some notes on my experience having replaced Arch Linux with Windows on my work laptop &lt;a href="https://t.co/8asxZmspwR"&gt;https://t.co/8asxZmspwR&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1086994000182153222?ref_src=twsrc%5Etfw"&gt;January 20, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/windows.html</guid><pubDate>Sun, 20 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Make small changes and solve the problems you have</title><link>http://notes.eatonphil.com/make-small-changes-and-solve-the-problems-you-have.html</link><description>&lt;p&gt;Two frustrating things that can happen in an organization are 1) big
 changes and 2) changes that aren’t clearly associated with a known
 problem. It’s even worse in that order.&lt;/p&gt;
 &lt;p&gt;These situations tend to happen when a problem remain unaddressed for
