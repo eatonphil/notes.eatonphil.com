@@ -1,0 +1,88 @@
+# How to get better at recursion
+## March 7, 2021
+###### functional-programming,recursion,learning
+
+tldr; reimplement standard library functions in your favorite
+language _without loops_.
+
+### Background
+
+For a few years after college I spent a lot of free time doing
+projects in Standard ML and Scheme. As a result I got really
+comfortable doing recursion. The two big reasons for this are 1)
+neither Standard ML or Scheme have loops and 2) they both have very
+small standard libraries. (Ok, they have loops. They're just so
+limited as to be useless.)
+
+I ended up building [a standard
+library](https://github.com/eatonphil/ponyo) for Standard ML including
+string functions (contains, indexOf, count, replace, etc.), an HTTP
+server and client, a hash table, a binary search tree, parts of a
+Standard ML parser, and [so on](https://ponyo.org/reference).
+
+All of this without for loops.
+
+### Strategy
+
+The good news (if you don't want to learn a new language) is that you
+don't have to take up Standard ML or Scheme to get better at
+recursion. But you do need to dedicate some time to _practicing
+recursion_ to get better at it.
+
+My recommendation would be to pick 10-20 string or array functions out
+of your favorite language's standard library and reimplement them
+without for loops. (Obviously, start simple and just pick one. But
+don't stop there.)
+
+### Some examples
+
+Here's an example reimplementation of <code>indexOf</code> in
+JavaScript:
+
+```javascript
+function indexOf(input, toMatch) {
+  function helper(index, offset, test) {
+    if (index === input.length) {
+      return -1;
+    }
+
+    if (toMatch === test) {
+      return index;
+    }
+
+    if (input[index+offset] !== toMatch[offset] || test.length > toMatch.length) {
+      return helper(index+1, 0, "");
+    }
+
+    return helper(index, offset+1, test+input[index+offset]);
+  }
+
+  return helper(0, 0, "");
+}
+```
+
+Or here's an example immutable reimplementation of <code>insert</code>
+in Python:
+
+```python
+def insert(arr, index, item):
+  def helper(currentIndex, accum):
+    if currentIndex == len(arr):
+      return accum
+    if currentIndex < index:
+      return helper(currentIndex+1, accum + [arr[currentIndex]])
+    if currentIndex == index:
+      return helper(currentIndex+1, accum + [item, arr[currentIndex]])
+    return helper(currentIndex+1, accum + [arr[currentIndex]])
+  return helper(0, [])
+```
+
+<p class="note">
+  You're going to find an edge case and that's all right. The
+  important part at the moment is practicing recursion.
+</p>
+
+For bonus points, avoid all mutation in your implementations and use
+only tail recursion.
+
+Happy recursion!
