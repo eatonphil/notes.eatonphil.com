@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>How to get better at recursion | notes.eatonphil.com</title>
+    <meta name="description" content="How to get better at recursion" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+    
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <div class="row">
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+
+	  <div class="row">
+            <a href="/" class="notes">Home</a>
+	    <a style="font-size: .9rem; padding-left: 15px" href="https://news.ycombinator.com/item?id=26304791">My team is hiring!</a>
+	  </div>
+          <h2>March 7, 2021</h2>
+          <h1>How to get better at recursion</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/functional-programming.html" class="tag">functional-programming</a><a href="/tags/recursion.html" class="tag">recursion</a><a href="/tags/learning.html" class="tag">learning</a></div>
+          </div>
+	</div>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="col-6">
+        <p>tldr; reimplement standard library functions in your favorite
+language <em>without loops</em>.</p>
+<h3 id="background">Background</h3><p>For a few years after college I spent a lot of free time doing
+projects in Standard ML and Scheme. As a result I got really
+comfortable doing recursion. The two big reasons for this are 1)
+neither Standard ML or Scheme have loops and 2) they both have very
+small standard libraries. (Ok, they have loops. They're just so
+limited as to be useless.)</p>
+<p>I ended up building <a href="https://github.com/eatonphil/ponyo">a standard
+library</a> for Standard ML including
+string functions (contains, indexOf, count, replace, etc.), an HTTP
+server and client, a hash table, a binary search tree, parts of a
+Standard ML parser, and <a href="https://ponyo.org/reference">so on</a>.</p>
+<p>All of this without for loops.</p>
+<h3 id="strategy">Strategy</h3><p>The good news (if you don't want to learn a new language) is that you
+don't have to take up Standard ML or Scheme to get better at
+recursion. But you do need to dedicate some time to <em>practicing
+recursion</em> to get better at it.</p>
+<p>My recommendation would be to pick 10-20 string or array functions out
+of your favorite language's standard library and reimplement them
+without for loops. (Obviously, start simple and just pick one. But
+don't stop there.)</p>
+<h3 id="some-examples">Some examples</h3><p>Here's an example reimplementation of <code>indexOf</code> in
+JavaScript:</p>
+<pre><code class="hljs javascript">function indexOf(input, toMatch) {
+  function helper(index, offset, test) {
+    if (index === input.length) {
+      return -1;
+    }
+
+    if (toMatch === test) {
+      return index;
+    }
+
+    if (input[index+offset] !== toMatch[offset] || test.length &gt; toMatch.length) {
+      return helper(index+1, 0, &quot;&quot;);
+    }
+
+    return helper(index, offset+1, test+input[index+offset]);
+  }
+
+  return helper(0, 0, &quot;&quot;);
+}
+</code></pre>
+<p>Or here's an example immutable reimplementation of <code>insert</code>
+in Python:</p>
+<pre><code class="hljs python">def insert(arr, index, item):
+  def helper(currentIndex, accum):
+    if currentIndex == len(arr):
+      return accum
+    if currentIndex &lt; index:
+      return helper(currentIndex+1, accum + [arr[currentIndex]])
+    if currentIndex == index:
+      return helper(currentIndex+1, accum + [item, arr[currentIndex]])
+    return helper(currentIndex+1, accum + [arr[currentIndex]])
+  return helper(0, [])
+</code></pre>
+<p class="note">
+  You're going to find an edge case and that's all right. The
+  important part at the moment is practicing recursion.
+</p><p>For bonus points, avoid all mutation in your implementations and use
+only tail recursion.</p>
+<p>Happy recursion!</p>
+
+      </div>
+    </div>
+
+    <footer>
+      <div class="container">
+	<div>
+	  <div class="row">
+            <a href="https://github.com/eatonphil" class="sm-link">
+              <i class="fab fa-github"></i>
+            </a>
+            <a href="https://twitter.com/phil_eaton" class="sm-link">
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+	</div>
+      </div>
+    </footer>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

@@ -1,5 +1,68 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Fri, 19 Feb 2021 14:12:03 +0000</lastBuildDate><item><title>Four books professional developers should read (and a few you don't need to)</title><link>http://notes.eatonphil.com/books-developers-should-read.html</link><description>&lt;p&gt;These are the books I recommend to developers wanting to improve their
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 07 Mar 2021 16:35:13 +0000</lastBuildDate><item><title>How to get better at recursion</title><link>http://notes.eatonphil.com/practicing-recursion.html</link><description>&lt;p&gt;tldr; reimplement standard library functions in your favorite
+language &lt;em&gt;without loops&lt;/em&gt;.&lt;/p&gt;
+&lt;h3 id="background"&gt;Background&lt;/h3&gt;&lt;p&gt;For a few years after college I spent a lot of free time doing
+projects in Standard ML and Scheme. As a result I got really
+comfortable doing recursion. The two big reasons for this are 1)
+neither Standard ML or Scheme have loops and 2) they both have very
+small standard libraries. (Ok, they have loops. They're just so
+limited as to be useless.)&lt;/p&gt;
+&lt;p&gt;I ended up building &lt;a href="https://github.com/eatonphil/ponyo"&gt;a standard
+library&lt;/a&gt; for Standard ML including
+string functions (contains, indexOf, count, replace, etc.), an HTTP
+server and client, a hash table, a binary search tree, parts of a
+Standard ML parser, and &lt;a href="https://ponyo.org/reference"&gt;so on&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;All of this without for loops.&lt;/p&gt;
+&lt;h3 id="strategy"&gt;Strategy&lt;/h3&gt;&lt;p&gt;The good news (if you don't want to learn a new language) is that you
+don't have to take up Standard ML or Scheme to get better at
+recursion. But you do need to dedicate some time to &lt;em&gt;practicing
+recursion&lt;/em&gt; to get better at it.&lt;/p&gt;
+&lt;p&gt;My recommendation would be to pick 10-20 string or array functions out
+of your favorite language's standard library and reimplement them
+without for loops. (Obviously, start simple and just pick one. But
+don't stop there.)&lt;/p&gt;
+&lt;h3 id="some-examples"&gt;Some examples&lt;/h3&gt;&lt;p&gt;Here's an example reimplementation of &lt;code&gt;indexOf&lt;/code&gt; in
+JavaScript:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs javascript"&gt;function indexOf(input, toMatch) {
+  function helper(index, offset, test) {
+    if (index === input.length) {
+      return -1;
+    }
+
+    if (toMatch === test) {
+      return index;
+    }
+
+    if (input[index+offset] !== toMatch[offset] || test.length &amp;gt; toMatch.length) {
+      return helper(index+1, 0, &amp;quot;&amp;quot;);
+    }
+
+    return helper(index, offset+1, test+input[index+offset]);
+  }
+
+  return helper(0, 0, &amp;quot;&amp;quot;);
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Or here's an example immutable reimplementation of &lt;code&gt;insert&lt;/code&gt;
+in Python:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def insert(arr, index, item):
+  def helper(currentIndex, accum):
+    if currentIndex == len(arr):
+      return accum
+    if currentIndex &amp;lt; index:
+      return helper(currentIndex+1, accum + [arr[currentIndex]])
+    if currentIndex == index:
+      return helper(currentIndex+1, accum + [item, arr[currentIndex]])
+    return helper(currentIndex+1, accum + [arr[currentIndex]])
+  return helper(0, [])
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p class="note"&gt;
+  You're going to find an edge case and that's all right. The
+  important part at the moment is practicing recursion.
+&lt;/p&gt;&lt;p&gt;For bonus points, avoid all mutation in your implementations and use
+only tail recursion.&lt;/p&gt;
+&lt;p&gt;Happy recursion!&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/practicing-recursion.html</guid><pubDate>Sun, 07 Mar 2021 00:00:00 +0000</pubDate></item><item><title>Four books professional developers should read (and a few you don't need to)</title><link>http://notes.eatonphil.com/books-developers-should-read.html</link><description>&lt;p&gt;These are the books I recommend to developers wanting to improve their
 skills as professional programmers because of high information
 density, believable premises/examples, and being well edited.&lt;/p&gt;
 &lt;p&gt;You don't need to read books to improve as a developer but
