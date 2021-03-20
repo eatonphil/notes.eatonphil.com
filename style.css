@@ -6,7 +6,7 @@ body {
     margin: 0 auto;
     padding: 0;
     color: black;
-    background: #fdfdff;
+    background: white;
     font-size: 1.1rem;
     font-family: sans-serif;
 }
@@ -61,8 +61,8 @@ a {
     text-decoration: none;
 }
 
-pre {
-    width: 650px;
+code {
+    font-family: "Source Code Pro", "Consolas", "Courier", monospace;
 }
 
 img {
@@ -93,7 +93,6 @@ footer {
 }
 
 header .container > div {
-    border-bottom: 1px solid #eee;
     padding-bottom: 15px;
 }
 
@@ -106,6 +105,11 @@ header .container {
     padding: 30px 15px 0 15px;
 }
 
+.tagline {
+    font-size: 14px;
+    padding: 15px 0;
+}
+
 .subscribe {
     flex: 1;
     text-align: right;    
@@ -113,12 +117,13 @@ header .container {
 
 .subscribe a {
     font-size: 1rem;
-    border: 1px solid rgb(0, 95, 255);
+    border: 1px solid black;
     padding: 5px;
+    color: black;
 }
 
 .subscribe a:hover {
-    background: rgb(0, 95, 255);
+    background: black;
     color: white;
 }
 
@@ -134,10 +139,13 @@ aside p {
 }
 
 .hljs {
-    padding: 15px;
+    padding: 2rem;
+    max-height: 1000px;
+    border: 1px solid #f0f0f0;
     background: white;
-    border: 1px solid #ccc;
-    max-height: 300px;
+    font-size: .7rem;
+    width: 800px;
+    margin-left: -100px;
 }
 
 .title {
@@ -162,7 +170,7 @@ aside p {
     display: inline-block;
     margin-right: 10px;
     padding: 3px 5px;
-    background: #e2e9ff;
+    background: #efefef;
     color: #777;
     font-size: .9rem;
 }
@@ -172,14 +180,12 @@ aside p {
 }
 
 .summary .tag {
-    background: #e2e9ff;
     font-size: .9rem;
 }
 
 .fp-project, .summary {
     margin: 0 -32px 0 -32px;
     padding: 15px 32px;
-    border-top: 2px solid white;
 }
 
 .summary-subtitle {
@@ -196,8 +202,8 @@ aside p {
 
 .note {
     line-height: 1.4rem;
-    background: #f0f0f0;
-    border-left: 2px solid #3661ff;
+    border: 1px solid #f0f0f0;
+    border-left: 5px solid #3661ff;
     padding: 15px;
 }
 
@@ -215,8 +221,6 @@ aside p {
 }
 
 .fp-section {
-    margin: -1rem;
-    padding: 2rem;
     margin-top: 4rem;
 }
 

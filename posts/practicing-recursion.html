@@ -69,11 +69,15 @@ def insert(arr, index, item):
   def helper(currentIndex, accum):
     if currentIndex == len(arr):
       return accum
+
     if currentIndex < index:
       return helper(currentIndex+1, accum + [arr[currentIndex]])
+
     if currentIndex == index:
       return helper(currentIndex+1, accum + [item, arr[currentIndex]])
+
     return helper(currentIndex+1, accum + [arr[currentIndex]])
+
   return helper(0, [])
 ```
 

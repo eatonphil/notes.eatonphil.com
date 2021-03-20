@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>My notes</title><link>http://notes.eatonphil.com/</link><description>My notes</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sat, 20 Mar 2021 21:18:28 +0000</lastBuildDate><item><title>How to get better at recursion</title><link>http://notes.eatonphil.com/practicing-recursion.html</link><description>&lt;p&gt;tldr; reimplement standard library functions in your favorite
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sat, 20 Mar 2021 22:52:10 +0000</lastBuildDate><item><title>How to get better at recursion</title><link>http://notes.eatonphil.com/practicing-recursion.html</link><description>&lt;p&gt;tldr; reimplement standard library functions in your favorite
 language &lt;em&gt;without loops&lt;/em&gt;.&lt;/p&gt;
 &lt;h3 id="background"&gt;Background&lt;/h3&gt;&lt;p&gt;For a few years after college I spent a lot of free time doing
 projects in Standard ML and Scheme. As a result I got really
@@ -49,11 +49,15 @@ in Python:&lt;/p&gt;
   def helper(currentIndex, accum):
     if currentIndex == len(arr):
       return accum
+
     if currentIndex &amp;lt; index:
       return helper(currentIndex+1, accum + [arr[currentIndex]])
+
     if currentIndex == index:
       return helper(currentIndex+1, accum + [item, arr[currentIndex]])
+
     return helper(currentIndex+1, accum + [arr[currentIndex]])
+
   return helper(0, [])
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p class="note"&gt;
@@ -304,7 +308,7 @@ skip the row, in memory.go:&lt;/p&gt;
                         if err != nil {
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p class="note"&gt;
-  Just to call explicitly, with &lt;code&gt;LIMIT&lt;/code&gt;
+  Just to call out explicitly, with &lt;code&gt;LIMIT&lt;/code&gt;
   and &lt;code&gt;OFFSET&lt;/code&gt; we still have to check every single row in
   the table (at least until we've reached the offset). This should
   clearly illustrate why paginating based on &lt;code&gt;LIMIT&lt;/code&gt;

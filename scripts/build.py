@@ -26,28 +26,33 @@ TAG_PAGE = """
 """
 HOME_PAGE = """
 <div class="fp-section fp-section--about">
-  <h2 class="fp-h2">Bio</h2>
+  <h2 class="fp-h2"></h2>
   <p>
-    Hello! I'm Phil, a Software Development Manager at a <a
-    href="https://www.linkedin.com/in/phil-e-97a490178/">
-    company</a> in New York City.
+    Hello! I'm Phil, a Software Development Manager in Brooklyn.
+    This site is about making complex topics approachable; in software,
+    organizations, product development, and professional growth.
   </p>
   <p>
-    I like to make complex topics (like building interpreters,
-    compilers, databases, servers, emulators, and teams of humans
-    delivering high quality products) more approachable.
+    Some of the most viewed topics here include writing <a
+    href="/tags/interpreter.html">interpreters</a>, <a
+    href="/tags/compiler.html">compilers</a>, <a
+    href="/tags/database.html">databases</a>, <a
+    href="/tags/web-servers.html">servers</a>, and <a
+    href="/tags/emulator.html">emulators</a> from scratch.
   </p>
   <p>
     You can find me elsewhere on <a
     href="https://github.com/eatonphil">Github</a>, <a
-    href="https://twitter.com/phil_eaton">Twitter</a>, and <a
+    href="https://twitter.com/phil_eaton">Twitter</a>, <a
+    href="https://www.linkedin.com/in/phil-e-97a490178/">LinkedIn</a>, and <a
     href="https://www.goodreads.com/user/show/50930981-phil-eaton">Goodreads</a>.
   </p>
 </div>
 <div class="fp-section fp-section--notes">
-  <h2 class="fp-h2">Notes</h2>
+  <h2 class="fp-h2">Archive</h2>
   {notes}
 </div>
+<!--
 <div class="fp-section fp-section--projects">
   <h2 class="fp-h2">Fun</h2>
   <a href="http://ponyo.org" class="fp-project">
@@ -111,9 +116,10 @@ HOME_PAGE = """
     <p>December 20, 2018</p>
   </div>
 </div>
+-->
 """
 TEMPLATE = open('template.html').read()
-TAG = "My notes"
+TAG = "Notes on software, organizations, product development, and professional growth"
 
 class Renderer(mistune.Renderer):
     def __init__(self):
@@ -194,8 +200,16 @@ def main():
 
     post_data.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
     post_data.reverse()
+    notes = []
+    for i, args in enumerate(post_data):
+        year = args[2].split(' ')[-1]
+        prev_post_year = str(datetime.today().year + 1) if i == 0 else post_data[i-1][2].split(' ')[-1]
+        if year != prev_post_year:
+            notes.append('<h3>{}</h3>'.format(year))
+        note = POST_SUMMARY.format(*args[:2], args[5], *args[2:3])
+        notes.append(note)
     home_page = HOME_PAGE.format(
-        notes="\n".join([POST_SUMMARY.format(*args[:2], args[5], *args[2:3]) for args in post_data]))
+        notes="\n".join(notes))
     with open('docs/index.html', 'w') as f:
         meta = '<meta name="google-site-verification" content="s-Odt0Dj7WZzEk6hLV28wLyR5LeGQFoopUV3IDNO6bM" />\n    '
         f.write(TEMPLATE.format(post=home_page, title="", tag=TAG, subtitle="", tags="", meta=meta))
