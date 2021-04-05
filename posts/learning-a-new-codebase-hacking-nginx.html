@@ -1,0 +1,470 @@
+# Learning a new codebase: hacking nginx
+## April 4, 2021
+###### hacking,nginx,c
+
+I have never contributed to nginx. My C skills are 1/10. But
+downloading the source, hacking it up, compiling it, and running it
+doesn't scare me. This post is to help you overcome your own fears
+about doing so. Not necessarily because you should be running
+out-of-tree diffs in production but because I see a lot of developers
+never even consider looking at the source of a big tool or dependency
+they use.
+
+Most of all, studying mature software projects is one of the best ways
+to grow as a programmer.
+
+### Source and build
+
+At a high-level, the steps for hacking on software projects are always
+the same:
+
+1. Find/download the source code
+1. Start grep-ing around based on you've seen in the output or capabilities you know exist
+1. Install necessary dependency libraries/compilers
+1. Make a change
+1. Run some variation of <code>./configure && make</code> to build
+1. Run the program
+1. Go back to step 4 until you're happy
+
+### nginx
+
+Let's follow these steps for nginx. We google <code>nginx github</code>
+to learn that there's a read-only copy of the source on
+[Github](https://github.com/nginx/nginx).
+
+```bash
+$ mkdir ~/vendor
+$ cd ~/vendor
+$ git clone https://github.com/nginx/nginx
+$ cd nginx
+```
+
+There's no readme, bummer. We google <code>nginx build from
+source</code> and find
+[this](http://nginx.org/en/docs/configure.html). We see it's a typical
+C project that builds exactly as guessed: <code>./configure &&
+make</code>. And it doesn't look like it has any third-party
+dependencies besides my C compiler.
+
+Install autoconf, gmake, and a C compiler. There's no `./configure`
+file in this directory but notice there is a `configure` file in
+`auto`. `cd auto && ./configure` crashes so try
+`./auto/configure`. That seems to do it except for the
+warning... `./auto/configure --without-http_rewrite_module`. And again
+for http_gzip_module.
+
+Ok autoconfigure is done. Now we've got a Makefile. Run `make -j` to compile using all cores.
+
+Don't see `./nginx` so run `git status` to see where the binary was placed. `ls objs` and there it is, great.
+
+### The hack
+
+We want a simple `dump` command that will return a literal string in a
+`location` block. So something like this:
+
+```diff
+$ diff --git a/conf/nginx.conf b/conf/nginx.conf
+index 29bc085f..e96e817f 100644
+--- a/conf/nginx.conf
++++ b/conf/nginx.conf
+
+@@ -41,8 +41,7 @@ http {
+#access_log  logs/host.access.log  main;
+
+location / {
+-            root   html;
+-            index  index.html index.htm;
++            dump 'It was a good Thursday.';
+         }
+
+         #error_page  404              /404.html;
+}
+```
+
+Now that we've built nginx we can try this out:
+
+```bash
+$ ./objs/nginx -t -c $(pwd)/conf/nginx.conf
+nginx: [alert] could not open error log file: open() "/usr/local/nginx/logs/error.log" failed (2: No such file or directory)
+2021/04/04 21:24:09 [emerg] 1030951#0: unknown directive "dump" in /home/phil/vendor/nginx/conf/nginx.conf:44
+nginx: configuration file /home/phil/vendor/nginx/conf/nginx.conf test failed
+```
+
+And now we've got something to go on! Clearly we have to register this
+directive and the log gives us enough info to start grepping:
+
+```bash
+$ git --no-pager grep 'unknown directive'
+src/core/ngx_conf_file.c:                       "unknown directive \"%s\"", name->data);
+```
+
+The case that has this failing comes from line 463: `rv = cmd->set(cf, cmd, conf)`. So let's see what this `set` does. `git grep set` is useless. Let's try finding out what `cmd` is so we can locate the struct that has `set` on it. Ah it's an `ngx_command_t`. Since it doesn't have `struct` behind it it means it's typedef-ed and will likely have a `;` after it. So `git grep ngx_command_t\;` finds us:
+
+```
+$ git --no-pager grep ngx_command_t\;
+src/core/ngx_core.h:typedef struct ngx_command_s         ngx_command_t;
+```
+
+Which means the implementation is hidden, so grep for ngx_command_s:
+
+```bash
+$ git --no-pager grep ngx_command_s
+src/core/ngx_conf_file.h:struct ngx_command_s {
+src/core/ngx_core.h:typedef struct ngx_command_s         ngx_command_t;
+```
+
+Ok this is going nowhere. Different approach. What command did we remove?
+
+```bash
+$ git --no-pager diff
+diff --git a/conf/nginx.conf b/conf/nginx.conf
+index 29bc085f..e96e817f 100644
+--- a/conf/nginx.conf
++++ b/conf/nginx.conf
+@@ -41,8 +41,7 @@ http {
+         #access_log  logs/host.access.log  main;
+
+         location / {
+-            root   html;
+-            index  index.html index.htm;
++            dump 'It was a good Thursday.';
+         }
+
+         #error_page  404              /404.html;
+```
+
+`root` is a command. Maybe we can copy that.
+
+```bash
+$ git --no-pager grep \"root\"
+docs/xml/nginx/changes.xml:in the "root" or "auth_basic_user_file" directives.
+docs/xml/nginx/changes.xml:a request was handled incorrectly, if a "root" directive used variables;
+docs/xml/nginx/changes.xml:the $document_root variable usage in the "root" and "alias" directives
+docs/xml/nginx/changes.xml:the $document_root variable did not support the variables in the "root"
+docs/xml/nginx/changes.xml:if a "root" was specified by variable only, then the root was relative
+src/http/ngx_http_core_module.c:    { ngx_string("root"),
+src/http/ngx_http_core_module.c:                           &cmd->name, clcf->alias ? "alias" : "root");
+```
+
+That looks more promising. Let's copy that:
+
+```bash
+$ git --no-pager diff src/http/
+diff --git a/src/http/ngx_http_core_module.c b/src/http/ngx_http_core_module.c             index 9b94b328..17a64e80 100644                                                            --- a/src/http/ngx_http_core_module.c                                                      +++ b/src/http/ngx_http_core_module.c                                                      @@ -331,6 +331,14 @@ static ngx_command_t  ngx_http_core_commands[] = {
+       0,
+       NULL },
++    { ngx_string("dump"),
++      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF
++                        |NGX_CONF_TAKE1,
++      ngx_http_core_dump,
++      NGX_HTTP_LOC_CONF_OFFSET,
++      0,
++      NULL },
++
+     { ngx_string("alias"),
+       NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+       ngx_http_core_root,
+```
+
+Ok so this is how a command is registered. It obviously won't build without `ngx_http_core_dump` so let's implement that by copying/renaming `ngx_http_core_root`:
+
+```bash
+$ git --no-pager diff src
+diff --git a/src/http/ngx_http_core_module.c b/src/http/ngx_http_core_module.c
+index 9b94b328..c184dab5 100644
+--- a/src/http/ngx_http_core_module.c
++++ b/src/http/ngx_http_core_module.c
+@@ -4402,6 +4410,16 @@ ngx_http_core_root(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+}
+
+
++static char *
++ngx_http_core_dump(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
++{
++    ngx_http_core_loc_conf_t *clcf = conf;
++    ngx_str_t *value = cf->args->elts;
++    clcf->dump = value[1];
++    return NGX_CONF_OK;
++}
++
++
+static ngx_http_method_name_t  ngx_methods_names[] = {
+     { (u_char *) "GET",       (uint32_t) ~NGX_HTTP_GET },
+     { (u_char *) "HEAD",      (uint32_t) ~NGX_HTTP_HEAD },
+```
+
+The goal here is to just store the dump script on this conf
+object. Then while serving the request we can check if this is set and
+evaluate the script.
+
+This still clearly won't build because we didn't modify this conf
+object. But let's run `make` anyway.
+
+```bash
+$ make -f objs/Makefile
+make[1]: Entering directory '/home/phil/vendor/nginx'
+cc -c -pipe  -O -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -g  -I src/core -I src/event -I src/event/modules -I src/os/unix -I objs -I src/http -I src/http/modules \
+        -o objs/src/http/ngx_http_core_module.o \
+        src/http/ngx_http_core_module.c
+src/http/ngx_http_core_module.c:337:7: error: ngx_http_core_dump undeclared here (not in a function); did you mean ngx_http_core_type?
+337 |       ngx_http_core_dump,
+    |       ^~~~~~~~~~~~~~~~~~~~~
+    |       ngx_http_core_type
+src/http/ngx_http_core_module.c: In function ngx_http_core_dump:
+src/http/ngx_http_core_module.c:4418:9: error: ngx_http_core_loc_conf_t {aka struct ngx_http_core_loc_conf_s} has no member named dump
+4418 |     clcf->dump = value[1];
+     |         ^~
+src/http/ngx_http_core_module.c:4418:5: error: statement with no effect [-Werror=unused-value]
+4418 |     clcf->dump = value[1];
+     |     ^~~~
+At top level:
+src/http/ngx_http_core_module.c:4414:1: error: ngx_http_core_dump defined but not used [-Werror=unused-function]
+4414 | ngx_http_core_dump(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+     | ^~~~~~~~~~~~~~~~~~~~~
+cc1: all warnings being treated as errors
+make[1]: *** [objs/Makefile:834: objs/src/http/ngx_http_core_module.o] Error 1
+make[1]: Leaving directory '/home/phil/vendor/nginx'
+make: *** [Makefile:10: build] Error 2
+```
+
+The dump handler is undeclared. While copying `ngx_http_core_root` earlier I saw that there was a forward declaration toward the top. Let's copy that as well and see if that fixes anything.
+
+```bash
+$ git --no-pager diff
+diff --git a/src/http/ngx_http_core_module.c b/src/http/ngx_http_core_module.c
+index 9b94b328..430e1256 100644
+--- a/src/http/ngx_http_core_module.c
++++ b/src/http/ngx_http_core_module.c
+@@ -56,6 +56,7 @@ static char *ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd,
+static char *ngx_http_core_server_name(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+static char *ngx_http_core_root(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
++static char *ngx_http_core_dump(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+ static char *ngx_http_core_limit_except(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+ static char *ngx_http_core_set_aio(ngx_conf_t *cf, ngx_command_t *cmd,
+```
+
+And build:
+
+```bash
+$ make
+make -f objs/Makefile
+make[1]: Entering directory '/home/phil/vendor/nginx'
+cc -c -pipe  -O -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -g  -I src/core -I src/event -I src/event/modules -I src/os/unix -I objs -I src/http -I src/http/modules \
+        -o objs/src/http/ngx_http_core_module.o \
+src/http/ngx_http_core_module.c
+src/http/ngx_http_core_module.c: In function ngx_http_core_dump:
+src/http/ngx_http_core_module.c:4419:9: error: ngx_http_core_loc_conf_t {aka struct ngx_http_core_loc_conf_s} has no member named dump
+4419 |     clcf->dump = value[1];
+     |         ^~
+make[1]: *** [objs/Makefile:834: objs/src/http/ngx_http_core_module.o] Error 1
+make[1]: Leaving directory '/home/phil/vendor/nginx'
+make: *** [Makefile:10: build] Error 2
+```
+
+Perfect. Now let's add `dump` as a member to this conf object.
+
+```bash
+$ git --no-pager grep ngx_http_core_loc_conf_t\;
+src/http/ngx_http_core_module.h:typedef struct ngx_http_core_loc_conf_s  ngx_http_core_loc_conf_t;
+```
+
+Let's just clone the `root` member:
+
+```bash
+$ diff --git a/src/http/ngx_http_core_module.h b/src/http/ngx_http_core_module.h
+index 2aadae7f..6b1b178b 100644
+--- a/src/http/ngx_http_core_module.h
++++ b/src/http/ngx_http_core_module.h
+@@ -333,6 +333,7 @@ struct ngx_http_core_loc_conf_s {
+/* location name length for inclusive location with inherited alias */
+     size_t        alias;
+     ngx_str_t     root;                    /* root, alias */
++    ngx_str_t     dump;
+     ngx_str_t     post_action;
+
+     ngx_array_t  *root_lengths;
+```
+
+Run `make` and it succeeds!
+
+Now we spend a few hours looking around for a good place to add a hook
+during a request. Ultimately, `ngx_http_core_find_config_phase` seems
+like a good place since only then will we be dealing with the struct
+we added `dump` to.
+
+Next step is figuring out how to send a response. Grepping for
+`response` isn't super useful, neither is `write`. But `send` has some
+pretty low-level but obvious behavior.
+
+```bash
+$ git --no-pager grep send\(
+src/mail/ngx_mail.h:void ngx_mail_send(ngx_event_t *wev);
+src/mail/ngx_mail_auth_http_module.c:    n = ngx_send(c, ctx->request->pos, size);)
+...
+```
+
+That second result looks promising. Looking at that file it looks like
+we need an object that has a `->data` member. In
+`src/http/ngx_http_core_module.c` I noticed that the request object
+has a member that looks interesting: `r->connection->write->data`. And
+if we look up the signature we just need to also send `ngx_send` a
+string and a length.
+
+Thankfully we already have that from our `dump` member. So let's try something simple:
+
+```bash
+$ git --no-pager diff
+diff --git a/src/http/ngx_http_core_module.c b/src/http/ngx_http_core_module.c
+index 9b94b328..bd58788b 100644
+--- a/src/http/ngx_http_core_module.c
++++ b/src/http/ngx_http_core_module.c
+@@ -989,6 +996,11 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
+         ngx_http_finalize_request(r, NGX_HTTP_REQUEST_ENTITY_TOO_LARGE);
+         return NGX_OK;
+}
++
++    if (clcf->dump.len) {
++      ngx_send(r->connection->write->data, clcf->dump.data, clcf->dump.len);
++      return NGX_OK;
++    }
+```
+
+Run `make` and it's good!. Let's turn off the nginx daemon and worker processes so it's easier to quit as we're iterating.
+
+```bash
+$ git --no-pager diff conf/
+diff --git a/conf/nginx.conf b/conf/nginx.conf
+index 29bc085f..7cce7d65 100644
+--- a/conf/nginx.conf
++++ b/conf/nginx.conf
+@@ -1,4 +1,5 @@
+-
++daemon off;
++master_process off;
+ #user  nobody;
+ worker_processes  1;
+```
+
+Now run `./objs/nginx -c $(pwd)/conf/nginx.conf`. Try to curl:
+
+```bash
+$ curl localhost:2020
+curl: (1) Received HTTP/0.9 when not allowed
+```
+
+Huh, that's unexpected. Let's try using telnet to get the whole raw
+response:
+
+```bash
+$ telnet localhost 2020
+Trying ::1...
+telnet: connect to address ::1: Connection refused
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+GET /
+It was a good Thursday.
+```
+
+Oh man. That's super cool. Unfortunately it's also not valid HTTP. It
+seems like if we're using `ngx_send` we'll have to set the HTTP
+response headers manually.
+
+If we're going to pass a literal string to `ngx_send` we'll have to
+convert it to an `ngx_str_t`. Judging from `src/core/ngx_string.h` the
+`ngx_string` macro should be able to do this.
+
+```bash
+$ git --no-pager diff src
+diff --git a/src/http/ngx_http_core_module.c b/src/http/ngx_http_core_module.c
+index 9b94b328..1a1baccd 100644
+--- a/src/http/ngx_http_core_module.c
++++ b/src/http/ngx_http_core_module.c
+@@ -989,6 +996,13 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
+         ngx_http_finalize_request(r, NGX_HTTP_REQUEST_ENTITY_TOO_LARGE);
+         return NGX_OK;
+     }
++
++    static ngx_str_t header = ngx_string("HTTP/1.0 200 OK\r\n\r\n");
++    if (clcf->dump.len) {
++      ngx_send(r->connection->write->data, header.data, header.len);
++      ngx_send(r->connection->write->data, clcf->dump.data, clcf->dump.len);
++      return NGX_OK;
++    }
+
+     if (rc == NGX_DONE) {
+         ngx_http_clear_location(r);
+}
+```
+
+Compile, run and curl:
+
+```bash
+$ curl localhost:2020
+```
+
+Huh. It's no longer complaining about HTTP/0.9 but it's now
+hanging. Let's try verbose curling.
+
+```bash
+$ curl -vvv localhost:2020
+*   Trying ::1:2020...
+* connect to ::1 port 2020 failed: Connection refused
+*   Trying 127.0.0.1:2020...
+* Connected to localhost (127.0.0.1) port 2020 (#0)
+> GET / HTTP/1.1
+> Host: localhost:2020
+> User-Agent: curl/7.71.1
+> Accept: */*
+>
+* Mark bundle as not supporting multiuse
+* HTTP 1.0, assume close after body
+< HTTP/1.0 200 OK
+```
+
+That's really weird. But I noticed there was a
+`ngx_http_request_finalize` function that other parts of the code were
+calling. Let's try adding that.
+
+```bash
+$ git --no-pager diff src
+diff --git a/src/http/ngx_http_core_module.c b/src/http/ngx_http_core_module.c
+index 9b94b328..1a1baccd 100644
+--- a/src/http/ngx_http_core_module.c
++++ b/src/http/ngx_http_core_module.c
+@@ -989,6 +996,14 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
+         ngx_http_finalize_request(r, NGX_HTTP_REQUEST_ENTITY_TOO_LARGE);
+         return NGX_OK;
+     }
++
++    static ngx_str_t header = ngx_string("HTTP/1.0 200 OK\r\n\r\n");
++    if (clcf->dump.len) {
++      ngx_send(r->connection->write->data, header.data, header.len);
++      ngx_send(r->connection->write->data, clcf->dump.data, clcf->dump.len);
++      ngx_http_finalize_request(r, NGX_DONE);
++      return NGX_OK;
++    }
+```
+
+Build, run, curl. Still hanging. Looking into the source code of
+`ngx_http_finalize_request` it seems like there's a case where the
+connection is completely closed if you pass in `NGX_HTTP_CLOSE`. Let's
+try that.
+
+```
+$ curl localhost:2020
+It was a good Thursday.
+```
+
+Well hot dog, it works.
+
+### Reflection
+
+Is this a good way to implement commands in nginx? No. While I knew a
+bit about nginx modules as a user it's clear that as a developer this
+command could have been implemented much more cleanly as a module too.
+
+There also has to be higher-level tooling for returning constructing
+responses rather than writing out headers manually.
