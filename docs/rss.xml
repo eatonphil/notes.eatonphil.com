@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 05 Apr 2021 12:04:07 +0000</lastBuildDate><item><title>Learning a new codebase: hacking on nginx</title><link>http://notes.eatonphil.com/learning-a-new-codebase-hacking-nginx.html</link><description>&lt;p&gt;I have never contributed to nginx. My C skills are 1/10. But
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 05 Apr 2021 12:17:09 +0000</lastBuildDate><item><title>Learning a new codebase: hacking on nginx</title><link>http://notes.eatonphil.com/learning-a-new-codebase-hacking-nginx.html</link><description>&lt;p&gt;I have never contributed to nginx. My C skills are 1/10. But
 downloading the source, hacking it up, compiling it, and running it
 doesn't scare me. This post is to help you overcome your own fears
 about doing so. Not necessarily because you should be running
@@ -275,7 +275,7 @@ index 9b94b328..bd58788b 100644
 +      return NGX_OK;
 +    }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;Run &lt;code&gt;make&lt;/code&gt; and it's good!. Let's turn off the nginx daemon and worker processes so it's easier to quit as we're iterating.&lt;/p&gt;
+&lt;p&gt;Run &lt;code&gt;make&lt;/code&gt; and it's good! Let's turn off the nginx daemon and worker processes so it's easier to quit as we're iterating.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ git --no-pager diff conf/
 diff --git a/conf/nginx.conf b/conf/nginx.conf
 index 29bc085f..7cce7d65 100644
