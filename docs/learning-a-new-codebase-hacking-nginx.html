@@ -8,7 +8,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
-    <link href='https://fonts.googleapis.com/css?family=Source+Code+Pro' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
     
     <link rel="stylesheet" type="text/css" href="/style.css" />
@@ -61,8 +60,8 @@ to grow as a programmer.</p>
 the same:</p>
 <ol>
 <li>Find/download the source code</li>
-<li>Start grep-ing around based on you've seen in the output or capabilities you know exist</li>
 <li>Install necessary dependency libraries/compilers</li>
+<li>Start grepping around based on you've seen in the output or capabilities you know exist</li>
 <li>Make a change</li>
 <li>Run some variation of <code>./configure && make</code> to build</li>
 <li>Run the program</li>
@@ -84,12 +83,25 @@ make</code>. And it doesn't look like it has any third-party
 dependencies besides my C compiler.</p>
 <p>Install autoconf, gmake, and a C compiler. There's no <code>./configure</code>
 file in this directory but notice there is a <code>configure</code> file in
-<code>auto</code>. <code>cd auto &amp;&amp; ./configure</code> crashes so try
-<code>./auto/configure</code>. That seems to do it except for the
-warning... <code>./auto/configure --without-http_rewrite_module</code>. And again
-for http_gzip_module.</p>
-<p>Ok autoconfigure is done. Now we've got a Makefile. Run <code>make -j</code> to compile using all cores.</p>
-<p>Don't see <code>./nginx</code> so run <code>git status</code> to see where the binary was placed. <code>ls objs</code> and there it is, great.</p>
+<code>auto</code>. Trying <code>cd auto &amp;&amp; ./configure</code> crashes so let's try
+<code>./auto/configure</code>. That seems to do it except for the warning:</p>
+<pre><code class="hljs bash">$ ./auto/configure
+...
+./auto/configure: error: the HTTP rewrite module requires the PCRE library.
+You can either disable the module by using --without-http_rewrite_module
+option, or install the PCRE library into the system, or build the PCRE library
+statically from the source with nginx by using --with-pcre=&lt;path&gt; option.
+</code></pre>
+<p>Run <code>./auto/configure --without-http_rewrite_module</code>. And then again
+when that fails but also omitting <code>http_gzip_module</code>.</p>
+<p>Ok autoconfigure is done. Now we've got a Makefile. Run <code>make -j</code> to
+compile using all cores.</p>
+<p>Don't see <code>./nginx</code> so run <code>git status</code> to see where the binary was
+placed. Run <code>ls objs</code> and there it is, great:</p>
+<pre><code class="hljs bash">$ ls objs
+autoconf.err  nginx    ngx_auto_config.h   ngx_modules.c  src
+Makefile      nginx.8  ngx_auto_headers.h  ngx_modules.o
+</code></pre>
 <h3 id="the-hack">The hack</h3><p>We want a simple <code>dump</code> command that will return a literal string in a
 <code>location</code> block. So something like this:</p>
 <pre><code class="hljs diff">$ diff --git a/conf/nginx.conf b/conf/nginx.conf
@@ -109,7 +121,8 @@ location / {
          #error_page  404              /404.html;
 }
 </code></pre>
-<p>Now that we've built nginx we can try this out:</p>
+<p>Now that we've built nginx we can use the <code>-t</code> flag to test the
+validity of this config:</p>
 <pre><code class="hljs bash">$ ./objs/nginx -t -c $(pwd)/conf/nginx.conf
 nginx: [alert] could not open error log file: open() &quot;/usr/local/nginx/logs/error.log&quot; failed (2: No such file or directory)
 2021/04/04 21:24:09 [emerg] 1030951#0: unknown directive &quot;dump&quot; in /home/phil/vendor/nginx/conf/nginx.conf:44

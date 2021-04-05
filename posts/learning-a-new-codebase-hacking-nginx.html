@@ -19,8 +19,8 @@ At a high-level, the steps for hacking on software projects are always
 the same:
 
 1. Find/download the source code
-1. Start grep-ing around based on you've seen in the output or capabilities you know exist
 1. Install necessary dependency libraries/compilers
+1. Start grepping around based on you've seen in the output or capabilities you know exist
 1. Make a change
 1. Run some variation of <code>./configure && make</code> to build
 1. Run the program
@@ -48,14 +48,32 @@ dependencies besides my C compiler.
 
 Install autoconf, gmake, and a C compiler. There's no `./configure`
 file in this directory but notice there is a `configure` file in
-`auto`. `cd auto && ./configure` crashes so try
-`./auto/configure`. That seems to do it except for the
-warning... `./auto/configure --without-http_rewrite_module`. And again
-for http_gzip_module.
+`auto`. Trying `cd auto && ./configure` crashes so let's try
+`./auto/configure`. That seems to do it except for the warning:
 
-Ok autoconfigure is done. Now we've got a Makefile. Run `make -j` to compile using all cores.
+```bash
+$ ./auto/configure
+...
+./auto/configure: error: the HTTP rewrite module requires the PCRE library.
+You can either disable the module by using --without-http_rewrite_module
+option, or install the PCRE library into the system, or build the PCRE library
+statically from the source with nginx by using --with-pcre=<path> option.
+```
 
-Don't see `./nginx` so run `git status` to see where the binary was placed. `ls objs` and there it is, great.
+Run `./auto/configure --without-http_rewrite_module`. And then again
+when that fails but also omitting `http_gzip_module`.
+
+Ok autoconfigure is done. Now we've got a Makefile. Run `make -j` to
+compile using all cores.
+
+Don't see `./nginx` so run `git status` to see where the binary was
+placed. Run `ls objs` and there it is, great:
+
+```bash
+$ ls objs
+autoconf.err  nginx    ngx_auto_config.h   ngx_modules.c  src
+Makefile      nginx.8  ngx_auto_headers.h  ngx_modules.o
+```
 
 ### The hack
 
@@ -81,7 +99,8 @@ location / {
 }
 ```
 
-Now that we've built nginx we can try this out:
+Now that we've built nginx we can use the `-t` flag to test the
+validity of this config:
 
 ```bash
 $ ./objs/nginx -t -c $(pwd)/conf/nginx.conf

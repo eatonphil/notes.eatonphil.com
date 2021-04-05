@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 05 Apr 2021 02:53:58 +0000</lastBuildDate><item><title>Learning a new codebase: hacking nginx</title><link>http://notes.eatonphil.com/learning-a-new-codebase-hacking-nginx.html</link><description>&lt;p&gt;I have never contributed to nginx. My C skills are 1/10. But
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 05 Apr 2021 02:59:45 +0000</lastBuildDate><item><title>Learning a new codebase: hacking nginx</title><link>http://notes.eatonphil.com/learning-a-new-codebase-hacking-nginx.html</link><description>&lt;p&gt;I have never contributed to nginx. My C skills are 1/10. But
 downloading the source, hacking it up, compiling it, and running it
 doesn't scare me. This post is to help you overcome your own fears
 about doing so. Not necessarily because you should be running
@@ -12,8 +12,8 @@ to grow as a programmer.&lt;/p&gt;
 the same:&lt;/p&gt;
 &lt;ol&gt;
 &lt;li&gt;Find/download the source code&lt;/li&gt;
-&lt;li&gt;Start grep-ing around based on you've seen in the output or capabilities you know exist&lt;/li&gt;
 &lt;li&gt;Install necessary dependency libraries/compilers&lt;/li&gt;
+&lt;li&gt;Start grepping around based on you've seen in the output or capabilities you know exist&lt;/li&gt;
 &lt;li&gt;Make a change&lt;/li&gt;
 &lt;li&gt;Run some variation of &lt;code&gt;./configure &amp;&amp; make&lt;/code&gt; to build&lt;/li&gt;
 &lt;li&gt;Run the program&lt;/li&gt;
@@ -35,12 +35,25 @@ make&lt;/code&gt;. And it doesn't look like it has any third-party
 dependencies besides my C compiler.&lt;/p&gt;
 &lt;p&gt;Install autoconf, gmake, and a C compiler. There's no &lt;code&gt;./configure&lt;/code&gt;
 file in this directory but notice there is a &lt;code&gt;configure&lt;/code&gt; file in
-&lt;code&gt;auto&lt;/code&gt;. &lt;code&gt;cd auto &amp;amp;&amp;amp; ./configure&lt;/code&gt; crashes so try
-&lt;code&gt;./auto/configure&lt;/code&gt;. That seems to do it except for the
-warning... &lt;code&gt;./auto/configure --without-http_rewrite_module&lt;/code&gt;. And again
-for http_gzip_module.&lt;/p&gt;
-&lt;p&gt;Ok autoconfigure is done. Now we've got a Makefile. Run &lt;code&gt;make -j&lt;/code&gt; to compile using all cores.&lt;/p&gt;
-&lt;p&gt;Don't see &lt;code&gt;./nginx&lt;/code&gt; so run &lt;code&gt;git status&lt;/code&gt; to see where the binary was placed. &lt;code&gt;ls objs&lt;/code&gt; and there it is, great.&lt;/p&gt;
+&lt;code&gt;auto&lt;/code&gt;. Trying &lt;code&gt;cd auto &amp;amp;&amp;amp; ./configure&lt;/code&gt; crashes so let's try
+&lt;code&gt;./auto/configure&lt;/code&gt;. That seems to do it except for the warning:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ ./auto/configure
+...
+./auto/configure: error: the HTTP rewrite module requires the PCRE library.
+You can either disable the module by using --without-http_rewrite_module
+option, or install the PCRE library into the system, or build the PCRE library
+statically from the source with nginx by using --with-pcre=&amp;lt;path&amp;gt; option.
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Run &lt;code&gt;./auto/configure --without-http_rewrite_module&lt;/code&gt;. And then again
+when that fails but also omitting &lt;code&gt;http_gzip_module&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;Ok autoconfigure is done. Now we've got a Makefile. Run &lt;code&gt;make -j&lt;/code&gt; to
+compile using all cores.&lt;/p&gt;
+&lt;p&gt;Don't see &lt;code&gt;./nginx&lt;/code&gt; so run &lt;code&gt;git status&lt;/code&gt; to see where the binary was
+placed. Run &lt;code&gt;ls objs&lt;/code&gt; and there it is, great:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ ls objs
+autoconf.err  nginx    ngx_auto_config.h   ngx_modules.c  src
+Makefile      nginx.8  ngx_auto_headers.h  ngx_modules.o
+&lt;/code&gt;&lt;/pre&gt;
 &lt;h3 id="the-hack"&gt;The hack&lt;/h3&gt;&lt;p&gt;We want a simple &lt;code&gt;dump&lt;/code&gt; command that will return a literal string in a
 &lt;code&gt;location&lt;/code&gt; block. So something like this:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs diff"&gt;$ diff --git a/conf/nginx.conf b/conf/nginx.conf
@@ -60,7 +73,8 @@ location / {
          #error_page  404              /404.html;
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;Now that we've built nginx we can try this out:&lt;/p&gt;
+&lt;p&gt;Now that we've built nginx we can use the &lt;code&gt;-t&lt;/code&gt; flag to test the
+validity of this config:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ ./objs/nginx -t -c $(pwd)/conf/nginx.conf
 nginx: [alert] could not open error log file: open() &amp;quot;/usr/local/nginx/logs/error.log&amp;quot; failed (2: No such file or directory)
 2021/04/04 21:24:09 [emerg] 1030951#0: unknown directive &amp;quot;dump&amp;quot; in /home/phil/vendor/nginx/conf/nginx.conf:44
