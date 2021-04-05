@@ -20,7 +20,7 @@ the same:
 
 1. Find/download the source code
 1. Install necessary dependency libraries/compilers
-1. Start grepping around based on you've seen in the output or capabilities you know exist
+1. Start grepping around based on something you see in the output or capabilities you know exist
 1. Make a change
 1. Run some variation of <code>./configure && make</code> to build
 1. Run the program
@@ -66,8 +66,8 @@ when that fails but also omitting `http_gzip_module`.
 Ok autoconfigure is done. Now we've got a Makefile. Run `make -j` to
 compile using all cores.
 
-Don't see `./nginx` so run `git status` to see where the binary was
-placed. Run `ls objs` and there it is, great:
+Run `git status` to see where the binary was placed. Run `ls objs` and
+there it is, great:
 
 ```bash
 $ ls objs
@@ -212,9 +212,9 @@ static ngx_http_method_name_t  ngx_methods_names[] = {
      { (u_char *) "HEAD",      (uint32_t) ~NGX_HTTP_HEAD },
 ```
 
-The goal here is to just store the dump script on this conf
+The goal here is to just store the dump string on this conf
 object. Then while serving the request we can check if this is set and
-evaluate the script.
+if so, respond to the request with this string.
 
 This still clearly won't build because we didn't modify this conf
 object. But let's run `make` anyway.

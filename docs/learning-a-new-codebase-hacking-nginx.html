@@ -61,7 +61,7 @@ the same:</p>
 <ol>
 <li>Find/download the source code</li>
 <li>Install necessary dependency libraries/compilers</li>
-<li>Start grepping around based on you've seen in the output or capabilities you know exist</li>
+<li>Start grepping around based on something you see in the output or capabilities you know exist</li>
 <li>Make a change</li>
 <li>Run some variation of <code>./configure && make</code> to build</li>
 <li>Run the program</li>
@@ -96,8 +96,8 @@ statically from the source with nginx by using --with-pcre=&lt;path&gt; option.
 when that fails but also omitting <code>http_gzip_module</code>.</p>
 <p>Ok autoconfigure is done. Now we've got a Makefile. Run <code>make -j</code> to
 compile using all cores.</p>
-<p>Don't see <code>./nginx</code> so run <code>git status</code> to see where the binary was
-placed. Run <code>ls objs</code> and there it is, great:</p>
+<p>Run <code>git status</code> to see where the binary was placed. Run <code>ls objs</code> and
+there it is, great:</p>
 <pre><code class="hljs bash">$ ls objs
 autoconf.err  nginx    ngx_auto_config.h   ngx_modules.c  src
 Makefile      nginx.8  ngx_auto_headers.h  ngx_modules.o
@@ -210,9 +210,9 @@ static ngx_http_method_name_t  ngx_methods_names[] = {
      { (u_char *) &quot;GET&quot;,       (uint32_t) ~NGX_HTTP_GET },
      { (u_char *) &quot;HEAD&quot;,      (uint32_t) ~NGX_HTTP_HEAD },
 </code></pre>
-<p>The goal here is to just store the dump script on this conf
+<p>The goal here is to just store the dump string on this conf
 object. Then while serving the request we can check if this is set and
-evaluate the script.</p>
+if so, respond to the request with this string.</p>
 <p>This still clearly won't build because we didn't modify this conf
 object. But let's run <code>make</code> anyway.</p>
 <pre><code class="hljs bash">$ make -f objs/Makefile
