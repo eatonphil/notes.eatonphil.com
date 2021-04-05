@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Learning a new codebase: hacking nginx | notes.eatonphil.com</title>
+    <meta name="description" content="Learning a new codebase: hacking nginx" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css" />
+    
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+	  <div class="tagline">
+	    Notes on software, organizations, product development, and professional growth
+	  </div>
+          <div class="row">
+	    <a href="/" class="sm-link">
+              <i class="fas fa-home"></i>
+            </a>
+	    <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+
+          <h2>April 4, 2021</h2>
+          <h1>Learning a new codebase: hacking nginx</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/hacking.html" class="tag">hacking</a><a href="/tags/nginx.html" class="tag">nginx</a><a href="/tags/c.html" class="tag">c</a></div>
+          </div>
+	</div>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="col-6">
+        <p>I have never contributed to nginx. My C skills are 1/10. But
+downloading the source, hacking it up, compiling it, and running it
+doesn't scare me. This post is to help you overcome your own fears
+about doing so. Not necessarily because you should be running
+out-of-tree diffs in production but because I see a lot of developers
+never even consider looking at the source of a big tool or dependency
+they use.</p>
+<p>Most of all, studying mature software projects is one of the best ways
+to grow as a programmer.</p>
+<h3 id="source-and-build">Source and build</h3><p>At a high-level, the steps for hacking on software projects are always
+the same:</p>
+<ol>
+<li>Find/download the source code</li>
+<li>Install necessary dependency libraries/compilers</li>
+<li>Start grepping around based on you've seen in the output or capabilities you know exist</li>
+<li>Make a change</li>
+<li>Run some variation of <code>./configure && make</code> to build</li>
+<li>Run the program</li>
+<li>Go back to step 4 until you're happy</li>
+</ol>
+<h3 id="nginx">nginx</h3><p>Let's follow these steps for nginx. We google <code>nginx github</code>
+to learn that there's a read-only copy of the source on
+<a href="https://github.com/nginx/nginx">Github</a>.</p>
+<pre><code class="hljs bash">$ mkdir ~/vendor
+$ cd ~/vendor
+$ git clone https://github.com/nginx/nginx
+$ cd nginx
+</code></pre>
+<p>There's no readme, bummer. We google <code>nginx build from
+source</code> and find
+<a href="http://nginx.org/en/docs/configure.html">this</a>. We see it's a typical
+C project that builds exactly as guessed: <code>./configure &&
+make</code>. And it doesn't look like it has any third-party
+dependencies besides my C compiler.</p>
+<p>Install autoconf, gmake, and a C compiler. There's no <code>./configure</code>
+file in this directory but notice there is a <code>configure</code> file in
+<code>auto</code>. Trying <code>cd auto &amp;&amp; ./configure</code> crashes so let's try
+<code>./auto/configure</code>. That seems to do it except for the warning:</p>
+<pre><code class="hljs bash">$ ./auto/configure
+...
+./auto/configure: error: the HTTP rewrite module requires the PCRE library.
+You can either disable the module by using --without-http_rewrite_module
+option, or install the PCRE library into the system, or build the PCRE library
+statically from the source with nginx by using --with-pcre=&lt;path&gt; option.
+</code></pre>
+<p>Run <code>./auto/configure --without-http_rewrite_module</code>. And then again
+when that fails but also omitting <code>http_gzip_module</code>.</p>
+<p>Ok autoconfigure is done. Now we've got a Makefile. Run <code>make -j</code> to
+compile using all cores.</p>
+<p>Don't see <code>./nginx</code> so run <code>git status</code> to see where the binary was
+placed. Run <code>ls objs</code> and there it is, great:</p>
+<pre><code class="hljs bash">$ ls objs
+autoconf.err  nginx    ngx_auto_config.h   ngx_modules.c  src
+Makefile      nginx.8  ngx_auto_headers.h  ngx_modules.o
+</code></pre>
+<h3 id="the-hack">The hack</h3><p>We want a simple <code>dump</code> command that will return a literal string in a
+<code>location</code> block. So something like this:</p>
+<pre><code class="hljs diff">$ diff --git a/conf/nginx.conf b/conf/nginx.conf
+index 29bc085f..e96e817f 100644
+--- a/conf/nginx.conf
++++ b/conf/nginx.conf
+
+@@ -41,8 +41,7 @@ http {
+#access_log  logs/host.access.log  main;
+
+location / {
+-            root   html;
+-            index  index.html index.htm;
++            dump &#39;It was a good Thursday.&#39;;
+         }
+
+         #error_page  404              /404.html;
+}
+</code></pre>
+<p>Now that we've built nginx we can use the <code>-t</code> flag to test the
+validity of this config:</p>
+<pre><code class="hljs bash">$ ./objs/nginx -t -c $(pwd)/conf/nginx.conf
+nginx: [alert] could not open error log file: open() &quot;/usr/local/nginx/logs/error.log&quot; failed (2: No such file or directory)
+2021/04/04 21:24:09 [emerg] 1030951#0: unknown directive &quot;dump&quot; in /home/phil/vendor/nginx/conf/nginx.conf:44
+nginx: configuration file /home/phil/vendor/nginx/conf/nginx.conf test failed
+</code></pre>
+<p>And now we've got something to go on! Clearly we have to register this
+directive and the log gives us enough info to start grepping:</p>
+<pre><code class="hljs bash">$ git --no-pager grep &#39;unknown directive&#39;
+src/core/ngx_conf_file.c:                       &quot;unknown directive \&quot;%s\&quot;&quot;, name-&gt;data);
+</code></pre>
+<p>The case that has this failing comes from line 463: <code>rv = cmd-&gt;set(cf, cmd, conf)</code>. So let's see what this <code>set</code> does. <code>git grep set</code> is useless. Let's try finding out what <code>cmd</code> is so we can locate the struct that has <code>set</code> on it. Ah it's an <code>ngx_command_t</code>. Since it doesn't have <code>struct</code> behind it it means it's typedef-ed and will likely have a <code>;</code> after it. So <code>git grep ngx_command_t\;</code> finds us:</p>
+<pre><code>$ git --no-pager grep ngx_command_t\;
+src/core/ngx_core.h:typedef struct ngx_command_s         ngx_command_t;
+</code></pre>
+<p>Which means the implementation is hidden, so grep for ngx_command_s:</p>
+<pre><code class="hljs bash">$ git --no-pager grep ngx_command_s
+src/core/ngx_conf_file.h:struct ngx_command_s {
+src/core/ngx_core.h:typedef struct ngx_command_s         ngx_command_t;
+</code></pre>
+<p>Ok this is going nowhere. Different approach. What command did we remove?</p>
+<pre><code class="hljs bash">$ git --no-pager diff
+diff --git a/conf/nginx.conf b/conf/nginx.conf
+index 29bc085f..e96e817f 100644
+--- a/conf/nginx.conf
++++ b/conf/nginx.conf
+@@ -41,8 +41,7 @@ http {
+         #access_log  logs/host.access.log  main;
+
+         location / {
+-            root   html;
+-            index  index.html index.htm;
++            dump &#39;It was a good Thursday.&#39;;
+         }
+
+         #error_page  404              /404.html;
+</code></pre>
+<p><code>root</code> is a command. Maybe we can copy that.</p>
+<pre><code class="hljs bash">$ git --no-pager grep \&quot;root\&quot;
+docs/xml/nginx/changes.xml:in the &quot;root&quot; or &quot;auth_basic_user_file&quot; directives.
+docs/xml/nginx/changes.xml:a request was handled incorrectly, if a &quot;root&quot; directive used variables;
+docs/xml/nginx/changes.xml:the $document_root variable usage in the &quot;root&quot; and &quot;alias&quot; directives
+docs/xml/nginx/changes.xml:the $document_root variable did not support the variables in the &quot;root&quot;
+docs/xml/nginx/changes.xml:if a &quot;root&quot; was specified by variable only, then the root was relative
+src/http/ngx_http_core_module.c:    { ngx_string(&quot;root&quot;),
+src/http/ngx_http_core_module.c:                           &amp;cmd-&gt;name, clcf-&gt;alias ? &quot;alias&quot; : &quot;root&quot;);
+</code></pre>
+<p>That looks more promising. Let's copy that:</p>
+<pre><code class="hljs bash">$ git --no-pager diff src/http/
+diff --git a/src/http/ngx_http_core_module.c b/src/http/ngx_http_core_module.c             index 9b94b328..17a64e80 100644                                                            --- a/src/http/ngx_http_core_module.c                                                      +++ b/src/http/ngx_http_core_module.c                                                      @@ -331,6 +331,14 @@ static ngx_command_t  ngx_http_core_commands[] = {
+       0,
+       NULL },
++    { ngx_string(&quot;dump&quot;),
++      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF
++                        |NGX_CONF_TAKE1,
++      ngx_http_core_dump,
++      NGX_HTTP_LOC_CONF_OFFSET,
++      0,
++      NULL },
++
+     { ngx_string(&quot;alias&quot;),
+       NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+       ngx_http_core_root,
+</code></pre>
+<p>Ok so this is how a command is registered. It obviously won't build without <code>ngx_http_core_dump</code> so let's implement that by copying/renaming <code>ngx_http_core_root</code>:</p>
+<pre><code class="hljs bash">$ git --no-pager diff src
+diff --git a/src/http/ngx_http_core_module.c b/src/http/ngx_http_core_module.c
+index 9b94b328..c184dab5 100644
+--- a/src/http/ngx_http_core_module.c
++++ b/src/http/ngx_http_core_module.c
+@@ -4402,6 +4410,16 @@ ngx_http_core_root(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+}
+
+
++static char *
++ngx_http_core_dump(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
++{
++    ngx_http_core_loc_conf_t *clcf = conf;
++    ngx_str_t *value = cf-&gt;args-&gt;elts;
++    clcf-&gt;dump = value[1];
++    return NGX_CONF_OK;
++}
++
++
+static ngx_http_method_name_t  ngx_methods_names[] = {
+     { (u_char *) &quot;GET&quot;,       (uint32_t) ~NGX_HTTP_GET },
+     { (u_char *) &quot;HEAD&quot;,      (uint32_t) ~NGX_HTTP_HEAD },
+</code></pre>
+<p>The goal here is to just store the dump script on this conf
+object. Then while serving the request we can check if this is set and
+evaluate the script.</p>
+<p>This still clearly won't build because we didn't modify this conf
+object. But let's run <code>make</code> anyway.</p>
+<pre><code class="hljs bash">$ make -f objs/Makefile
+make[1]: Entering directory &#39;/home/phil/vendor/nginx&#39;
+cc -c -pipe  -O -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -g  -I src/core -I src/event -I src/event/modules -I src/os/unix -I objs -I src/http -I src/http/modules \
+        -o objs/src/http/ngx_http_core_module.o \
+        src/http/ngx_http_core_module.c
+src/http/ngx_http_core_module.c:337:7: error: ngx_http_core_dump undeclared here (not in a function); did you mean ngx_http_core_type?
+337 |       ngx_http_core_dump,
+    |       ^~~~~~~~~~~~~~~~~~~~~
+    |       ngx_http_core_type
+src/http/ngx_http_core_module.c: In function ngx_http_core_dump:
+src/http/ngx_http_core_module.c:4418:9: error: ngx_http_core_loc_conf_t {aka struct ngx_http_core_loc_conf_s} has no member named dump
+4418 |     clcf-&gt;dump = value[1];
+     |         ^~
+src/http/ngx_http_core_module.c:4418:5: error: statement with no effect [-Werror=unused-value]
+4418 |     clcf-&gt;dump = value[1];
+     |     ^~~~
+At top level:
+src/http/ngx_http_core_module.c:4414:1: error: ngx_http_core_dump defined but not used [-Werror=unused-function]
+4414 | ngx_http_core_dump(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+     | ^~~~~~~~~~~~~~~~~~~~~
+cc1: all warnings being treated as errors
+make[1]: *** [objs/Makefile:834: objs/src/http/ngx_http_core_module.o] Error 1
+make[1]: Leaving directory &#39;/home/phil/vendor/nginx&#39;
+make: *** [Makefile:10: build] Error 2
+</code></pre>
+<p>The dump handler is undeclared. While copying <code>ngx_http_core_root</code> earlier I saw that there was a forward declaration toward the top. Let's copy that as well and see if that fixes anything.</p>
+<pre><code class="hljs bash">$ git --no-pager diff
+diff --git a/src/http/ngx_http_core_module.c b/src/http/ngx_http_core_module.c
+index 9b94b328..430e1256 100644
+--- a/src/http/ngx_http_core_module.c
++++ b/src/http/ngx_http_core_module.c
+@@ -56,6 +56,7 @@ static char *ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd,
+static char *ngx_http_core_server_name(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+static char *ngx_http_core_root(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
++static char *ngx_http_core_dump(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+ static char *ngx_http_core_limit_except(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+ static char *ngx_http_core_set_aio(ngx_conf_t *cf, ngx_command_t *cmd,
+</code></pre>
+<p>And build:</p>
+<pre><code class="hljs bash">$ make
+make -f objs/Makefile
+make[1]: Entering directory &#39;/home/phil/vendor/nginx&#39;
+cc -c -pipe  -O -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -g  -I src/core -I src/event -I src/event/modules -I src/os/unix -I objs -I src/http -I src/http/modules \
+        -o objs/src/http/ngx_http_core_module.o \
+src/http/ngx_http_core_module.c
+src/http/ngx_http_core_module.c: In function ngx_http_core_dump:
+src/http/ngx_http_core_module.c:4419:9: error: ngx_http_core_loc_conf_t {aka struct ngx_http_core_loc_conf_s} has no member named dump
+4419 |     clcf-&gt;dump = value[1];
+     |         ^~
+make[1]: *** [objs/Makefile:834: objs/src/http/ngx_http_core_module.o] Error 1
+make[1]: Leaving directory &#39;/home/phil/vendor/nginx&#39;
+make: *** [Makefile:10: build] Error 2
+</code></pre>
+<p>Perfect. Now let's add <code>dump</code> as a member to this conf object.</p>
+<pre><code class="hljs bash">$ git --no-pager grep ngx_http_core_loc_conf_t\;
+src/http/ngx_http_core_module.h:typedef struct ngx_http_core_loc_conf_s  ngx_http_core_loc_conf_t;
+</code></pre>
+<p>Let's just clone the <code>root</code> member:</p>
+<pre><code class="hljs bash">$ diff --git a/src/http/ngx_http_core_module.h b/src/http/ngx_http_core_module.h
+index 2aadae7f..6b1b178b 100644
+--- a/src/http/ngx_http_core_module.h
++++ b/src/http/ngx_http_core_module.h
+@@ -333,6 +333,7 @@ struct ngx_http_core_loc_conf_s {
+/* location name length for inclusive location with inherited alias */
+     size_t        alias;
+     ngx_str_t     root;                    /* root, alias */
++    ngx_str_t     dump;
+     ngx_str_t     post_action;
+
+     ngx_array_t  *root_lengths;
+</code></pre>
+<p>Run <code>make</code> and it succeeds!</p>
+<p>Now we spend a few hours looking around for a good place to add a hook
+during a request. Ultimately, <code>ngx_http_core_find_config_phase</code> seems
+like a good place since only then will we be dealing with the struct
+we added <code>dump</code> to.</p>
+<p>Next step is figuring out how to send a response. Grepping for
+<code>response</code> isn't super useful, neither is <code>write</code>. But <code>send</code> has some
+pretty low-level but obvious behavior.</p>
+<pre><code class="hljs bash">$ git --no-pager grep send\(
+src/mail/ngx_mail.h:void ngx_mail_send(ngx_event_t *wev);
+src/mail/ngx_mail_auth_http_module.c:    n = ngx_send(c, ctx-&gt;request-&gt;pos, size);)
+...
+</code></pre>
+<p>That second result looks promising. Looking at that file it looks like
+we need an object that has a <code>-&gt;data</code> member. In
+<code>src/http/ngx_http_core_module.c</code> I noticed that the request object
+has a member that looks interesting: <code>r-&gt;connection-&gt;write-&gt;data</code>. And
+if we look up the signature we just need to also send <code>ngx_send</code> a
+string and a length.</p>
+<p>Thankfully we already have that from our <code>dump</code> member. So let's try something simple:</p>
+<pre><code class="hljs bash">$ git --no-pager diff
+diff --git a/src/http/ngx_http_core_module.c b/src/http/ngx_http_core_module.c
+index 9b94b328..bd58788b 100644
+--- a/src/http/ngx_http_core_module.c
++++ b/src/http/ngx_http_core_module.c
+@@ -989,6 +996,11 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
+         ngx_http_finalize_request(r, NGX_HTTP_REQUEST_ENTITY_TOO_LARGE);
+         return NGX_OK;
+}
++
++    if (clcf-&gt;dump.len) {
++      ngx_send(r-&gt;connection-&gt;write-&gt;data, clcf-&gt;dump.data, clcf-&gt;dump.len);
++      return NGX_OK;
++    }
+</code></pre>
+<p>Run <code>make</code> and it's good!. Let's turn off the nginx daemon and worker processes so it's easier to quit as we're iterating.</p>
+<pre><code class="hljs bash">$ git --no-pager diff conf/
+diff --git a/conf/nginx.conf b/conf/nginx.conf
+index 29bc085f..7cce7d65 100644
+--- a/conf/nginx.conf
++++ b/conf/nginx.conf
+@@ -1,4 +1,5 @@
+-
++daemon off;
++master_process off;
+ #user  nobody;
+ worker_processes  1;
+</code></pre>
+<p>Now run <code>./objs/nginx -c $(pwd)/conf/nginx.conf</code>. Try to curl:</p>
+<pre><code class="hljs bash">$ curl localhost:2020
+curl: (1) Received HTTP/0.9 when not allowed
+</code></pre>
+<p>Huh, that's unexpected. Let's try using telnet to get the whole raw
+response:</p>
+<pre><code class="hljs bash">$ telnet localhost 2020
+Trying ::1...
+telnet: connect to address ::1: Connection refused
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is &#39;^]&#39;.
+GET /
+It was a good Thursday.
+</code></pre>
+<p>Oh man. That's super cool. Unfortunately it's also not valid HTTP. It
+seems like if we're using <code>ngx_send</code> we'll have to set the HTTP
+response headers manually.</p>
+<p>If we're going to pass a literal string to <code>ngx_send</code> we'll have to
+convert it to an <code>ngx_str_t</code>. Judging from <code>src/core/ngx_string.h</code> the
+<code>ngx_string</code> macro should be able to do this.</p>
+<pre><code class="hljs bash">$ git --no-pager diff src
+diff --git a/src/http/ngx_http_core_module.c b/src/http/ngx_http_core_module.c
+index 9b94b328..1a1baccd 100644
+--- a/src/http/ngx_http_core_module.c
++++ b/src/http/ngx_http_core_module.c
+@@ -989,6 +996,13 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
+         ngx_http_finalize_request(r, NGX_HTTP_REQUEST_ENTITY_TOO_LARGE);
+         return NGX_OK;
+     }
++
++    static ngx_str_t header = ngx_string(&quot;HTTP/1.0 200 OK\r\n\r\n&quot;);
++    if (clcf-&gt;dump.len) {
++      ngx_send(r-&gt;connection-&gt;write-&gt;data, header.data, header.len);
++      ngx_send(r-&gt;connection-&gt;write-&gt;data, clcf-&gt;dump.data, clcf-&gt;dump.len);
++      return NGX_OK;
++    }
+
+     if (rc == NGX_DONE) {
+         ngx_http_clear_location(r);
+}
+</code></pre>
+<p>Compile, run and curl:</p>
+<pre><code class="hljs bash">$ curl localhost:2020
+</code></pre>
+<p>Huh. It's no longer complaining about HTTP/0.9 but it's now
+hanging. Let's try verbose curling.</p>
+<pre><code class="hljs bash">$ curl -vvv localhost:2020
+*   Trying ::1:2020...
+* connect to ::1 port 2020 failed: Connection refused
+*   Trying 127.0.0.1:2020...
+* Connected to localhost (127.0.0.1) port 2020 (#0)
+&gt; GET / HTTP/1.1
+&gt; Host: localhost:2020
+&gt; User-Agent: curl/7.71.1
+&gt; Accept: */*
+&gt;
+* Mark bundle as not supporting multiuse
+* HTTP 1.0, assume close after body
+&lt; HTTP/1.0 200 OK
+</code></pre>
+<p>That's really weird. But I noticed there was a
+<code>ngx_http_request_finalize</code> function that other parts of the code were
+calling. Let's try adding that.</p>
+<pre><code class="hljs bash">$ git --no-pager diff src
+diff --git a/src/http/ngx_http_core_module.c b/src/http/ngx_http_core_module.c
+index 9b94b328..1a1baccd 100644
+--- a/src/http/ngx_http_core_module.c
++++ b/src/http/ngx_http_core_module.c
+@@ -989,6 +996,14 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
+         ngx_http_finalize_request(r, NGX_HTTP_REQUEST_ENTITY_TOO_LARGE);
+         return NGX_OK;
+     }
++
++    static ngx_str_t header = ngx_string(&quot;HTTP/1.0 200 OK\r\n\r\n&quot;);
++    if (clcf-&gt;dump.len) {
++      ngx_send(r-&gt;connection-&gt;write-&gt;data, header.data, header.len);
++      ngx_send(r-&gt;connection-&gt;write-&gt;data, clcf-&gt;dump.data, clcf-&gt;dump.len);
++      ngx_http_finalize_request(r, NGX_DONE);
++      return NGX_OK;
++    }
+</code></pre>
+<p>Build, run, curl. Still hanging. Looking into the source code of
+<code>ngx_http_finalize_request</code> it seems like there's a case where the
+connection is completely closed if you pass in <code>NGX_HTTP_CLOSE</code>. Let's
+try that.</p>
+<pre><code>$ curl localhost:2020
+It was a good Thursday.
+</code></pre>
+<p>Well hot dog, it works.</p>
+<h3 id="reflection">Reflection</h3><p>Is this a good way to implement commands in nginx? No. While I knew a
+bit about nginx modules as a user it's clear that as a developer this
+command could have been implemented much more cleanly as a module too.</p>
+<p>There also has to be higher-level tooling for returning constructing
+responses rather than writing out headers manually.</p>
+
+      </div>
+    </div>
+
+    <footer>
+      <div class="container">
+	<div>
+	  <div class="row">
+	    <a href="/" class="sm-link">
+              <i class="fas fa-home"></i>
+            </a>
+	    <a href="/rss.xml" class="sm-link">
+              <i class="fas fa-rss"></i>
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+	</div>
+      </div>
+    </footer>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>
