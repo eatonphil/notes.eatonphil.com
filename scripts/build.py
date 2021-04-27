@@ -29,11 +29,9 @@ HOME_PAGE = """
   <h2 class="fp-h2"></h2>
   <p>
     Hello! I'm Phil, a Software Development Manager in Queens.
-    This site is about making complex topics approachable; in software,
-    organizations, product development, and professional growth.
   </p>
   <p>
-    Some of the most viewed topics here include writing <a
+    Some of the most viewed posts here are on writing <a
     href="/tags/interpreter.html">interpreters</a>, <a
     href="/tags/compiler.html">compilers</a>, <a
     href="/tags/database.html">databases</a>, <a
