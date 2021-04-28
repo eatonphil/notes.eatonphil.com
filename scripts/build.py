@@ -28,18 +28,14 @@ HOME_PAGE = """
 <div class="fp-section fp-section--about">
   <h2 class="fp-h2"></h2>
   <p>
-    Hello! I'm Phil, a Software Development Manager in Queens.
-  </p>
-  <p>
-    Some of the most viewed posts here are on writing <a
+    Hello! I'm Phil, a Software Development Manager in Queens, NY. Some of
+    my most viewed posts are on building <a
     href="/tags/interpreter.html">interpreters</a>, <a
     href="/tags/compiler.html">compilers</a>, <a
     href="/tags/database.html">databases</a>, <a
     href="/tags/web-servers.html">servers</a>, and <a
     href="/tags/emulator.html">emulators</a> from scratch.
-  </p>
-  <p>
-    You can find me elsewhere on <a
+    You can also find me on <a
     href="https://github.com/eatonphil">Github</a>, <a
     href="https://twitter.com/phil_eaton">Twitter</a>, <a
     href="https://www.linkedin.com/in/phil-e-97a490178/">LinkedIn</a>, and <a
