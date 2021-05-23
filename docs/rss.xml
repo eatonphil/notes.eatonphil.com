@@ -1,5 +1,512 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 28 Apr 2021 00:00:02 +0000</lastBuildDate><item><title>Learning a new codebase: hacking on nginx</title><link>http://notes.eatonphil.com/learning-a-new-codebase-hacking-nginx.html</link><description>&lt;p&gt;I have never contributed to nginx. My C skills are 1/10. But
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 23 May 2021 18:28:26 +0000</lastBuildDate><item><title>Writing a Jinja-inspired template library in Python</title><link>http://notes.eatonphil.com/writing-a-template-library-in-python.html</link><description>&lt;p&gt;I've written a bunch of projects recently that involved parsing. This
+one is no different. It is a little more practical though.&lt;/p&gt;
+&lt;p&gt;In this post we'll build a minimal text templating library in Python
+inspired by Jinja. It will be able to display variables and iterate
+over arrays.&lt;/p&gt;
+&lt;p&gt;By the end of this article, with around 300 lines of code, we'll be
+able to create this program:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;from pytemplate import eval_template
+
+template = &amp;#39;&amp;#39;&amp;#39;
+&amp;lt;html&amp;gt;
+  &amp;lt;body&amp;gt;
+  {% for-in(post, posts) %}
+  &amp;lt;article&amp;gt;
+    &amp;lt;h1&amp;gt;{{ get(post, &amp;#39;title&amp;#39;) }}&amp;lt;/h1&amp;gt;
+    &amp;lt;p&amp;gt;
+      {{ get(post, &amp;#39;body&amp;#39;) }}
+    &amp;lt;/p&amp;gt;
+  &amp;lt;/article&amp;gt;
+  {% endfor-in %}
+  &amp;lt;/body&amp;gt;
+&amp;lt;/html&amp;gt;
+&amp;#39;&amp;#39;&amp;#39;
+
+env = {
+    &amp;#39;posts&amp;#39;: [
+        {
+            &amp;#39;title&amp;#39;: &amp;#39;Hello world!&amp;#39;,
+            &amp;#39;body&amp;#39;: &amp;#39;This is my first post!&amp;#39;,
+        },
+        {
+            &amp;#39;title&amp;#39;: &amp;#39;Take two&amp;#39;,
+            &amp;#39;body&amp;#39;: &amp;#39;This is a second post.&amp;#39;,
+        },
+    ],
+}
+
+print(eval_template(template, env))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That runs and produces what we expect:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ python3 test.py
+
+&amp;lt;html&amp;gt;
+  &amp;lt;body&amp;gt;
+
+  &amp;lt;article&amp;gt;
+    &amp;lt;h1&amp;gt;Hello world!&amp;lt;/h1&amp;gt;
+    &amp;lt;p&amp;gt;
+      This is my first post!
+    &amp;lt;/p&amp;gt;
+  &amp;lt;/article&amp;gt;
+
+  &amp;lt;article&amp;gt;
+    &amp;lt;h1&amp;gt;Take two&amp;lt;/h1&amp;gt;
+    &amp;lt;p&amp;gt;
+      This is a second post.
+    &amp;lt;/p&amp;gt;
+  &amp;lt;/article&amp;gt;
+
+  &amp;lt;/body&amp;gt;
+&amp;lt;/html&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;All code is available on
+&lt;a href="https://github.com/eatonphil/pytemplate"&gt;Github&lt;/a&gt;. Let's dig in.&lt;/p&gt;
+&lt;h3 id="specification"&gt;Specification&lt;/h3&gt;&lt;p&gt;In this templating language, pytemplate, &lt;code&gt;{% $function () %}
+... {% end$function %}&lt;/code&gt; blocks are specially evaluated depending
+on the particular function being called. For example, the &lt;code&gt;for-in
+($iter_name, $array)&lt;/code&gt; function will duplicate its children for
+every element in &lt;code&gt;$array&lt;/code&gt;. Within the body of the loop, the
+variable &lt;code&gt;$iter_name&lt;/code&gt; will exist and be set to the current
+element in the array.&lt;/p&gt;
+&lt;p&gt;While we won't implement it here, you can imagine what the &lt;code&gt;if
+($test)&lt;/code&gt; block function might do.&lt;/p&gt;
+&lt;h3 id="arguments,-expressions,-function-calls:-nodes"&gt;Arguments, expressions, function calls: nodes&lt;/h3&gt;&lt;p&gt;Function arguments are expressions (or &lt;code&gt;nodes&lt;/code&gt; as we'll
+call them). They can be strings (surrounded by single quotes),
+identifiers found in a provided dictionary (or
+&lt;code&gt;environment&lt;/code&gt; as we'll call it), or nested function calls
+(also called nodes).&lt;/p&gt;
+&lt;h3 id="non-blocks:-tags"&gt;Non-blocks: tags&lt;/h3&gt;&lt;p&gt;The non-block syntax &lt;code&gt;{{ ... }}&lt;/code&gt; are just called tags. The
+inside of a tag is a node and is evaluated the same way a function
+argument is.&lt;/p&gt;
+&lt;h3 id="architecture"&gt;Architecture&lt;/h3&gt;&lt;p&gt;We'll break up the library into a few main parts:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Lexer for the node language&lt;/li&gt;
+&lt;li&gt;Parser for the node language&lt;/li&gt;
+&lt;li&gt;Lexer for blocks, tags, and text&lt;/li&gt;
+&lt;li&gt;Parser for blocks, tags, and text&lt;/li&gt;
+&lt;li&gt;Interpreter that takes an AST and an environment dictionary and produces text&lt;/li&gt;
+&lt;li&gt;An entrypoint to tie all the above together&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;We'll tackle these aspects in roughly reverse order.&lt;/p&gt;
+&lt;h3 id="entrypoint"&gt;Entrypoint&lt;/h3&gt;&lt;p&gt;When we call the library we want to be able to just accept a template
+string and an environment dictionary. The result of the entrypoint
+will be the evaluated template.&lt;/p&gt;
+&lt;p&gt;&lt;span class="code-caption"&gt;pytemplate.py&lt;/span&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;import io
+
+
+def eval_template(template: str, env: dict) -&amp;gt; str:
+    tokens = lex(template)
+    ast, _ = parse(tokens)
+    with io.StringIO() as memfd:
+        interpret(memfd, ast, env)
+        return memfd.getvalue()
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Where lex, parse, and interpret have to do with the block- and
+tag-level language.&lt;/p&gt;
+&lt;h3 id="block,-tag-and-text-lexing"&gt;Block, tag and text lexing&lt;/h3&gt;&lt;p&gt;This process is responsible for turning the template string into an
+array of tokens. To make the code simpler, lexing for the function
+call and expression language is done separately. At this stage all
+we'll look for is tokens consisting of block and tag end and beginning
+markers. So
+just &lt;code&gt;{%&lt;/code&gt;, &lt;code&gt;%}&lt;/code&gt;, &lt;code&gt;{{&lt;/code&gt;, &lt;code&gt;}}&lt;/code&gt;. If
+a token is not one of these, it is regular text.&lt;/p&gt;
+&lt;p&gt;&lt;span class="code-caption"&gt;pytemplate.py&lt;/span&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;BLOCK_OPEN = &amp;#39;{%&amp;#39;
+BLOCK_CLOSE = &amp;#39;%}&amp;#39;
+
+TAG_OPEN = &amp;#39;{{&amp;#39;
+TAG_CLOSE = &amp;#39;}}&amp;#39;
+
+
+def getelement(source, cursor):
+    if cursor &amp;lt; 0:
+        return None
+    if cursor &amp;lt; len(source):
+        return source[cursor]
+    return None
+
+
+def lex(source):
+    tokens = []
+    current = &amp;#39;&amp;#39;
+    cursor = 0
+    while cursor &amp;lt; len(source):
+        char = getelement(source, cursor)
+        if char == &amp;#39;{&amp;#39;:
+            # Handle escaping {
+            if getelement(source, cursor-1) == &amp;#39;{&amp;#39;:
+                cursor += 1
+                continue
+
+            next_char = getelement(source, cursor+1)
+            if next_char in [&amp;#39;%&amp;#39;, &amp;#39;{&amp;#39;]:
+                if current:
+                    tokens.append({
+                        &amp;#39;value&amp;#39;: current,
+                        &amp;#39;cursor&amp;#39;: cursor - len(current),
+                    })
+                    current = &amp;#39;&amp;#39;
+
+                tokens.append({
+                    &amp;#39;value&amp;#39;: BLOCK_OPEN if next_char == &amp;#39;%&amp;#39; else TAG_OPEN,
+                    &amp;#39;cursor&amp;#39;: cursor,
+                })
+                cursor += 2
+                continue
+
+        if char in [&amp;#39;%&amp;#39;, &amp;#39;}&amp;#39;]:
+            # Handle escaping % and }
+            if getelement(source, cursor-1) == char:
+                cursor += 1
+                continue
+
+            if getelement(source, cursor+1) != &amp;#39;}&amp;#39;:
+                cursor += 1
+                continue
+
+            if current:
+                tokens.append({
+                    &amp;#39;value&amp;#39;: current,
+                    &amp;#39;cursor&amp;#39;: cursor - len(current),
+                })
+                current = &amp;#39;&amp;#39;
+
+            tokens.append({
+                &amp;#39;value&amp;#39;: BLOCK_CLOSE if char == &amp;#39;%&amp;#39; else TAG_CLOSE,
+                &amp;#39;cursor&amp;#39;: cursor,
+            })
+            cursor += 2
+            continue
+
+        current += getelement(source, cursor)
+        cursor += 1
+
+    if current:
+        tokens.append({
+            &amp;#39;value&amp;#39;: current,
+            &amp;#39;cursor&amp;#39;: cursor - len(current),
+        })
+
+    return tokens
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That's it for lexing!&lt;/p&gt;
+&lt;h3 id="block,-tag-and-text-parsing"&gt;Block, tag and text parsing&lt;/h3&gt;&lt;p&gt;Next up is a matter of finding the ending/closing patterns in the array of tokens. There are a few main rules we'll look for:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Every open tag symbol &lt;code&gt;{{&lt;/code&gt; must be followed by a text token then a closing tag symbol &lt;code&gt;}}&lt;/code&gt;&lt;ul&gt;
+&lt;li&gt;The text within the open and close tag must parse into a valid expression (we'll define this logic later)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Every block symbol &lt;code&gt;{%&lt;/code&gt; must be followed by a text token then an end of block symbol &lt;code&gt;%}&lt;/code&gt;&lt;ul&gt;
+&lt;li&gt;The text token within the open and close block must parse into a valid function call (we'll define this logic later)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Every block must have a matching end block where the text in the end block is &lt;code&gt;end&lt;/code&gt; concatenated to the beginning of the function being called in the start block&lt;ul&gt;
+&lt;li&gt;The text between two blocks can contain nested blocks or tags&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Let's codify that:&lt;/p&gt;
+&lt;p&gt;&lt;span class="code-caption"&gt;pytemplate.py&lt;/span&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def parse(tokens, end_of_block_marker=None):
+    cursor = 0
+    ast = []
+    while cursor &amp;lt; len(tokens):
+        t = getelement(tokens, cursor)
+        value = t[&amp;#39;value&amp;#39;]
+        if value == TAG_OPEN:
+            if getelement(tokens, cursor+2)[&amp;#39;value&amp;#39;] != TAG_CLOSE:
+                raise Exception(&amp;#39;Expected closing tag&amp;#39;)
+
+            node_tokens = lex_node(getelement(tokens, cursor+1)[&amp;#39;value&amp;#39;])
+            node_ast = parse_node(node_tokens)
+            ast.append({
+                &amp;#39;type&amp;#39;: &amp;#39;tag&amp;#39;,
+                &amp;#39;value&amp;#39;: node_ast,
+            })
+            cursor += 3
+            continue
+
+        if value == TAG_CLOSE:
+            raise Exception(&amp;#39;Expected opening tag&amp;#39;)
+
+        if value == BLOCK_OPEN:
+            if getelement(tokens, cursor+2)[&amp;#39;value&amp;#39;] != BLOCK_CLOSE:
+                raise Exception(&amp;#39;Expected end of block open&amp;#39;)
+
+            block = getelement(tokens, cursor+1)
+            node_tokens = lex_node(block[&amp;#39;value&amp;#39;])
+            node_ast = parse_node(node_tokens)
+            if end_of_block_marker and &amp;#39;end&amp;#39;+end_of_block_marker == node_ast[&amp;#39;value&amp;#39;]:
+                return ast, cursor+3
+
+            child, cursor_offset = parse(tokens[cursor+3:], node_ast[&amp;#39;value&amp;#39;])
+            if cursor_offset == 0:
+                raise Exception(&amp;#39;Failed to find end of block&amp;#39;)
+
+            ast.append({
+                &amp;#39;type&amp;#39;: &amp;#39;block&amp;#39;,
+                &amp;#39;value&amp;#39;: node_ast,
+                &amp;#39;child&amp;#39;: child,
+            })
+            cursor += cursor_offset + 3
+            continue
+
+        if value == BLOCK_CLOSE:
+            raise Exception(&amp;#39;Expected start of block open&amp;#39;)
+
+        ast.append({
+            &amp;#39;type&amp;#39;: &amp;#39;text&amp;#39;,
+            &amp;#39;value&amp;#39;: t,
+        })
+        cursor += 1
+
+    return ast, cursor
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And that's it for parsing blocks and tags. Now we have to get into the
+node language.&lt;/p&gt;
+&lt;h3 id="node-lexing"&gt;Node lexing&lt;/h3&gt;&lt;p&gt;In the node language, everything is either a literal or a function
+call. Whitespace is ignored. The only special symbols in the node
+language are commas and parentheses.&lt;/p&gt;
+&lt;p&gt;So to break the text into tokens we just iterate over all characters
+until we find whitespace or a symbol. Accumulate the characters that
+are not either. Add everything but whitespace to the list of tokens.&lt;/p&gt;
+&lt;p&gt;&lt;span class="code-caption"&gt;pytemplate.py&lt;/span&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def lex_node(source):
+    tokens = []
+    cursor = 0
+    current = &amp;#39;&amp;#39;
+    while cursor &amp;lt; len(source):
+        char = getelement(source, cursor)
+        if char in [&amp;#39;\r&amp;#39;, &amp;#39;\t&amp;#39;, &amp;#39;\n&amp;#39;, &amp;#39; &amp;#39;]:
+            if current:
+                tokens.append({
+                    &amp;#39;value&amp;#39;: current,
+                    &amp;#39;type&amp;#39;: &amp;#39;literal&amp;#39;,
+                })
+                current = &amp;#39;&amp;#39;
+
+            cursor += 1
+            continue
+
+        if char in [&amp;#39;(&amp;#39;, &amp;#39;)&amp;#39;, &amp;#39;,&amp;#39;]:
+            if current:
+                tokens.append({
+                    &amp;#39;value&amp;#39;: current,
+                    &amp;#39;type&amp;#39;: &amp;#39;literal&amp;#39;,
+                })
+                current = &amp;#39;&amp;#39;
+
+            tokens.append({
+                &amp;#39;value&amp;#39;: char,
+                &amp;#39;type&amp;#39;: &amp;#39;syntax&amp;#39;,
+            })
+            cursor += 1
+            continue
+
+        current += char
+        cursor +=1
+
+    return tokens
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And that's it for node lexing.&lt;/p&gt;
+&lt;h3 id="node-parsing"&gt;Node parsing&lt;/h3&gt;&lt;p&gt;We'll break this up into two functions. The first is just for parsing
+literals and function calls.&lt;/p&gt;
+&lt;p&gt;&lt;span class="code-caption"&gt;pytemplate.py&lt;/span&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def parse_node(tokens):
+    cursor = 0
+    ast = None
+    while cursor &amp;lt; len(tokens):
+        t = getelement(tokens, cursor)
+        if t[&amp;#39;type&amp;#39;] != &amp;#39;literal&amp;#39;:
+            raise Exception(&amp;#39;Expected literal&amp;#39;)
+        cursor += 1
+
+        next_t = getelement(tokens, cursor)
+        if not next_t:
+            ast = t
+            break
+
+        if next_t[&amp;#39;value&amp;#39;] != &amp;#39;(&amp;#39;:
+            ast = t
+            break
+
+        cursor += 1
+
+        if next_t[&amp;#39;value&amp;#39;] == &amp;#39;(&amp;#39;:
+            args, cursor = parse_node_args(tokens[cursor:])
+            ast = {
+                &amp;#39;type&amp;#39;: &amp;#39;function&amp;#39;,
+                &amp;#39;value&amp;#39;: t[&amp;#39;value&amp;#39;].strip(),
+                &amp;#39;args&amp;#39;: args,
+            }
+            cursor += 2
+
+        break
+
+    if cursor != len(tokens):
+        raise Exception(&amp;#39;Failed to parse node: &amp;#39; + tokens[cursor][&amp;#39;value&amp;#39;])
+
+    return ast
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The second is for parsing function call arguments.&lt;/p&gt;
+&lt;p&gt;&lt;span class="code-caption"&gt;pytemplate.py&lt;/span&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def parse_node_args(tokens):
+    args = []
+    cursor = 0
+    while cursor &amp;lt; len(tokens):
+        t = getelement(tokens, cursor)
+        if t[&amp;#39;value&amp;#39;] == &amp;#39;)&amp;#39;:
+            return args, cursor + 1
+
+        if len(args) and t[&amp;#39;value&amp;#39;] == &amp;#39;,&amp;#39;:
+            cursor += 1
+        elif len(args) and t[&amp;#39;value&amp;#39;] != &amp;#39;,&amp;#39;:
+            raise Exception(&amp;#39;Expected comma to separate args&amp;#39;)
+
+        args.append(getelement(tokens, cursor))
+        cursor += 1
+
+    return args, cursor
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And that's it for parsing and lexing the entire whole template and
+node language!&lt;/p&gt;
+&lt;h3 id="interpreting"&gt;Interpreting&lt;/h3&gt;&lt;p&gt;Interpreting is a matter of iterating over the AST recursively,
+writing out literal text, evaluating the contents of tags, and doing
+special processing for blocks.&lt;/p&gt;
+&lt;p&gt;&lt;span class="code-caption"&gt;pytemplate.py&lt;/span&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python3"&gt;def interpret(outfd, ast, env):
+    for item in ast:
+        item_type = item[&amp;#39;type&amp;#39;]
+        node = item[&amp;#39;value&amp;#39;]
+
+        if item_type == &amp;#39;text&amp;#39;:
+            outfd.write(node[&amp;#39;value&amp;#39;])
+            continue
+
+        if item_type == &amp;#39;tag&amp;#39;:
+            tag_value = interpret_node(node, env)
+            outfd.write(tag_value)
+            continue
+
+        if item_type == &amp;#39;block&amp;#39;:
+            interpret_block(outfd, node, item[&amp;#39;child&amp;#39;], env)
+            continue
+
+        raise Exception(&amp;#39;Unknown type: &amp;#39; + item_type)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="intepreting-nodes"&gt;Intepreting nodes&lt;/h4&gt;&lt;p&gt;A node is one of two things:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;A literal which is either a&lt;ul&gt;
+&lt;li&gt;String if surrounded by single quotes&lt;/li&gt;
+&lt;li&gt;Otherwise an identifier to be looked up in the environment dictionary&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Or a function call&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;span class="code-caption"&gt;pytemplate.py&lt;/span&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def interpret_node(node, env):
+    if node[&amp;#39;type&amp;#39;] == &amp;#39;literal&amp;#39;:
+        # Is a string
+        if node[&amp;#39;value&amp;#39;][0] == &amp;quot;&amp;#39;&amp;quot; and node[&amp;#39;value&amp;#39;][-1] == &amp;quot;&amp;#39;&amp;quot;:
+            return node[&amp;#39;value&amp;#39;][1:-1]
+
+        # Default to an env lookup
+        return env[node[&amp;#39;value&amp;#39;]]
+
+    function = node[&amp;#39;value&amp;#39;]
+    args = node[&amp;#39;args&amp;#39;]
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Let's define &lt;code&gt;==&lt;/code&gt; which checks if all args are equal. First
+we have to interpret all args and then we return True if they are all
+equal.&lt;/p&gt;
+&lt;p&gt;&lt;span class="code-caption"&gt;pytemplate.py&lt;/span&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;    if function == &amp;#39;==&amp;#39;:
+        arg_vals = [interpret_node(arg) for arg in args]
+        if arg_vals.count(arg_vals[0]) == len(arg_vals):
+            return True
+
+        return False
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now let's define a helper for retrieving an entry from a dictionary,
+called &lt;code&gt;get&lt;/code&gt;. This will evaluate its first arg and assume
+it is a dictionary. Then it will evaluate its second arg and assume it
+is a key in the dictionary. Then it will return the result of looking
+up the key in the dictionary.&lt;/p&gt;
+&lt;p&gt;&lt;span class="code-caption"&gt;pytemplate.py&lt;/span&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;    if function == &amp;#39;get&amp;#39;:
+        arg_vals = [interpret_node(arg, env) for arg in args]
+        return arg_vals[0][arg_vals[1]]
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And if its neither of these supported functions, just raise an error.&lt;/p&gt;
+&lt;p&gt;&lt;span class="code-caption"&gt;pytemplate.py&lt;/span&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;    raise Exception(&amp;#39;Unknown function: &amp;#39; + function)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="interpreting-blocks"&gt;Interpreting blocks&lt;/h4&gt;&lt;p&gt;Blocks are just a little different than a generic node. In addition to
+being evaluated they act on a child AST within the start and end of
+the block.&lt;/p&gt;
+&lt;p&gt;For example, in an &lt;code&gt;if&lt;/code&gt; block we will evaluate its argument
+and recursively call &lt;code&gt;interpret&lt;/code&gt; on the child AST if the argument is
+truthy.&lt;/p&gt;
+&lt;p&gt;&lt;span class="code-caption"&gt;pytemplate.py&lt;/span&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;def interpret_block(outfd, node, child, env):
+    function = node[&amp;#39;value&amp;#39;]
+    args = node[&amp;#39;args&amp;#39;]
+    if function == &amp;#39;if&amp;#39; and interpret_node(node):
+        interpret(outfd, child, env)
+        return
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And for &lt;code&gt;for-in&lt;/code&gt; we will use the first argument as the name
+of an identifier to be copied into a child environment
+dictionary. We'll interpret the second argument and then iterate over
+it, calling &lt;code&gt;interpret&lt;/code&gt; recursively for each item in the
+array and passing the child environment dictionary so it has access to
+the current element.&lt;/p&gt;
+&lt;p&gt;&lt;span class="code-caption"&gt;pytemplate.py&lt;/span&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;    if function == &amp;#39;for-in&amp;#39;:
+        loop_variable = args[1]
+        loop_iter_variable = args[0][&amp;#39;value&amp;#39;]
+
+        for elem in interpret_node(loop_variable, env):
+            child_env = env.copy()
+            child_env[loop_iter_variable] = elem
+            interpret(outfd, child, child_env)
+
+        return
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Just like before, if we see a block we don't support yet, throw an
+error.&lt;/p&gt;
+&lt;p&gt;&lt;span class="code-caption"&gt;pytemplate.py&lt;/span&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs python"&gt;    raise Exception(&amp;#39;Unsupported block node function: &amp;#39; + function)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And that's that. :)&lt;/p&gt;
+&lt;h3 id="run-it"&gt;Run it&lt;/h3&gt;&lt;p&gt;Now we can give the example from the beginning a shot.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ python3 test.py
+
+&amp;lt;html&amp;gt;
+  &amp;lt;body&amp;gt;
+
+  &amp;lt;article&amp;gt;
+    &amp;lt;h1&amp;gt;Hello world!&amp;lt;/h1&amp;gt;
+    &amp;lt;p&amp;gt;
+      This is my first post!
+    &amp;lt;/p&amp;gt;
+  &amp;lt;/article&amp;gt;
+
+  &amp;lt;article&amp;gt;
+    &amp;lt;h1&amp;gt;Take two&amp;lt;/h1&amp;gt;
+    &amp;lt;p&amp;gt;
+      This is a second post.
+    &amp;lt;/p&amp;gt;
+  &amp;lt;/article&amp;gt;
+
+  &amp;lt;/body&amp;gt;
+&amp;lt;/html&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Pretty sweet for only 300 lines of Python!&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/writing-a-template-library-in-python.html</guid><pubDate>Sun, 23 May 2021 00:00:00 +0000</pubDate></item><item><title>Learning a new codebase: hacking on nginx</title><link>http://notes.eatonphil.com/learning-a-new-codebase-hacking-nginx.html</link><description>&lt;p&gt;I have never contributed to nginx. My C skills are 1/10. But
 downloading the source, hacking it up, compiling it, and running it
 doesn't scare me. This post is to help you overcome your own fears
 about doing so. Not necessarily because you should be running

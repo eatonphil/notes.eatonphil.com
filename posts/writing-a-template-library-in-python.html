@@ -1,5 +1,6 @@
 # Writing a Jinja-inspired template library in Python
 ## May 23, 2021
+###### python,parsing,template-library
 
 I've written a bunch of projects recently that involved parsing. This
 one is no different. It is a little more practical though.
@@ -121,7 +122,7 @@ When we call the library we want to be able to just accept a template
 string and an environment dictionary. The result of the entrypoint
 will be the evaluated template.
 
-[pytemplate.py]
+<span class="code-caption">pytemplate.py</span>
 ```python
 import io
 
@@ -147,7 +148,7 @@ markers. So
 just <code>{%</code>, <code>%}</code>, <code>{{</code>, <code>}}</code>. If
 a token is not one of these, it is regular text.
 
-[pytemplate.py]
+<span class="code-caption">pytemplate.py</span>
 ```python
 BLOCK_OPEN = '{%'
 BLOCK_CLOSE = '%}'
@@ -243,7 +244,7 @@ Next up is a matter of finding the ending/closing patterns in the array of token
 
 Let's codify that:
 
-[pytemplate.py]
+<span class="code-caption">pytemplate.py</span>
 ```python
 def parse(tokens, end_of_block_marker=None):
     cursor = 0
@@ -314,7 +315,7 @@ So to break the text into tokens we just iterate over all characters
 until we find whitespace or a symbol. Accumulate the characters that
 are not either. Add everything but whitespace to the list of tokens.
 
-[pytemplate.py]
+<span class="code-caption">pytemplate.py</span>
 ```python
 def lex_node(source):
     tokens = []
@@ -361,7 +362,7 @@ And that's it for node lexing.
 We'll break this up into two functions. The first is just for parsing
 literals and function calls.
 
-[pytemplate.py]
+<span class="code-caption">pytemplate.py</span>
 ```python
 def parse_node(tokens):
     cursor = 0
@@ -402,7 +403,7 @@ def parse_node(tokens):
 
 The second is for parsing function call arguments.
 
-[pytemplate.py]
+<span class="code-caption">pytemplate.py</span>
 ```python
 def parse_node_args(tokens):
     args = []
@@ -432,7 +433,7 @@ Interpreting is a matter of iterating over the AST recursively,
 writing out literal text, evaluating the contents of tags, and doing
 special processing for blocks.
 
-[pytemplate.py]
+<span class="code-caption">pytemplate.py</span>
 ```python3
 def interpret(outfd, ast, env):
     for item in ast:
@@ -464,7 +465,7 @@ A node is one of two things:
   * Otherwise an identifier to be looked up in the environment dictionary
 * Or a function call
 
-[pytemplate.py]
+<span class="code-caption">pytemplate.py</span>
 ```python
 def interpret_node(node, env):
     if node['type'] == 'literal':
@@ -483,7 +484,7 @@ Let's define <code>==</code> which checks if all args are equal. First
 we have to interpret all args and then we return True if they are all
 equal.
 
-[pytemplate.py]
+<span class="code-caption">pytemplate.py</span>
 ```python
     if function == '==':
         arg_vals = [interpret_node(arg) for arg in args]
@@ -499,7 +500,7 @@ it is a dictionary. Then it will evaluate its second arg and assume it
 is a key in the dictionary. Then it will return the result of looking
 up the key in the dictionary.
 
-[pytemplate.py]
+<span class="code-caption">pytemplate.py</span>
 ```python
     if function == 'get':
         arg_vals = [interpret_node(arg, env) for arg in args]
@@ -508,7 +509,7 @@ up the key in the dictionary.
 
 And if its neither of these supported functions, just raise an error.
 
-[pytemplate.py]
+<span class="code-caption">pytemplate.py</span>
 ```python
     raise Exception('Unknown function: ' + function)
 ```
@@ -523,7 +524,7 @@ For example, in an <code>if</code> block we will evaluate its argument
 and recursively call `interpret` on the child AST if the argument is
 truthy.
 
-[pytemplate.py]
+<span class="code-caption">pytemplate.py</span>
 ```python
 def interpret_block(outfd, node, child, env):
     function = node['value']
@@ -540,7 +541,7 @@ it, calling <code>interpret</code> recursively for each item in the
 array and passing the child environment dictionary so it has access to
 the current element.
 
-[pytemplate.py]
+<span class="code-caption">pytemplate.py</span>
 ```python
     if function == 'for-in':
         loop_variable = args[1]
@@ -557,7 +558,7 @@ the current element.
 Just like before, if we see a block we don't support yet, throw an
 error.
 
-[pytemplate.py]
+<span class="code-caption">pytemplate.py</span>
 ```python
     raise Exception('Unsupported block node function: ' + function)
 ```
@@ -593,4 +594,4 @@ $ python3 test.py
 
 ```
 
-That is pretty sweet for only 300 lines of Python!
+Pretty sweet for only 300 lines of Python!
