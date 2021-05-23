@@ -1,7 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 23 May 2021 18:28:26 +0000</lastBuildDate><item><title>Writing a Jinja-inspired template library in Python</title><link>http://notes.eatonphil.com/writing-a-template-library-in-python.html</link><description>&lt;p&gt;I've written a bunch of projects recently that involved parsing. This
-one is no different. It is a little more practical though.&lt;/p&gt;
-&lt;p&gt;In this post we'll build a minimal text templating library in Python
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 23 May 2021 18:35:51 +0000</lastBuildDate><item><title>Writing a Jinja-inspired template library in Python</title><link>http://notes.eatonphil.com/writing-a-template-library-in-python.html</link><description>&lt;p&gt;In this post we'll build a minimal text templating library in Python
 inspired by Jinja. It will be able to display variables and iterate
 over arrays.&lt;/p&gt;
 &lt;p&gt;By the end of this article, with around 300 lines of code, we'll be
@@ -506,6 +504,9 @@ error.&lt;/p&gt;
 &amp;lt;/html&amp;gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Pretty sweet for only 300 lines of Python!&lt;/p&gt;
+&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
+questions or ideas.&lt;/p&gt;
+&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Been wanting to write a Python template library ever since I failed trying to do so years ago in Standard ML. Here&amp;#39;s my take on a Jinja-like library!&lt;a href="https://t.co/P1nAV6fSxk"&gt;https://t.co/P1nAV6fSxk&lt;/a&gt; &lt;a href="https://t.co/DbXQt1JYx8"&gt;pic.twitter.com/DbXQt1JYx8&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1396535283190046722?ref_src=twsrc%5Etfw"&gt;May 23, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/writing-a-template-library-in-python.html</guid><pubDate>Sun, 23 May 2021 00:00:00 +0000</pubDate></item><item><title>Learning a new codebase: hacking on nginx</title><link>http://notes.eatonphil.com/learning-a-new-codebase-hacking-nginx.html</link><description>&lt;p&gt;I have never contributed to nginx. My C skills are 1/10. But
 downloading the source, hacking it up, compiling it, and running it
 doesn't scare me. This post is to help you overcome your own fears
