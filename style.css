@@ -61,12 +61,20 @@ a {
     text-decoration: none;
 }
 
+.code-caption {
+    font-size: .8rem;
+    color: #777;
+    display: block;
+    margin-bottom: -1.5em;
+}
+
 p code {
-    font-weight: bold;
+    background: #f0f0f0;
+    color: black;
 }
 
 code {
-    font-family: "Consolas", "Courier", monospace;
+    font-family: monospace;
 }
 
 img {
@@ -76,6 +84,17 @@ img {
 
 footer {
     margin-bottom: 50px;
+}
+
+.banner {
+    background: black;
+    color: white;
+    display: block;
+    padding: 15px 0;
+}
+
+.banner a {
+    color: white;
 }
 
 .row {
@@ -147,7 +166,6 @@ aside p {
     max-height: 1000px;
     border: 1px solid #f0f0f0;
     background: white;
-    font-size: .7rem;
     width: 800px;
     margin-left: -100px;
 }

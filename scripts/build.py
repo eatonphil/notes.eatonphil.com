@@ -28,7 +28,7 @@ HOME_PAGE = """
 <div class="fp-section fp-section--about">
   <h2 class="fp-h2"></h2>
   <p>
-    Hello! I'm Phil, a Software Development Manager in Queens, NY. Some of
+    Hello! I'm Phil, a developer and manager in Queens, NY. Some of
     my most viewed posts are on building <a
     href="/tags/interpreter.html">interpreters</a>, <a
     href="/tags/compiler.html">compilers</a>, <a
@@ -40,6 +40,25 @@ HOME_PAGE = """
     href="https://twitter.com/phil_eaton">Twitter</a>, <a
     href="https://www.linkedin.com/in/phil-e-97a490178/">LinkedIn</a>, and <a
     href="https://www.goodreads.com/user/show/50930981-phil-eaton">Goodreads</a>.
+  </p>
+</div>
+<div id="hire-me" class="fp-section fp-section--hire-me">
+  <h2 class="fp-h2">Hire me</h2>
+  <p>
+    I've led teams for the last 5 years, been an IC for the last
+    9. I've been at Fortune 500-, series A startup-, and numerous
+    other- stage companies in between. I've worked with teams locally
+    and distributed across the US, Canada, and India. I've focused on
+    React, JavaScript/TypeScript on the frontend and Go, Python, and
+    Node.js on the backend. I prefer serverless technology on GCP and
+    AWS to avoid operations pain, but I'm comfortable managing
+    software on plain old servers.
+  </p>
+  <p>
+    I am proud to have worked closely with executives in product and
+    engineering to build products that are scalable and solve business
+    problems. <a href="mailto:me@eatonphil.com">Email me</a> to chat
+    about your project.
   </p>
 </div>
 <div class="fp-section fp-section--notes">

@@ -1,0 +1,597 @@
+# Writing a Jinja-inspired template library in Python
+## May 23, 2021
+###### python,parsing,template-library
+
+I've written a bunch of projects recently that involved parsing. This
+one is no different. It is a little more practical though.
+
+In this post we'll build a minimal text templating library in Python
+inspired by Jinja. It will be able to display variables and iterate
+over arrays.
+
+By the end of this article, with around 300 lines of code, we'll be
+able to create this program:
+
+```python
+from pytemplate import eval_template
+
+template = '''
+<html>
+  <body>
+  {% for-in(post, posts) %}
+  <article>
+    <h1>{{ get(post, 'title') }}</h1>
+    <p>
+      {{ get(post, 'body') }}
+    </p>
+  </article>
+  {% endfor-in %}
+  </body>
+</html>
+'''
+
+env = {
+    'posts': [
+        {
+            'title': 'Hello world!',
+            'body': 'This is my first post!',
+        },
+        {
+            'title': 'Take two',
+            'body': 'This is a second post.',
+        },
+    ],
+}
+
+print(eval_template(template, env))
+```
+
+That runs and produces what we expect:
+
+```bash
+$ python3 test.py
+
+<html>
+  <body>
+  
+  <article>
+    <h1>Hello world!</h1>
+    <p>
+      This is my first post!
+    </p>
+  </article>
+  
+  <article>
+    <h1>Take two</h1>
+    <p>
+      This is a second post.
+    </p>
+  </article>
+  
+  </body>
+</html>
+
+```
+
+All code is available on
+[Github](https://github.com/eatonphil/pytemplate). Let's dig in.
+
+### Specification
+
+In this templating language, pytemplate, <code>{% $function () %}
+... {% end$function %}</code> blocks are specially evaluated depending
+on the particular function being called. For example, the <code>for-in
+($iter_name, $array)</code> function will duplicate its children for
+every element in <code>$array</code>. Within the body of the loop, the
+variable <code>$iter_name</code> will exist and be set to the current
+element in the array.
+
+While we won't implement it here, you can imagine what the <code>if
+($test)</code> block function might do.
+
+### Arguments, expressions, function calls: nodes
+
+Function arguments are expressions (or <code>nodes</code> as we'll
+call them). They can be strings (surrounded by single quotes),
+identifiers found in a provided dictionary (or
+<code>environment</code> as we'll call it), or nested function calls
+(also called nodes).
+
+### Non-blocks: tags
+
+The non-block syntax <code>{{ ... }}</code> are just called tags. The
+inside of a tag is a node and is evaluated the same way a function
+argument is.
+
+### Architecture
+
+We'll break up the library into a few main parts:
+
+* Lexer for the node language
+* Parser for the node language
+* Lexer for blocks, tags, and text
+* Parser for blocks, tags, and text
+* Interpreter that takes an AST and an environment dictionary and produces text
+* An entrypoint to tie all the above together
+
+We'll tackle these aspects in roughly reverse order.
+
+### Entrypoint
+
+When we call the library we want to be able to just accept a template
+string and an environment dictionary. The result of the entrypoint
+will be the evaluated template.
+
+<span class="code-caption">pytemplate.py</span>
+```python
+import io
+
+
+def eval_template(template: str, env: dict) -> str:
+    tokens = lex(template)
+    ast, _ = parse(tokens)
+    with io.StringIO() as memfd:
+        interpret(memfd, ast, env)
+        return memfd.getvalue()
+```
+
+Where lex, parse, and interpret have to do with the block- and
+tag-level language.
+
+### Block, tag and text lexing
+
+This process is responsible for turning the template string into an
+array of tokens. To make the code simpler, lexing for the function
+call and expression language is done separately. At this stage all
+we'll look for is tokens consisting of block and tag end and beginning
+markers. So
+just <code>{%</code>, <code>%}</code>, <code>{{</code>, <code>}}</code>. If
+a token is not one of these, it is regular text.
+
+<span class="code-caption">pytemplate.py</span>
+```python
+BLOCK_OPEN = '{%'
+BLOCK_CLOSE = '%}'
+
+TAG_OPEN = '{{'
+TAG_CLOSE = '}}'
+
+
+def getelement(source, cursor):
+    if cursor < 0:
+        return None
+    if cursor < len(source):
+        return source[cursor]
+    return None
+
+
+def lex(source):
+    tokens = []
+    current = ''
+    cursor = 0
+    while cursor < len(source):
+        char = getelement(source, cursor)
+        if char == '{':
+            # Handle escaping {
+            if getelement(source, cursor-1) == '{':
+                cursor += 1
+                continue
+            
+            next_char = getelement(source, cursor+1)
+            if next_char in ['%', '{']:
+                if current:
+                    tokens.append({
+                        'value': current,
+                        'cursor': cursor - len(current),
+                    })
+                    current = ''
+
+                tokens.append({
+                    'value': BLOCK_OPEN if next_char == '%' else TAG_OPEN,
+                    'cursor': cursor,
+                })
+                cursor += 2
+                continue
+
+        if char in ['%', '}']:
+            # Handle escaping % and }
+            if getelement(source, cursor-1) == char:
+                cursor += 1
+                continue
+
+            if getelement(source, cursor+1) != '}':
+                cursor += 1
+                continue
+
+            if current:
+                tokens.append({
+                    'value': current,
+                    'cursor': cursor - len(current),
+                })
+                current = ''
+
+            tokens.append({
+                'value': BLOCK_CLOSE if char == '%' else TAG_CLOSE,
+                'cursor': cursor,
+            })
+            cursor += 2
+            continue
+
+        current += getelement(source, cursor)
+        cursor += 1
+
+    if current:
+        tokens.append({
+            'value': current,
+            'cursor': cursor - len(current),
+        })
+
+    return tokens
+```
+
+That's it for lexing!
+
+### Block, tag and text parsing
+
+Next up is a matter of finding the ending/closing patterns in the array of tokens. There are a few main rules we'll look for:
+
+* Every open tag symbol <code>{{</code> must be followed by a text token then a closing tag symbol <code>}}</code>
+  * The text within the open and close tag must parse into a valid expression (we'll define this logic later)
+* Every block symbol <code>{%</code> must be followed by a text token then an end of block symbol <code>%}</code>
+  * The text token within the open and close block must parse into a valid function call (we'll define this logic later)
+* Every block must have a matching end block where the text in the end block is `end` concatenated to the beginning of the function being called in the start block
+  * The text between two blocks can contain nested blocks or tags
+
+Let's codify that:
+
+<span class="code-caption">pytemplate.py</span>
+```python
+def parse(tokens, end_of_block_marker=None):
+    cursor = 0
+    ast = []
+    while cursor < len(tokens):
+        t = getelement(tokens, cursor)
+        value = t['value']
+        if value == TAG_OPEN:
+            if getelement(tokens, cursor+2)['value'] != TAG_CLOSE:
+                raise Exception('Expected closing tag')
+
+            node_tokens = lex_node(getelement(tokens, cursor+1)['value'])
+            node_ast = parse_node(node_tokens)
+            ast.append({
+                'type': 'tag',
+                'value': node_ast,
+            })
+            cursor += 3
+            continue
+        
+        if value == TAG_CLOSE:
+            raise Exception('Expected opening tag')
+
+        if value == BLOCK_OPEN:
+            if getelement(tokens, cursor+2)['value'] != BLOCK_CLOSE:
+                raise Exception('Expected end of block open')
+
+            block = getelement(tokens, cursor+1)
+            node_tokens = lex_node(block['value'])
+            node_ast = parse_node(node_tokens)
+            if end_of_block_marker and 'end'+end_of_block_marker == node_ast['value']:
+                return ast, cursor+3
+
+            child, cursor_offset = parse(tokens[cursor+3:], node_ast['value'])
+            if cursor_offset == 0:
+                raise Exception('Failed to find end of block')
+
+            ast.append({
+                'type': 'block',
+                'value': node_ast,
+                'child': child,
+            })
+            cursor += cursor_offset + 3
+            continue
+
+        if value == BLOCK_CLOSE:
+            raise Exception('Expected start of block open')
+
+        ast.append({
+            'type': 'text',
+            'value': t,
+        })
+        cursor += 1
+
+    return ast, cursor
+```
+
+And that's it for parsing blocks and tags. Now we have to get into the
+node language.
+
+### Node lexing
+
+In the node language, everything is either a literal or a function
+call. Whitespace is ignored. The only special symbols in the node
+language are commas and parentheses.
+
+So to break the text into tokens we just iterate over all characters
+until we find whitespace or a symbol. Accumulate the characters that
+are not either. Add everything but whitespace to the list of tokens.
+
+<span class="code-caption">pytemplate.py</span>
+```python
+def lex_node(source):
+    tokens = []
+    cursor = 0
+    current = ''
+    while cursor < len(source):
+        char = getelement(source, cursor)
+        if char in ['\r', '\t', '\n', ' ']:
+            if current:
+                tokens.append({
+                    'value': current,
+                    'type': 'literal',
+                })
+                current = ''
+
+            cursor += 1
+            continue
+
+        if char in ['(', ')', ',']:
+            if current:
+                tokens.append({
+                    'value': current,
+                    'type': 'literal',
+                })
+                current = ''
+
+            tokens.append({
+                'value': char,
+                'type': 'syntax',
+            })
+            cursor += 1
+            continue
+
+        current += char
+        cursor +=1
+
+    return tokens
+```
+
+And that's it for node lexing.
+
+### Node parsing
+
+We'll break this up into two functions. The first is just for parsing
+literals and function calls.
+
+<span class="code-caption">pytemplate.py</span>
+```python
+def parse_node(tokens):
+    cursor = 0
+    ast = None
+    while cursor < len(tokens):
+        t = getelement(tokens, cursor)
+        if t['type'] != 'literal':
+            raise Exception('Expected literal')
+        cursor += 1
+
+        next_t = getelement(tokens, cursor)
+        if not next_t:
+            ast = t
+            break
+
+        if next_t['value'] != '(':
+            ast = t
+            break
+
+        cursor += 1
+
+        if next_t['value'] == '(':
+            args, cursor = parse_node_args(tokens[cursor:])
+            ast = {
+                'type': 'function',
+                'value': t['value'].strip(),
+                'args': args,
+            }
+            cursor += 2
+
+        break
+
+    if cursor != len(tokens):
+        raise Exception('Failed to parse node: ' + tokens[cursor]['value'])
+
+    return ast
+```
+
+The second is for parsing function call arguments.
+
+<span class="code-caption">pytemplate.py</span>
+```python
+def parse_node_args(tokens):
+    args = []
+    cursor = 0
+    while cursor < len(tokens):
+        t = getelement(tokens, cursor)
+        if t['value'] == ')':
+            return args, cursor + 1
+        
+        if len(args) and t['value'] == ',':
+            cursor += 1
+        elif len(args) and t['value'] != ',':
+            raise Exception('Expected comma to separate args')
+
+        args.append(getelement(tokens, cursor))
+        cursor += 1
+
+    return args, cursor
+```
+
+And that's it for parsing and lexing the entire whole template and
+node language!
+
+### Interpreting
+
+Interpreting is a matter of iterating over the AST recursively,
+writing out literal text, evaluating the contents of tags, and doing
+special processing for blocks.
+
+<span class="code-caption">pytemplate.py</span>
+```python3
+def interpret(outfd, ast, env):
+    for item in ast:
+        item_type = item['type']
+        node = item['value']
+
+        if item_type == 'text':
+            outfd.write(node['value'])
+            continue
+
+        if item_type == 'tag':
+            tag_value = interpret_node(node, env)
+            outfd.write(tag_value)
+            continue
+
+        if item_type == 'block':
+            interpret_block(outfd, node, item['child'], env)
+            continue
+
+        raise Exception('Unknown type: ' + item_type)
+```
+
+#### Intepreting nodes
+
+A node is one of two things:
+
+* A literal which is either a
+  * String if surrounded by single quotes
+  * Otherwise an identifier to be looked up in the environment dictionary
+* Or a function call
+
+<span class="code-caption">pytemplate.py</span>
+```python
+def interpret_node(node, env):
+    if node['type'] == 'literal':
+        # Is a string
+        if node['value'][0] == "'" and node['value'][-1] == "'":
+            return node['value'][1:-1]
+
+        # Default to an env lookup
+        return env[node['value']]
+
+    function = node['value']
+    args = node['args']
+```
+
+Let's define <code>==</code> which checks if all args are equal. First
+we have to interpret all args and then we return True if they are all
+equal.
+
+<span class="code-caption">pytemplate.py</span>
+```python
+    if function == '==':
+        arg_vals = [interpret_node(arg) for arg in args]
+        if arg_vals.count(arg_vals[0]) == len(arg_vals):
+            return True
+
+        return False
+```
+
+Now let's define a helper for retrieving an entry from a dictionary,
+called <code>get</code>. This will evaluate its first arg and assume
+it is a dictionary. Then it will evaluate its second arg and assume it
+is a key in the dictionary. Then it will return the result of looking
+up the key in the dictionary.
+
+<span class="code-caption">pytemplate.py</span>
+```python
+    if function == 'get':
+        arg_vals = [interpret_node(arg, env) for arg in args]
+        return arg_vals[0][arg_vals[1]]
+```
+
+And if its neither of these supported functions, just raise an error.
+
+<span class="code-caption">pytemplate.py</span>
+```python
+    raise Exception('Unknown function: ' + function)
+```
+
+#### Interpreting blocks
+
+Blocks are just a little different than a generic node. In addition to
+being evaluated they act on a child AST within the start and end of
+the block.
+
+For example, in an <code>if</code> block we will evaluate its argument
+and recursively call `interpret` on the child AST if the argument is
+truthy.
+
+<span class="code-caption">pytemplate.py</span>
+```python
+def interpret_block(outfd, node, child, env):
+    function = node['value']
+    args = node['args']
+    if function == 'if' and interpret_node(node):
+        interpret(outfd, child, env)
+        return
+```
+
+And for <code>for-in</code> we will use the first argument as the name
+of an identifier to be copied into a child environment
+dictionary. We'll interpret the second argument and then iterate over
+it, calling <code>interpret</code> recursively for each item in the
+array and passing the child environment dictionary so it has access to
+the current element.
+
+<span class="code-caption">pytemplate.py</span>
+```python
+    if function == 'for-in':
+        loop_variable = args[1]
+        loop_iter_variable = args[0]['value']
+
+        for elem in interpret_node(loop_variable, env):
+            child_env = env.copy()
+            child_env[loop_iter_variable] = elem
+            interpret(outfd, child, child_env)
+
+        return
+```
+
+Just like before, if we see a block we don't support yet, throw an
+error.
+
+<span class="code-caption">pytemplate.py</span>
+```python
+    raise Exception('Unsupported block node function: ' + function)
+```
+
+And that's that. :)
+
+### Run it
+
+Now we can give the example from the beginning a shot.
+
+```bash
+$ python3 test.py
+
+<html>
+  <body>
+  
+  <article>
+    <h1>Hello world!</h1>
+    <p>
+      This is my first post!
+    </p>
+  </article>
+  
+  <article>
+    <h1>Take two</h1>
+    <p>
+      This is a second post.
+    </p>
+  </article>
+  
+  </body>
+</html>
+
+```
+
+Pretty sweet for only 300 lines of Python!
