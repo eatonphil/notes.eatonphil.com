@@ -471,7 +471,7 @@ we have to interpret all args and then we return True if they are all
 equal.</p>
 <p><span class="code-caption">pytemplate.py</span></p>
 <pre><code class="hljs python">    if function == &#39;==&#39;:
-        arg_vals = [interpret_node(arg) for arg in args]
+        arg_vals = [interpret_node(arg, env) for arg in args]
         if arg_vals.count(arg_vals[0]) == len(arg_vals):
             return True
 
@@ -501,7 +501,7 @@ truthy.</p>
 <pre><code class="hljs python">def interpret_block(outfd, node, child, env):
     function = node[&#39;value&#39;]
     args = node[&#39;args&#39;]
-    if function == &#39;if&#39; and interpret_node(node):
+    if function == &#39;if&#39; and interpret_node(node, env):
         interpret(outfd, child, env)
         return
 </code></pre>

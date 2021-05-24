@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 23 May 2021 18:35:51 +0000</lastBuildDate><item><title>Writing a Jinja-inspired template library in Python</title><link>http://notes.eatonphil.com/writing-a-template-library-in-python.html</link><description>&lt;p&gt;In this post we'll build a minimal text templating library in Python
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 24 May 2021 11:46:34 +0000</lastBuildDate><item><title>Writing a Jinja-inspired template library in Python</title><link>http://notes.eatonphil.com/writing-a-template-library-in-python.html</link><description>&lt;p&gt;In this post we'll build a minimal text templating library in Python
 inspired by Jinja. It will be able to display variables and iterate
 over arrays.&lt;/p&gt;
 &lt;p&gt;By the end of this article, with around 300 lines of code, we'll be
@@ -422,7 +422,7 @@ we have to interpret all args and then we return True if they are all
 equal.&lt;/p&gt;
 &lt;p&gt;&lt;span class="code-caption"&gt;pytemplate.py&lt;/span&gt;&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs python"&gt;    if function == &amp;#39;==&amp;#39;:
-        arg_vals = [interpret_node(arg) for arg in args]
+        arg_vals = [interpret_node(arg, env) for arg in args]
         if arg_vals.count(arg_vals[0]) == len(arg_vals):
             return True
 
@@ -452,7 +452,7 @@ truthy.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs python"&gt;def interpret_block(outfd, node, child, env):
     function = node[&amp;#39;value&amp;#39;]
     args = node[&amp;#39;args&amp;#39;]
-    if function == &amp;#39;if&amp;#39; and interpret_node(node):
+    if function == &amp;#39;if&amp;#39; and interpret_node(node, env):
         interpret(outfd, child, env)
         return
 &lt;/code&gt;&lt;/pre&gt;
