@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Fri, 04 Jun 2021 14:05:19 +0000</lastBuildDate><item><title>Coolest hard-tech companies in NYC 2021</title><link>http://notes.eatonphil.com/coolest-tech-companies-in-nyc-2021.html</link><description>&lt;p&gt;For years I've kept a private list of really cool tech companies in
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Fri, 04 Jun 2021 18:28:20 +0000</lastBuildDate><item><title>Coolest hard-tech companies in NYC 2021</title><link>http://notes.eatonphil.com/coolest-tech-companies-in-nyc-2021.html</link><description>&lt;p&gt;For years I've kept a private list of really cool tech companies in
 NYC. Now that I'm funemployed it's the perfect time to publish. This
 list is influenced by 1) my perception of the difficulty of the
 engineering behind the product and 2) the company's educational and
@@ -23,14 +23,14 @@ to understand how the internet works go work for this group.&lt;/p&gt;
 &lt;h3 id="squarespace"&gt;SquareSpace&lt;/h3&gt;&lt;p&gt;The first program I made in 7th grade was a Java program that
 generated HTML from terminal prompts in my first attempt at a
 CMS. Stuff that builds stuff is amazing and SquareSpace is kinda OG.&lt;/p&gt;
-&lt;p&gt;They also just IPO-ed so the one hand comp won't be imaginary!&lt;/p&gt;
+&lt;p&gt;They also just IPO-ed so the comp won't be imaginary!&lt;/p&gt;
 &lt;p&gt;Disclosure: my wife works here, but they've been on my list longer
 than that.&lt;/p&gt;
 &lt;p&gt;&lt;a href="https://www.squarespace.com/"&gt;https://www.squarespace.com/&lt;/a&gt;&lt;/p&gt;
-&lt;h3 id="grafana"&gt;Grafana&lt;/h3&gt;&lt;p&gt;Everyone who can't afford Splunk or doesn't want to buy competitor's
-products uses ElasticSearch and Grafana. I didn't realize until double
-checking my research that Grafana is even based in NYC. Let's hope
-they're hiring developers here.&lt;/p&gt;
+&lt;h3 id="grafana"&gt;Grafana&lt;/h3&gt;&lt;p&gt;Amazing platform. Everyone who can't afford Splunk or doesn't want to
+buy competitor's products uses ElasticSearch and Grafana. I didn't
+realize until double-checking my research that Grafana is even based
+in NYC. Let's hope they're hiring developers here.&lt;/p&gt;
 &lt;p&gt;&lt;a href="https://grafana.com/"&gt;https://grafana.com/&lt;/a&gt;&lt;/p&gt;
 &lt;h3 id="frame.io"&gt;Frame.io&lt;/h3&gt;&lt;p&gt;It's like Figma for video. Clearly the future.&lt;/p&gt;
 &lt;p&gt;&lt;a href="https://www.frame.io/"&gt;https://www.frame.io/&lt;/a&gt;&lt;/p&gt;
@@ -57,7 +57,7 @@ important things I think a company can do.&lt;/p&gt;
 &lt;h3 id="capsule8"&gt;Capsule8&lt;/h3&gt;&lt;p&gt;I moved to NYC for this company because the founders and product are
 insane. If you want to learn how compilers and Linux don't work,
 you've got to come here.&lt;/p&gt;
-&lt;p&gt;Disclosure: I used to work here and own stock.&lt;/p&gt;
+&lt;p&gt;Disclosure: I own stock.&lt;/p&gt;
 &lt;p&gt;&lt;a href="https://capsule8.com/"&gt;https://capsule8.com/&lt;/a&gt;&lt;/p&gt;
 &lt;h3 id="two-sigma"&gt;Two Sigma&lt;/h3&gt;&lt;p&gt;Algorithmic trading? Maybe the smartest guys in NYC? They don't accept
 candidates without bachelor's degrees or they just don't like me. ;)
