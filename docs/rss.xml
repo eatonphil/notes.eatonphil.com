@@ -1,5 +1,93 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 24 May 2021 11:46:34 +0000</lastBuildDate><item><title>Writing a Jinja-inspired template library in Python</title><link>http://notes.eatonphil.com/writing-a-template-library-in-python.html</link><description>&lt;p&gt;In this post we'll build a minimal text templating library in Python
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Fri, 04 Jun 2021 13:57:44 +0000</lastBuildDate><item><title>Coolest hard-tech companies in NYC 2021</title><link>http://notes.eatonphil.com/coolest-tech-companies-in-nyc-2021.html</link><description>&lt;p&gt;For years I've kept a private list of really &amp;lt;&amp;gt;cool tech companies in
+NYC. Now that I'm funemployed it's the perfect time to publish. This
+list is influenced by 1) my perception of the difficulty of the
+engineering behind the product and 2) the company's educational and
+OSS presence.&lt;/p&gt;
+&lt;p&gt;With no further ado and in no particular order, here's my list!&lt;/p&gt;
+&lt;h3 id="backtrace"&gt;Backtrace&lt;/h3&gt;&lt;p&gt;This company builds a product for debugging
+mobile crashes. Your app produces a crash dump and their debugger will
+help you figure out what went wrong. That's freaking awesome.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://backtrace.io"&gt;https://backtrace.io&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="equinix-metal-(previously-packet)"&gt;Equinix Metal (previously Packet)&lt;/h3&gt;&lt;p&gt;This company provides an API around scheduling hardware servers in
+their datacenters, not virtual machines. That's nuts.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://packet.com"&gt;https://packet.com&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="digital-ocean"&gt;Digital Ocean&lt;/h3&gt;&lt;p&gt;Ok I used to work for Linode and am still a massive fan but I love all
+the clouds and this post is about NYC not Philly. If you want to learn
+how Linux works you have to work here.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://www.digitalocean.com/"&gt;https://www.digitalocean.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="ns1"&gt;NS1&lt;/h3&gt;&lt;p&gt;This company does DNS. Seeing as &lt;a href="https://www.cyberciti.biz/humour/a-haiku-about-dns/"&gt;it was
+DNS&lt;/a&gt;, if you want
+to understand how the internet works go work for this group.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://ns1.com/"&gt;https://ns1.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="squarespace"&gt;SquareSpace&lt;/h3&gt;&lt;p&gt;The first program I made in 7th grade was a Java program that
+generated HTML from terminal prompts in my first attempt at a
+CMS. Stuff that builds stuff is amazing and SquareSpace is kinda OG.&lt;/p&gt;
+&lt;p&gt;They did just IPO though so on the one hand comp won't be imaginary
+but on the other hand they're probably going to tank this year by the
+rules of tech IPOs.&lt;/p&gt;
+&lt;p&gt;Disclosure: my wife works here, but they've been on my list longer
+than that, and my comment about IPOs is about IPOs in general.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://www.squarespace.com/"&gt;https://www.squarespace.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="grafana"&gt;Grafana&lt;/h3&gt;&lt;p&gt;Everyone who can't afford Splunk or doesn't want to buy competitor's
+products uses ElasticSearch and Grafana. I didn't realize until double
+checking my research that Grafana is even based in NYC. Let's hope
+they're hiring developers here.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://grafana.com/"&gt;https://grafana.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="frame.io"&gt;Frame.io&lt;/h3&gt;&lt;p&gt;It's like Figma for video. Clearly the future.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://www.frame.io/"&gt;https://www.frame.io/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="datadog"&gt;DataDog&lt;/h3&gt;&lt;p&gt;DataDog feels like the only real competitor in the hosted server analytics.&lt;/p&gt;
+&lt;p&gt;Their stock has been doing surprisingly well, or maybe I'm just tired
+from WeWork, Uber, et al.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://www.datadoghq.com/"&gt;https://www.datadoghq.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="chronosphere"&gt;Chronosphere&lt;/h3&gt;&lt;p&gt;I'm a sucker for startups doing hosted data and search because that's
+really hard. Chronosphere does Uber-scale log storage/analysis.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://chronosphere.io/"&gt;https://chronosphere.io/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="cockroach-labs"&gt;Cockroach Labs&lt;/h3&gt;&lt;p&gt;Worst company name but maybe one of the single coolest products in
+NYC. They built a PostgreSQL compatible scalable platform in
+Go. Everything about that is amazing.&lt;/p&gt;
+&lt;p&gt;They've also turned down my application like 5 times now though so
+maybe they're very picky. :)&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://www.cockroachlabs.com/"&gt;https://www.cockroachlabs.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="mongodb"&gt;MongoDB&lt;/h3&gt;&lt;p&gt;It's cloud scale! Need more be said.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://www.mongodb.com/"&gt;https://www.mongodb.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="trail-of-bits"&gt;Trail of Bits&lt;/h3&gt;&lt;p&gt;I don't actually understand what they do or if they have a product but
+their &lt;a href="https://github.com/trailofbits"&gt;Github presence&lt;/a&gt; is amazing and
+they're dedicated to educating the community which is one of the most
+important things I think a company can do.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://www.trailofbits.com/"&gt;https://www.trailofbits.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="capsule8"&gt;Capsule8&lt;/h3&gt;&lt;p&gt;I moved to NYC for this company because the founders and product are
+insane. If you want to learn how compilers and Linux don't work,
+you've got to come here.&lt;/p&gt;
+&lt;p&gt;Disclosure: I used to work here and own stock.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://capsule8.com/"&gt;https://capsule8.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="two-sigma"&gt;Two Sigma&lt;/h3&gt;&lt;p&gt;Algorithmic trading? Maybe the smartest guys in NYC? They don't accept
+candidates without bachelor's degrees or they just don't like me. ;)
+They also host the only good tech meetups in NYC: Linux User Group and
+Papers We Love.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://www.twosigma.com/"&gt;https://www.twosigma.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="jane-street"&gt;Jane Street&lt;/h3&gt;&lt;p&gt;Another algorithmic trading company but this time with OCaml. They're
+so crazy &lt;a href="https://blog.janestreet.com/what-the-interns-have-wrought-2018/"&gt;you should see what the intern
+built&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://www.janestreet.com/"&gt;https://www.janestreet.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="vimeo"&gt;Vimeo&lt;/h3&gt;&lt;p&gt;Everybody loves an underdog story. And the &lt;a href="https://www.linkedin.com/pulse/now-shes-ceo-vimeo-after-rejected-dozens-companies-mamta-shah-/"&gt;CEO seems really
+cool&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://vimeo.com/"&gt;https://vimeo.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="etsy"&gt;Etsy&lt;/h3&gt;&lt;p&gt;Their blog posts and engineering organization philosophy are widely
+regarded. And they've got a sweet headquarters in Brooklyn.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://www.etsy.com/"&gt;https://www.etsy.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="sisense"&gt;Sisense&lt;/h3&gt;&lt;p&gt;If you're not using ElasticSearch and you're not using Splunk, you
+might be using Sisense. Again, I'm a big sucker for data and analytics
+platforms.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://www.sisense.com/"&gt;https://www.sisense.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="codeacademy"&gt;CodeAcademy&lt;/h3&gt;&lt;p&gt;I am 100% on board with giving people opportunities in tech.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://www.codecademy.com/"&gt;https://www.codecademy.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="stack-overflow"&gt;Stack Overflow&lt;/h3&gt;&lt;p&gt;They were just bought! But they still exist I suppose. If you love
+.NET you've got to work here.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://stackoverflow.com/"&gt;https://stackoverflow.com/&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id="that's-it!"&gt;That's it!&lt;/h3&gt;&lt;p&gt;Tell me what you think and if I'm missing any hard-tech companies in
+NYC. I'm sure I am.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/coolest-tech-companies-in-nyc-2021.html</guid><pubDate>Fri, 04 Jun 2021 00:00:00 +0000</pubDate></item><item><title>Writing a Jinja-inspired template library in Python</title><link>http://notes.eatonphil.com/writing-a-template-library-in-python.html</link><description>&lt;p&gt;In this post we'll build a minimal text templating library in Python
 inspired by Jinja. It will be able to display variables and iterate
 over arrays.&lt;/p&gt;
 &lt;p&gt;By the end of this article, with around 300 lines of code, we'll be
@@ -12552,7 +12640,81 @@ team's work up to your stakeholders. This is the best position to be
 in.&lt;/p&gt;
 &lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;tldr; don&amp;#39;t let your folks overwork unnecessarily when you could be reporting more frequently/honestly on understood priorities and accomplishments achieved/not achieved &lt;a href="https://t.co/PeTe2Bq0Xz"&gt;https://t.co/PeTe2Bq0Xz&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1087722536236957697?ref_src=twsrc%5Etfw"&gt;January 22, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/transparency-and-communication-on-small-teams.html</guid><pubDate>Tue, 22 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Writing a lisp compiler from scratch in JavaScript: 2. user-defined functions and variables</title><link>http://notes.eatonphil.com/compiler-basics-functions.html</link><description>&lt;p class="note"&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/transparency-and-communication-on-small-teams.html</guid><pubDate>Tue, 22 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Windows</title><link>http://notes.eatonphil.com/windows.html</link><description>&lt;p&gt;It has been six years since I last used Windows for any remotely
+serious software development. I've used Ubuntu, Arch, or FreeBSD
+since. But eventually I spent so much time working around common
+workplace tasks that I decided to put Windows 10 Pro on my work
+laptop.&lt;/p&gt;
+&lt;h3 id="windows-subsystem-for-linux"&gt;Windows Subsystem for Linux&lt;/h3&gt;&lt;p&gt;Introduced in 2016, this technology allows Windows to run unmodified
+Linux binaries. The core feat being &lt;a href="https://blogs.msdn.microsoft.com/wsl/2016/06/08/wsl-system-calls/"&gt;syscall
+translation&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;It works nearly flawlessly. This means I can do all my Go, Node,
+PostgreSQL development on Windows without a virtual machine using
+bash, tmux, git, emacs, etc.&lt;/p&gt;
+&lt;p&gt;I've seen a few minor exceptions over the course of regular software
+development in WSL:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://github.com/Microsoft/WSL/issues/2249"&gt;ss/netstat does not work&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/hashicorp/vagrant/issues/8700"&gt;vagrant does not work&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;More generally, Linux programs are heavily file-oriented. And Windows
+I/O &lt;a href="https://github.com/Microsoft/WSL/issues/873#issuecomment-425272829"&gt;is not designed well for
+that&lt;/a&gt;.
+In the worst cases (installing/adding Node packages) it can take
+minutes to do operations that would take Linux seconds.&lt;/p&gt;
+&lt;h3 id="vagrant"&gt;Vagrant&lt;/h3&gt;&lt;p&gt;Vagrant-Windows interoperability is abysmal.&lt;/p&gt;
+&lt;p&gt;As noted above, you cannot manage Hyper-V from vagrant within WSL. So
+you're stuck using Powershell. Even then, managing synced files from
+vagrant is a nightmare. The default sync method requires you to sign
+in using your &lt;strong&gt;Windows Live&lt;/strong&gt; username and password on every
+reboot. But Node package installation attempts some file operations
+that are not supported over the default synced, network filesystem.&lt;/p&gt;
+&lt;p&gt;When I switched to rsync vagrant wouldn't reliable sync when the
+virtual machine went down and came back up.&lt;/p&gt;
+&lt;p&gt;After hours of trying to get some files synced with vagrant I gave up.&lt;/p&gt;
+&lt;h3 id="hyper-v"&gt;Hyper-V&lt;/h3&gt;&lt;p&gt;Hyper-V's GUI is much more complex/feature-complete than VirtualBox.
+It even provides a Ubuntu-quick-install that I used to jump right in.
+I don't recommend using this though because it gives you no option but
+an 11GB hard disk. I didn't realize this until I went through an hour
+or two of post-install customization only to run out of space. Too
+lazy to boot into a live CD to grow the root filesystem I reinstalled
+with a more suitable 64GB drive and went through the hour-long
+post-install customization process again.&lt;/p&gt;
+&lt;p&gt;Networking in Hyper-V is more complex/feature-complete than VirtualBox
+as well. To access a Hyper-V machine you must create a new virtual
+network interface manually and associate it. Static IP address appear
+to be controlled at the host networking level (e.g. Control Panel)
+instead of within the Hyper-V interface. This highlights how these
+virtual interfaces are first-class, but overcomplicates the process of
+getting started.&lt;/p&gt;
+&lt;p&gt;Ultimately I gave up on a static IP address and decided to reboot less
+frequently.&lt;/p&gt;
+&lt;p&gt;Performance-wise Hyper-V machines are exactly as expected: excellent.&lt;/p&gt;
+&lt;h3 id="misc"&gt;Misc&lt;/h3&gt;&lt;p&gt;Docker support on Windows needs work. It took me a while to understand
+how Docker interacts with the WSL filesystem and what I needed to do
+to allow Docker to mount. The complexity is similar on macOS when you
+want to mount privileged directories like /var, but the experience is
+worse on Windows.&lt;/p&gt;
+&lt;p&gt;Apparently Windows does have tiling window managers, but I have not
+tried one out yet.&lt;/p&gt;
+&lt;p&gt;Powershell, a language with real types, is pretty compelling. But I
+have not spent enough time with it to be efficient. And since WSL is
+mostly good enough I don't really plan to.&lt;/p&gt;
+&lt;p&gt;Windows doesn't allow you to delete any files that are "in use". This
+is kinda cool except for that the errors you get when trying to delete
+files that are in use are useless. They are even more useless when you
+get the plain "could not delete directory" when you try to delete a
+directory with some file inside it that is in use. I had to start
+deleting files within by hand until I found the one I realized was in
+use.&lt;/p&gt;
+&lt;h3 id="conclusion"&gt;Conclusion&lt;/h3&gt;&lt;p&gt;If you have never run Linux or FreeBSD, don't use this post as an
+excuse not to. You should run Linux or FreeBSD for the experience. But
+if you've reached diminishing returns in your Linux/FreeBSD use,
+Windows as a development environment has come a long way. It may be
+the best platform available for software development, the profession.&lt;/p&gt;
+&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
+&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Some notes on my experience having replaced Arch Linux with Windows on my work laptop &lt;a href="https://t.co/8asxZmspwR"&gt;https://t.co/8asxZmspwR&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1086994000182153222?ref_src=twsrc%5Etfw"&gt;January 20, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/windows.html</guid><pubDate>Sun, 20 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Writing a lisp compiler from scratch in JavaScript: 2. user-defined functions and variables</title><link>http://notes.eatonphil.com/compiler-basics-functions.html</link><description>&lt;p class="note"&gt;
   Previously in compiler basics:
   &lt;! forgive me, for I have sinned &gt;
   &lt;br /&gt;
@@ -12972,81 +13134,7 @@ $ echo $?
 conditionals and tail-call optimization.&lt;/p&gt;
 &lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Part two on compiler basics using JavaScript: user-defined functions and variables &lt;a href="https://t.co/XOam67HO8h"&gt;https://t.co/XOam67HO8h&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1087103061590446083?ref_src=twsrc%5Etfw"&gt;January 20, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/compiler-basics-functions.html</guid><pubDate>Sun, 20 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Windows</title><link>http://notes.eatonphil.com/windows.html</link><description>&lt;p&gt;It has been six years since I last used Windows for any remotely
-serious software development. I've used Ubuntu, Arch, or FreeBSD
-since. But eventually I spent so much time working around common
-workplace tasks that I decided to put Windows 10 Pro on my work
-laptop.&lt;/p&gt;
-&lt;h3 id="windows-subsystem-for-linux"&gt;Windows Subsystem for Linux&lt;/h3&gt;&lt;p&gt;Introduced in 2016, this technology allows Windows to run unmodified
-Linux binaries. The core feat being &lt;a href="https://blogs.msdn.microsoft.com/wsl/2016/06/08/wsl-system-calls/"&gt;syscall
-translation&lt;/a&gt;.&lt;/p&gt;
-&lt;p&gt;It works nearly flawlessly. This means I can do all my Go, Node,
-PostgreSQL development on Windows without a virtual machine using
-bash, tmux, git, emacs, etc.&lt;/p&gt;
-&lt;p&gt;I've seen a few minor exceptions over the course of regular software
-development in WSL:&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;&lt;a href="https://github.com/Microsoft/WSL/issues/2249"&gt;ss/netstat does not work&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="https://github.com/hashicorp/vagrant/issues/8700"&gt;vagrant does not work&lt;/a&gt;&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;More generally, Linux programs are heavily file-oriented. And Windows
-I/O &lt;a href="https://github.com/Microsoft/WSL/issues/873#issuecomment-425272829"&gt;is not designed well for
-that&lt;/a&gt;.
-In the worst cases (installing/adding Node packages) it can take
-minutes to do operations that would take Linux seconds.&lt;/p&gt;
-&lt;h3 id="vagrant"&gt;Vagrant&lt;/h3&gt;&lt;p&gt;Vagrant-Windows interoperability is abysmal.&lt;/p&gt;
-&lt;p&gt;As noted above, you cannot manage Hyper-V from vagrant within WSL. So
-you're stuck using Powershell. Even then, managing synced files from
-vagrant is a nightmare. The default sync method requires you to sign
-in using your &lt;strong&gt;Windows Live&lt;/strong&gt; username and password on every
-reboot. But Node package installation attempts some file operations
-that are not supported over the default synced, network filesystem.&lt;/p&gt;
-&lt;p&gt;When I switched to rsync vagrant wouldn't reliable sync when the
-virtual machine went down and came back up.&lt;/p&gt;
-&lt;p&gt;After hours of trying to get some files synced with vagrant I gave up.&lt;/p&gt;
-&lt;h3 id="hyper-v"&gt;Hyper-V&lt;/h3&gt;&lt;p&gt;Hyper-V's GUI is much more complex/feature-complete than VirtualBox.
-It even provides a Ubuntu-quick-install that I used to jump right in.
-I don't recommend using this though because it gives you no option but
-an 11GB hard disk. I didn't realize this until I went through an hour
-or two of post-install customization only to run out of space. Too
-lazy to boot into a live CD to grow the root filesystem I reinstalled
-with a more suitable 64GB drive and went through the hour-long
-post-install customization process again.&lt;/p&gt;
-&lt;p&gt;Networking in Hyper-V is more complex/feature-complete than VirtualBox
-as well. To access a Hyper-V machine you must create a new virtual
-network interface manually and associate it. Static IP address appear
-to be controlled at the host networking level (e.g. Control Panel)
-instead of within the Hyper-V interface. This highlights how these
-virtual interfaces are first-class, but overcomplicates the process of
-getting started.&lt;/p&gt;
-&lt;p&gt;Ultimately I gave up on a static IP address and decided to reboot less
-frequently.&lt;/p&gt;
-&lt;p&gt;Performance-wise Hyper-V machines are exactly as expected: excellent.&lt;/p&gt;
-&lt;h3 id="misc"&gt;Misc&lt;/h3&gt;&lt;p&gt;Docker support on Windows needs work. It took me a while to understand
-how Docker interacts with the WSL filesystem and what I needed to do
-to allow Docker to mount. The complexity is similar on macOS when you
-want to mount privileged directories like /var, but the experience is
-worse on Windows.&lt;/p&gt;
-&lt;p&gt;Apparently Windows does have tiling window managers, but I have not
-tried one out yet.&lt;/p&gt;
-&lt;p&gt;Powershell, a language with real types, is pretty compelling. But I
-have not spent enough time with it to be efficient. And since WSL is
-mostly good enough I don't really plan to.&lt;/p&gt;
-&lt;p&gt;Windows doesn't allow you to delete any files that are "in use". This
-is kinda cool except for that the errors you get when trying to delete
-files that are in use are useless. They are even more useless when you
-get the plain "could not delete directory" when you try to delete a
-directory with some file inside it that is in use. I had to start
-deleting files within by hand until I found the one I realized was in
-use.&lt;/p&gt;
-&lt;h3 id="conclusion"&gt;Conclusion&lt;/h3&gt;&lt;p&gt;If you have never run Linux or FreeBSD, don't use this post as an
-excuse not to. You should run Linux or FreeBSD for the experience. But
-if you've reached diminishing returns in your Linux/FreeBSD use,
-Windows as a development environment has come a long way. It may be
-the best platform available for software development, the profession.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
-&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Some notes on my experience having replaced Arch Linux with Windows on my work laptop &lt;a href="https://t.co/8asxZmspwR"&gt;https://t.co/8asxZmspwR&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1086994000182153222?ref_src=twsrc%5Etfw"&gt;January 20, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/windows.html</guid><pubDate>Sun, 20 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Make small changes and solve the problems you have</title><link>http://notes.eatonphil.com/make-small-changes-and-solve-the-problems-you-have.html</link><description>&lt;p&gt;Two frustrating things that can happen in an organization are 1) big
+</description><guid isPermaLink="false">http://notes.eatonphil.com/compiler-basics-functions.html</guid><pubDate>Sun, 20 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Make small changes and solve the problems you have</title><link>http://notes.eatonphil.com/make-small-changes-and-solve-the-problems-you-have.html</link><description>&lt;p&gt;Two frustrating things that can happen in an organization are 1) big
 changes and 2) changes that aren’t clearly associated with a known
 problem. It’s even worse in that order.&lt;/p&gt;
 &lt;p&gt;These situations tend to happen when a problem remain unaddressed for
