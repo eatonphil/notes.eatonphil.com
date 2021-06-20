@@ -30,7 +30,7 @@ HOME_PAGE = """
   <p>
     Hello! I'm Phil, a developer and manager in Queens, NY. I'm
     building <a
-    href="https://github.com/multiprocessio/datastation">DataStation</a>,
+    href="https://datastation.multiprocess.io">DataStation</a>,
     a data IDE for developers. Check out the <a
     href="https://app.datastation.multiprocess.io">in-browser
     demo</a>.
