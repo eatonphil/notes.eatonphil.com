@@ -236,6 +236,24 @@ def main():
     fg.language('en')
     fg.rss_file('docs/rss.xml')
 
+    with open('docs/sitemap.xml', 'w') as f:
+        urls = []
+        for url, _, date, _, _, _ in reversed(post_data):
+            urls.append("""  <url>
+    <loc>https://notes.eatonphil.com/{url}</loc>
+    <lastmod>{date}</lastmod>
+ </url>""".format(url=url, date=datetime.strptime(date, '%B %d, %Y').strftime('%Y-%m-%d')))
+        f.write("""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+{urls}
+</urlset>""".format(urls='\n'.join(urls)))
+
+    with open('docs/robots.txt', 'w') as f:
+        f.write("""User-agent: *
+Allow: /
+
+Sitemap: https://notes.eatonphil.com/sitemap.xml""")
+
     if not os.path.exists('docs/tags'):
         os.makedirs('docs/tags')
     for tag in all_tags:
