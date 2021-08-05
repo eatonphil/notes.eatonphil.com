@@ -343,7 +343,7 @@ But if you run this <code>abcl --load main.lisp</code> and hit this
 exists at the call to <code>Path.of(filename)</code>.
 
 After digging around I saw it was because
-[Path.of](https://docs.oracle.com/en/java/javase/16/docs/api/java.base/java/nio/file/Path.html#of(java.lang.String,java.lang.String...))
+[Path.of](https://docs.oracle.com/en/java/javase/16/docs/api/java.base/java/nio/file/Path.html#of(java.lang.String,java.lang.String...%29)
 is a variadic function.
 
 And while there are [examples
