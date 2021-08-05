@@ -1,12 +1,12 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 05 Aug 2021 18:07:14 +0000</lastBuildDate><item><title>Practical? Common Lisp on the JVM: A quick intro to ABCL for modern web apps</title><link>http://notes.eatonphil.com/practical-common-lisp-on-the-jvm.html</link><description>&lt;p&gt;In a ridiculous attempt to &lt;a href="https://github.com/eatonphil/jvm-lisp-examples"&gt;prove an internet
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 05 Aug 2021 18:10:06 +0000</lastBuildDate><item><title>Practical? Common Lisp on the JVM: A quick intro to ABCL for modern web apps</title><link>http://notes.eatonphil.com/practical-common-lisp-on-the-jvm.html</link><description>&lt;p&gt;In a ridiculous attempt to &lt;a href="https://github.com/eatonphil/jvm-lisp-examples"&gt;prove an internet
 wrong&lt;/a&gt; about the
 practicality of Lisp (Common Lisp specifically), I tried to get a
 simple (but realistic) web app running. After four days and &lt;a href="https://github.com/armedbear/abcl/pull/379"&gt;a patch
 to ABCL&lt;/a&gt; I got something
 working.&lt;/p&gt;
 &lt;p&gt;The code I had in mind would look something like this:&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs scheme"&gt;(let* ((port 8080)
+&lt;pre&gt;&lt;code class="hljs lisp"&gt;(let* ((port 8080)
        (server (make-server 8080)))
   (route server &amp;quot;GET&amp;quot; &amp;quot;/&amp;quot; (lambda (ctx) &amp;quot;My index!&amp;quot;))
   (route server &amp;quot;GET&amp;quot; &amp;quot;/search&amp;quot;
@@ -78,7 +78,7 @@ install&lt;/code&gt;. Your &lt;code&gt;pom.xml&lt;/code&gt; looks like this:&lt;
 &amp;lt;/project&amp;gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;ABCL has a package called &lt;code&gt;abcl-asdf&lt;/code&gt; that helps you resolve dependencies through Maven and your filesystem. We'll import it and a package it depends on (&lt;code&gt;abcl-contrib&lt;/code&gt;):&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs scheme"&gt;(require :abcl-contrib)
+&lt;pre&gt;&lt;code class="hljs lisp"&gt;(require :abcl-contrib)
 (require :abcl-asdf)
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;All our code will go into a single &lt;code&gt;main.lisp&lt;/code&gt; file.&lt;/p&gt;
@@ -88,7 +88,7 @@ containing the Maven package group id and artifact id. Then you pass
 that result to &lt;code&gt;abcl-asdf:as-classpath&lt;/code&gt; and pass that
 result to &lt;code&gt;java:add-to-classpath&lt;/code&gt;.&lt;/p&gt;
 &lt;p&gt;It will look like this:&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs scheme"&gt;(setf imports &amp;#39;(&amp;quot;io.jooby:jooby&amp;quot;
+&lt;pre&gt;&lt;code class="hljs lisp"&gt;(setf imports &amp;#39;(&amp;quot;io.jooby:jooby&amp;quot;
                 &amp;quot;io.jooby:jooby-netty&amp;quot;
                 &amp;quot;io.pebbletemplates:pebble&amp;quot;))
 (loop for import in imports
@@ -138,7 +138,7 @@ object that extends &lt;code&gt;io.jooby.Jooby&lt;/code&gt;. Since we're not usi
 an OOP language though we're going to try avoiding classes as much as
 possible. So we'll just create a new instance
 of &lt;code&gt;io.jooby.Jooby&lt;/code&gt; and add routes directly to it.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs scheme"&gt;(defun template (filename context)
+&lt;pre&gt;&lt;code class="hljs lisp"&gt;(defun template (filename context)
   &amp;quot;&amp;quot;)
 
 (defun route (app method path handler)
@@ -184,7 +184,7 @@ it into a string to be returned as an HTTP response body.&lt;/p&gt;
 "classname" :interfaces '("an interface name") :methods '(("method
 name 1" "return type" ("first parameter type" ...) (lambda (this arg1
   ...) body))))&lt;/code&gt;:&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs scheme"&gt;(defun route (app method path handler)
+&lt;pre&gt;&lt;code class="hljs lisp"&gt;(defun route (app method path handler)
   (#&amp;quot;route&amp;quot;
    app
    method
@@ -217,7 +217,7 @@ realized we can trick Jooby/Java/somebody into figuring out the
 correct return type by adding another implementation
 of &lt;code&gt;apply&lt;/code&gt; that returns a &lt;code&gt;String&lt;/code&gt; to our class.&lt;/p&gt;
 &lt;p&gt;The full &lt;code&gt;route&lt;/code&gt; code now looks like this:&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs scheme"&gt;(defun route (app method path handler)
+&lt;pre&gt;&lt;code class="hljs lisp"&gt;(defun route (app method path handler)
   (#&amp;quot;route&amp;quot;
    app
    method
@@ -253,7 +253,7 @@ compiledTemplate.evaluate(writer, context);
 String output = writer.toString();
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;We can easily translate this into Lisp:&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs scheme"&gt;(defun hashmap (alist)
+&lt;pre&gt;&lt;code class="hljs lisp"&gt;(defun hashmap (alist)
   (let ((map (jss:new &amp;#39;HashMap)))
     (loop for el in alist
          do (#&amp;quot;put&amp;quot; map (car el) (cadr el)))
@@ -288,7 +288,7 @@ call&lt;/a&gt;
 and tried this logic on a local copy of the ABCL source code.&lt;/p&gt;
 &lt;p&gt;It worked. So I opened a &lt;a href="https://github.com/armedbear/abcl/pull/379"&gt;pull request&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;So the full working code for &lt;code&gt;template&lt;/code&gt; is:&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs scheme"&gt;(defun template (filename context-alist)
+&lt;pre&gt;&lt;code class="hljs lisp"&gt;(defun template (filename context-alist)
   (let* ((ctx (hashmap context-alist))
          (path (java:jstatic &amp;quot;of&amp;quot; &amp;quot;java.nio.file.Path&amp;quot; filename (java:jnew-array &amp;quot;java.lang.String&amp;quot; 0)))
          (file (#&amp;quot;readString&amp;quot; &amp;#39;java.nio.file.Files path))
@@ -323,6 +323,9 @@ Hello world!%
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Phew! Easy peasy.&lt;/p&gt;
 &lt;h3 id="next-up"&gt;Next up&lt;/h3&gt;&lt;p&gt;I'm porting this example to Kawa to see how it fairs. Blog post to come.&lt;/p&gt;
+&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:phil@eatonphil.com"&gt;hear from you&lt;/a&gt; with
+questions or ideas.&lt;/p&gt;
+&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;In a ridiculous attempt to prove an internet wrong about the practicality of Lisp (Common Lisp specifically), I tried to get a simple (but realistic) web app running. After four days and a patch to ABCL I got something working.&lt;a href="https://t.co/5UUWNR8Wnn"&gt;https://t.co/5UUWNR8Wnn&lt;/a&gt; &lt;a href="https://t.co/cZsx32IlKD"&gt;pic.twitter.com/cZsx32IlKD&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1423345414279942150?ref_src=twsrc%5Etfw"&gt;August 5, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/practical-common-lisp-on-the-jvm.html</guid><pubDate>Thu, 05 Aug 2021 00:00:00 +0000</pubDate></item><item><title>Leaders, you need to share organization success stories more frequently</title><link>http://notes.eatonphil.com/leaders-share-company-success-stories.html</link><description>&lt;p&gt;This post goes out to anyone who leads a team: managers, directors,
 VPs, executives. You need to share organization success stories with
 your organization on a regular and frequent basis. Talk about sales

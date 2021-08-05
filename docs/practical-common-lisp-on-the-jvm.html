@@ -50,7 +50,7 @@ simple (but realistic) web app running. After four days and <a href="https://git
 to ABCL</a> I got something
 working.</p>
 <p>The code I had in mind would look something like this:</p>
-<pre><code class="hljs scheme">(let* ((port 8080)
+<pre><code class="hljs lisp">(let* ((port 8080)
        (server (make-server 8080)))
   (route server &quot;GET&quot; &quot;/&quot; (lambda (ctx) &quot;My index!&quot;))
   (route server &quot;GET&quot; &quot;/search&quot;
@@ -122,7 +122,7 @@ install</code>. Your <code>pom.xml</code> looks like this:</p>
 &lt;/project&gt;
 </code></pre>
 <p>ABCL has a package called <code>abcl-asdf</code> that helps you resolve dependencies through Maven and your filesystem. We'll import it and a package it depends on (<code>abcl-contrib</code>):</p>
-<pre><code class="hljs scheme">(require :abcl-contrib)
+<pre><code class="hljs lisp">(require :abcl-contrib)
 (require :abcl-asdf)
 </code></pre>
 <p>All our code will go into a single <code>main.lisp</code> file.</p>
@@ -132,7 +132,7 @@ containing the Maven package group id and artifact id. Then you pass
 that result to <code>abcl-asdf:as-classpath</code> and pass that
 result to <code>java:add-to-classpath</code>.</p>
 <p>It will look like this:</p>
-<pre><code class="hljs scheme">(setf imports &#39;(&quot;io.jooby:jooby&quot;
+<pre><code class="hljs lisp">(setf imports &#39;(&quot;io.jooby:jooby&quot;
                 &quot;io.jooby:jooby-netty&quot;
                 &quot;io.pebbletemplates:pebble&quot;))
 (loop for import in imports
@@ -182,7 +182,7 @@ object that extends <code>io.jooby.Jooby</code>. Since we're not using
 an OOP language though we're going to try avoiding classes as much as
 possible. So we'll just create a new instance
 of <code>io.jooby.Jooby</code> and add routes directly to it.</p>
-<pre><code class="hljs scheme">(defun template (filename context)
+<pre><code class="hljs lisp">(defun template (filename context)
   &quot;&quot;)
 
 (defun route (app method path handler)
@@ -228,7 +228,7 @@ it into a string to be returned as an HTTP response body.</p>
 "classname" :interfaces '("an interface name") :methods '(("method
 name 1" "return type" ("first parameter type" ...) (lambda (this arg1
   ...) body))))</code>:</p>
-<pre><code class="hljs scheme">(defun route (app method path handler)
+<pre><code class="hljs lisp">(defun route (app method path handler)
   (#&quot;route&quot;
    app
    method
@@ -261,7 +261,7 @@ realized we can trick Jooby/Java/somebody into figuring out the
 correct return type by adding another implementation
 of <code>apply</code> that returns a <code>String</code> to our class.</p>
 <p>The full <code>route</code> code now looks like this:</p>
-<pre><code class="hljs scheme">(defun route (app method path handler)
+<pre><code class="hljs lisp">(defun route (app method path handler)
   (#&quot;route&quot;
    app
    method
@@ -297,7 +297,7 @@ compiledTemplate.evaluate(writer, context);
 String output = writer.toString();
 </code></pre>
 <p>We can easily translate this into Lisp:</p>
-<pre><code class="hljs scheme">(defun hashmap (alist)
+<pre><code class="hljs lisp">(defun hashmap (alist)
   (let ((map (jss:new &#39;HashMap)))
     (loop for el in alist
          do (#&quot;put&quot; map (car el) (cadr el)))
@@ -332,7 +332,7 @@ call</a>
 and tried this logic on a local copy of the ABCL source code.</p>
 <p>It worked. So I opened a <a href="https://github.com/armedbear/abcl/pull/379">pull request</a>.</p>
 <p>So the full working code for <code>template</code> is:</p>
-<pre><code class="hljs scheme">(defun template (filename context-alist)
+<pre><code class="hljs lisp">(defun template (filename context-alist)
   (let* ((ctx (hashmap context-alist))
          (path (java:jstatic &quot;of&quot; &quot;java.nio.file.Path&quot; filename (java:jnew-array &quot;java.lang.String&quot; 0)))
          (file (#&quot;readString&quot; &#39;java.nio.file.Files path))
@@ -367,6 +367,9 @@ Hello world!%
 </code></pre>
 <p>Phew! Easy peasy.</p>
 <h3 id="next-up">Next up</h3><p>I'm porting this example to Kawa to see how it fairs. Blog post to come.</p>
+<h4 id="feedback">Feedback</h4><p>As always, I'd love to <a href="mailto:phil@eatonphil.com">hear from you</a> with
+questions or ideas.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">In a ridiculous attempt to prove an internet wrong about the practicality of Lisp (Common Lisp specifically), I tried to get a simple (but realistic) web app running. After four days and a patch to ABCL I got something working.<a href="https://t.co/5UUWNR8Wnn">https://t.co/5UUWNR8Wnn</a> <a href="https://t.co/cZsx32IlKD">pic.twitter.com/cZsx32IlKD</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1423345414279942150?ref_src=twsrc%5Etfw">August 5, 2021</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
 
       </div>
     </div>
