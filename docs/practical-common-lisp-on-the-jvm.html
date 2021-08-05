@@ -51,7 +51,7 @@ to ABCL</a> I got something
 working.</p>
 <p>The code I had in mind would look something like this:</p>
 <pre><code class="hljs lisp">(let* ((port 8080)
-       (server (make-server 8080)))
+       (server (make-server port)))
   (route server &quot;GET&quot; &quot;/&quot; (lambda (ctx) &quot;My index!&quot;))
   (route server &quot;GET&quot; &quot;/search&quot;
     (lambda (ctx)

@@ -13,7 +13,7 @@ The code I had in mind would look something like this:
 
 ```lisp
 (let* ((port 8080)
-       (server (make-server 8080)))
+       (server (make-server port)))
   (route server "GET" "/" (lambda (ctx) "My index!"))
   (route server "GET" "/search"
     (lambda (ctx)

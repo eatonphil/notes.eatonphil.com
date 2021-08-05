@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 05 Aug 2021 20:08:11 +0000</lastBuildDate><item><title>Practical? Common Lisp on the JVM: A quick intro to ABCL for modern web apps</title><link>http://notes.eatonphil.com/practical-common-lisp-on-the-jvm.html</link><description>&lt;p&gt;In a ridiculous attempt to &lt;a href="https://news.ycombinator.com/item?id=28036679"&gt;prove an internet
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 05 Aug 2021 21:52:55 +0000</lastBuildDate><item><title>Practical? Common Lisp on the JVM: A quick intro to ABCL for modern web apps</title><link>http://notes.eatonphil.com/practical-common-lisp-on-the-jvm.html</link><description>&lt;p&gt;In a ridiculous attempt to &lt;a href="https://news.ycombinator.com/item?id=28036679"&gt;prove an internet
 wrong&lt;/a&gt; about the
 practicality of Lisp (Common Lisp specifically), I tried to get a
 simple (but realistic) web app running. After four days and &lt;a href="https://github.com/armedbear/abcl/pull/379"&gt;a patch
@@ -7,7 +7,7 @@ to ABCL&lt;/a&gt; I got something
 working.&lt;/p&gt;
 &lt;p&gt;The code I had in mind would look something like this:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs lisp"&gt;(let* ((port 8080)
-       (server (make-server 8080)))
+       (server (make-server port)))
   (route server &amp;quot;GET&amp;quot; &amp;quot;/&amp;quot; (lambda (ctx) &amp;quot;My index!&amp;quot;))
   (route server &amp;quot;GET&amp;quot; &amp;quot;/search&amp;quot;
     (lambda (ctx)
