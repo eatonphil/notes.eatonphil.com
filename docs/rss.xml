@@ -1,5 +1,329 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 06 Jul 2021 00:39:58 +0000</lastBuildDate><item><title>Leaders, you need to share organization success stories more frequently</title><link>http://notes.eatonphil.com/leaders-share-company-success-stories.html</link><description>&lt;p&gt;This post goes out to anyone who leads a team: managers, directors,
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 05 Aug 2021 18:07:14 +0000</lastBuildDate><item><title>Practical? Common Lisp on the JVM: A quick intro to ABCL for modern web apps</title><link>http://notes.eatonphil.com/practical-common-lisp-on-the-jvm.html</link><description>&lt;p&gt;In a ridiculous attempt to &lt;a href="https://github.com/eatonphil/jvm-lisp-examples"&gt;prove an internet
+wrong&lt;/a&gt; about the
+practicality of Lisp (Common Lisp specifically), I tried to get a
+simple (but realistic) web app running. After four days and &lt;a href="https://github.com/armedbear/abcl/pull/379"&gt;a patch
+to ABCL&lt;/a&gt; I got something
+working.&lt;/p&gt;
+&lt;p&gt;The code I had in mind would look something like this:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs scheme"&gt;(let* ((port 8080)
+       (server (make-server 8080)))
+  (route server &amp;quot;GET&amp;quot; &amp;quot;/&amp;quot; (lambda (ctx) &amp;quot;My index!&amp;quot;))
+  (route server &amp;quot;GET&amp;quot; &amp;quot;/search&amp;quot;
+    (lambda (ctx)
+      (template &amp;quot;search.tmpl&amp;quot; &amp;#39;((&amp;quot;version&amp;quot; &amp;quot;0.1.0&amp;quot;)
+                                (&amp;quot;results&amp;quot; (&amp;quot;cat&amp;quot; &amp;quot;dog&amp;quot; &amp;quot;mouse&amp;quot;)))))))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And &lt;code&gt;search.tmpl&lt;/code&gt; would be some Jinja-like text file:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs html"&gt;&amp;lt;html&amp;gt;
+  &amp;lt;title&amp;gt;Version {{ version }}&amp;lt;/title&amp;gt;
+  {% for item in results %}
+    &amp;lt;h2&amp;gt;{{ item }}&amp;lt;/h2&amp;gt;
+  {% endfor %}
+&amp;lt;/html&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The source code for this post can be found &lt;a href="https://github.com/eatonphil/jvm-lisp-examples"&gt;on Github&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id="picking-a-language,-libraries"&gt;Picking a language, libraries&lt;/h3&gt;&lt;p&gt;&lt;a href="abcl.org"&gt;Armed Bear Common Lisp&lt;/a&gt; (ABCL) is the only Common Lisp
+implementation I'm aware of that can hook into a major ecosystem of
+libraries like the JVM or CLR has. In theory, this makes it a safe
+suggestion for folks who want the stability and resources of the
+ecosystem even if they aren't using its flagship language.&lt;/p&gt;
+&lt;p&gt;I wanted to use some micro web framework like
+&lt;a href="https://sparkjava.com/"&gt;Spark&lt;/a&gt; or &lt;a href="https://micronaut.io/"&gt;Micronaut&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;The problem with libraries like Micronaut (and
+&lt;a href="https://eclipse-ee4j.github.io/jersey/"&gt;Jersey&lt;/a&gt;) is that they do a
+lot of dynamic inspection to figure out how to register controllers
+and whatnot. This is certainly convenient for developers using the
+library in Java. But it becomes an ordeal when you're trying to use
+the library through a foreign function interface (FFI) in another
+language. An example of this is if a framework scans all files in a
+directory for a &lt;code&gt; @GET&lt;/code&gt; annotation.&lt;/p&gt;
+&lt;p&gt;On the other hand, Spark had a seeming hard-requirement about bringing
+in a Websocket library which caused some issues during
+configuration. So I ended up going with &lt;a href="https://jooby.io/"&gt;Jooby&lt;/a&gt; and
+&lt;a href="https://netty.io/"&gt;Netty&lt;/a&gt; (as the underlying server).&lt;/p&gt;
+&lt;p&gt;Finally, I looked into a few Jinja-like template libraries and settled
+on &lt;a href="https://pebbletemplates.io/"&gt;Pebble&lt;/a&gt; since
+&lt;a href="https://github.com/HubSpot/jinjava"&gt;Jinjava&lt;/a&gt; &lt;a href="https://github.com/HubSpot/jinjava/issues/317"&gt;wouldn't load for
+me&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id="3rd-party-jars-and-foreign-function-calls"&gt;3rd-party jars and foreign function calls&lt;/h3&gt;&lt;p&gt;So you've got your maven dependencies and ran &lt;code&gt;mvn
+install&lt;/code&gt;. Your &lt;code&gt;pom.xml&lt;/code&gt; looks like this:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs xml"&gt;&amp;lt;?xml version=&amp;quot;1.0&amp;quot; encoding=&amp;quot;utf-8&amp;quot;?&amp;gt;
+&amp;lt;project&amp;gt;
+  &amp;lt;modelVersion&amp;gt;4.0.0&amp;lt;/modelVersion&amp;gt;
+
+  &amp;lt;groupId&amp;gt;com.github.eatonphil&amp;lt;/groupId&amp;gt;
+  &amp;lt;artifactId&amp;gt;abcl-rest-api-hello-world&amp;lt;/artifactId&amp;gt;
+  &amp;lt;version&amp;gt;1&amp;lt;/version&amp;gt;
+
+  &amp;lt;dependencies&amp;gt;
+    &amp;lt;dependency&amp;gt;
+      &amp;lt;groupId&amp;gt;io.jooby&amp;lt;/groupId&amp;gt;
+      &amp;lt;artifactId&amp;gt;jooby&amp;lt;/artifactId&amp;gt;
+      &amp;lt;version&amp;gt;2.10.0&amp;lt;/version&amp;gt;
+    &amp;lt;/dependency&amp;gt;
+
+    &amp;lt;dependency&amp;gt;
+      &amp;lt;groupId&amp;gt;io.jooby&amp;lt;/groupId&amp;gt;
+      &amp;lt;artifactId&amp;gt;jooby-netty&amp;lt;/artifactId&amp;gt;
+      &amp;lt;version&amp;gt;2.10.0&amp;lt;/version&amp;gt;
+    &amp;lt;/dependency&amp;gt;
+
+    &amp;lt;dependency&amp;gt;
+      &amp;lt;groupId&amp;gt;io.pebbletemplates&amp;lt;/groupId&amp;gt;
+      &amp;lt;artifactId&amp;gt;pebble&amp;lt;/artifactId&amp;gt;
+      &amp;lt;version&amp;gt;3.1.5&amp;lt;/version&amp;gt;
+    &amp;lt;/dependency&amp;gt;
+  &amp;lt;/dependencies&amp;gt;
+&amp;lt;/project&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;ABCL has a package called &lt;code&gt;abcl-asdf&lt;/code&gt; that helps you resolve dependencies through Maven and your filesystem. We'll import it and a package it depends on (&lt;code&gt;abcl-contrib&lt;/code&gt;):&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs scheme"&gt;(require :abcl-contrib)
+(require :abcl-asdf)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;All our code will go into a single &lt;code&gt;main.lisp&lt;/code&gt; file.&lt;/p&gt;
+&lt;p&gt;To import a specific package from Maven you
+call &lt;code&gt;abcl-asdf:resolve&lt;/code&gt; with a colon-separated string
+containing the Maven package group id and artifact id. Then you pass
+that result to &lt;code&gt;abcl-asdf:as-classpath&lt;/code&gt; and pass that
+result to &lt;code&gt;java:add-to-classpath&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;It will look like this:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs scheme"&gt;(setf imports &amp;#39;(&amp;quot;io.jooby:jooby&amp;quot;
+                &amp;quot;io.jooby:jooby-netty&amp;quot;
+                &amp;quot;io.pebbletemplates:pebble&amp;quot;))
+(loop for import in imports
+      do (java:add-to-classpath
+          (abcl-asdf:as-classpath (abcl-asdf:resolve import))))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now you can call functions within these packages. If you want to call
+a Java method using only builtins it looks like &lt;code&gt;(jcall "method"
+"com.organization.package.Class" object arg1 arg2 ... argN)&lt;/code&gt;. If
+you want to call a static Java method you use &lt;code&gt;(jstatic
+...)&lt;/code&gt; instead of &lt;code&gt;(jcall ...)&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;It seems that ABCL will automatically convert simple types from their
+Lisp representation to Java but it will not turn a list into an
+array. If a Java function requires an array you'll have to do that
+explicitly with a function like &lt;code&gt;(java:jnew-array-from-list
+"java.lang.String" my-string-list)&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;When using the builtin Java FFI you always need to use the fully
+qualified name for classes like &lt;code&gt;java.lang.Object&lt;/code&gt;
+for &lt;code&gt;Object&lt;/code&gt; or &lt;code&gt;java.util.Array&lt;/code&gt;
+for &lt;code&gt;Array&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;Alternatively you can &lt;code&gt;(require :jss)&lt;/code&gt; to get access to a
+simpler syntax for making Java calls. A method call looks
+like &lt;code&gt;(#"method" object arg1 arg2 ... argN)&lt;/code&gt;. Creating a
+new instance of an object is calling &lt;code&gt;(jss:jnew
+'className)&lt;/code&gt;. When you use JSS you don't need to fully qualify a
+class name unless there are more than one class with the same
+name. For example to create a new Jooby application instance we can
+call &lt;code&gt;(jss:jnew 'Jooby)&lt;/code&gt;. As long as the class can be found
+in the class path JSS will resolve it.&lt;/p&gt;
+&lt;h3 id="some-real-code"&gt;Some real code&lt;/h3&gt;&lt;p&gt;The real code will look similar to the pseudo-code at the top of this
+article. We'll stub out the library-specific wrappers for rendering a
+template and for registering a route.&lt;/p&gt;
+&lt;p&gt;Fumbling around the &lt;a href="https://github.com/jooby-project/jooby/blob/2.x/jooby/src/main/java/io/jooby/Server.java#L35"&gt;Jooby source code&lt;/a&gt; we see this snippet of Java:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs java"&gt; * Server server = new Netty(); // or Jetty or Utow
+ *
+ * App app = new App();
+ *
+ * server.start(app);
+ *
+ * ...
+ *
+ * server.stop();
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;code&gt;Netty&lt;/code&gt; comes from the &lt;code&gt;jooby-netty&lt;/code&gt; artifact in
+the &lt;code&gt;io.jooby&lt;/code&gt; group on Maven. And &lt;code&gt;App&lt;/code&gt; is some
+object that extends &lt;code&gt;io.jooby.Jooby&lt;/code&gt;. Since we're not using
+an OOP language though we're going to try avoiding classes as much as
+possible. So we'll just create a new instance
+of &lt;code&gt;io.jooby.Jooby&lt;/code&gt; and add routes directly to it.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs scheme"&gt;(defun template (filename context)
+  &amp;quot;&amp;quot;)
+
+(defun route (app method path handler)
+  nil)
+
+(defun register-endpoints (app)
+  (route app &amp;quot;GET&amp;quot; &amp;quot;/&amp;quot;
+         (lambda (ctx) &amp;quot;An index!&amp;quot;))
+  (route app &amp;quot;GET&amp;quot; &amp;quot;/search&amp;quot;
+         (lambda (ctx)
+             (template &amp;quot;search.tmpl&amp;quot; `((&amp;quot;version&amp;quot; &amp;quot;1.0.0&amp;quot;)
+                                       (&amp;quot;results&amp;quot; ,(java:jarray-from-list &amp;#39;(&amp;quot;cat&amp;quot; &amp;quot;dog&amp;quot; &amp;quot;mouse&amp;quot;)))))))
+  (route app &amp;quot;GET&amp;quot; &amp;quot;/hello-world&amp;quot;
+         (lambda (ctx) &amp;quot;Hello world!&amp;quot;)))
+
+(let* ((port 8080)
+       (server (jss:new &amp;#39;Netty))
+       (app (jss:new &amp;#39;Jooby)))
+  (register-endpoints app)
+  (#&amp;quot;setOptions&amp;quot; server (#&amp;quot;setPort&amp;quot; (jss:new &amp;#39;ServerOptions) port))
+  (#&amp;quot;start&amp;quot; server app)
+  (#&amp;quot;join&amp;quot; server))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Easy enough. Now we just need to implement &lt;code&gt;route&lt;/code&gt;
+and &lt;code&gt;template&lt;/code&gt;.&lt;/p&gt;
+&lt;h3 id="implementing-java-classes-in-abcl"&gt;Implementing Java classes in ABCL&lt;/h3&gt;&lt;p&gt;We are again not going the happy path with fancy Java syntax (which is
+fine if you're using Java) like the Jooby documentation
+suggests. Scouring the &lt;a href="https://github.com/jooby-project/jooby/blob/2.x/jooby/src/main/java/io/jooby/Jooby.java#L546"&gt;Jooby source code
+again&lt;/a&gt;
+it looks like we can call &lt;code&gt;route&lt;/code&gt; on the &lt;code&gt;Jooby&lt;/code&gt;
+class with a method string, a path string, and an instance of an
+object implementing the &lt;code&gt;io.jooby.Route.Handler&lt;/code&gt; interface.&lt;/p&gt;
+&lt;p&gt;Since this handler argument is an interface, we cannot cheat again by
+creating an instance of it we'll have to actually create a new class
+in Lisp that extends it. Thankfully there's only one method we need to
+implement to satisfy this interface,
+&lt;a href="https://github.com/jooby-project/jooby/blob/2.x/jooby/src/main/java/io/jooby/Route.java#L256"&gt;apply&lt;/a&gt;. It
+accepts a &lt;code&gt;io.jooby.Context&lt;/code&gt; object and returns
+a &lt;code&gt;java.lang.Object&lt;/code&gt;. The framework then does introspection
+to figure out what exactly the object is and if it needs to transform
+it into a string to be returned as an HTTP response body.&lt;/p&gt;
+&lt;p&gt;To create a new class in ABCL we call &lt;code&gt;(java:jnew-runtime-class
+"classname" :interfaces '("an interface name") :methods '(("method
+name 1" "return type" ("first parameter type" ...) (lambda (this arg1
+  ...) body))))&lt;/code&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs scheme"&gt;(defun route (app method path handler)
+  (#&amp;quot;route&amp;quot;
+   app
+   method
+   path
+   (jss:new (java:jnew-runtime-class
+             (substitute #\$ #\/ (substitute #\$ #\- path))
+             :interfaces &amp;#39;(&amp;quot;io.jooby.Route$Handler&amp;quot;)
+             :methods `(
+                       (&amp;quot;apply&amp;quot; &amp;quot;java.lang.Object&amp;quot; (&amp;quot;io.jooby.Context&amp;quot;)
+                        (lambda (this ctx)
+                          (funcall ,handler ctx))))))))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;One thing to note is that when referring to a subclass within a file
+we need to address it with the &lt;code&gt;io.jooby.Route$Handler&lt;/code&gt;
+syntax rather than as you might refer to it in Java
+as &lt;code&gt;io.jooby.Route.Handler&lt;/code&gt;. In the latter case ABCL
+thinks &lt;code&gt;Route&lt;/code&gt; is a package when in fact it's just a class.&lt;/p&gt;
+&lt;p&gt;If you run this now with &lt;code&gt;abcl --load main.lisp&lt;/code&gt;. It will
+work until you hit an endpoint. The problem is how Jooby tries to
+figure out the real type of the returned object.&lt;/p&gt;
+&lt;p&gt;The app will crash somewhere around
+&lt;a href="https://github.com/jooby-project/jooby/blob/2.x/jooby/src/main/java/io/jooby/internal/RouterImpl.java#L560"&gt;here&lt;/a&gt;
+calling &lt;code&gt;analyzer.returnType(route.getHandle())&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;In this case it tries to &lt;a href="https://github.com/jooby-project/jooby/blob/f47eda4500bc4b76b23d24d4d77aa2ab3cc19e95/jooby/src/main/java/io/jooby/internal/RouteAnalyzer.java#L44"&gt;open and parse the (Java) source
+code&lt;/a&gt;
+of our application to try to find the return type for
+this &lt;code&gt;apply&lt;/code&gt; function.&lt;/p&gt;
+&lt;p&gt;That's a problem since our code isn't Java. Through trial and error I
+realized we can trick Jooby/Java/somebody into figuring out the
+correct return type by adding another implementation
+of &lt;code&gt;apply&lt;/code&gt; that returns a &lt;code&gt;String&lt;/code&gt; to our class.&lt;/p&gt;
+&lt;p&gt;The full &lt;code&gt;route&lt;/code&gt; code now looks like this:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs scheme"&gt;(defun route (app method path handler)
+  (#&amp;quot;route&amp;quot;
+   app
+   method
+   path
+   (jss:new (java:jnew-runtime-class
+             (substitute #\$ #\/ (substitute #\$ #\- path))
+             :interfaces &amp;#39;(&amp;quot;io.jooby.Route$Handler&amp;quot;)
+             :methods `(
+                       ;; Need to define this one to make Jooby figure out the return type
+                       ;; Otherwise it tries to read &amp;quot;this file&amp;quot; which isn&amp;#39;t a Java file so cannot be parsed
+                       (&amp;quot;apply&amp;quot; &amp;quot;java.lang.String&amp;quot; (&amp;quot;io.jooby.Context&amp;quot;)
+                        (lambda (this ctx) nil))
+                       ;; This one actually gets called
+                       (&amp;quot;apply&amp;quot; &amp;quot;java.lang.Object&amp;quot; (&amp;quot;io.jooby.Context&amp;quot;)
+                        (lambda (this ctx)
+                          (funcall ,handler ctx))))))))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You may wonder, why keep the original method around? Well it's because
+during reflection, ABCL says no such method that
+returns &lt;code&gt;String&lt;/code&gt; exists in the &lt;code&gt;Handler&lt;/code&gt;
+interface. That's fair I guess.&lt;/p&gt;
+&lt;h3 id="implementing-the-template"&gt;Implementing the template&lt;/h3&gt;&lt;p&gt;The Java example on the &lt;a href="https://pebbletemplates.io/"&gt;Pebble homepage&lt;/a&gt;
+is perfect:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs java"&gt;PebbleEngine engine = new PebbleEngine.Builder().build();
+PebbleTemplate compiledTemplate = engine.getTemplate(&amp;quot;home.html&amp;quot;);
+
+Map&amp;lt;String, Object&amp;gt; context = new HashMap&amp;lt;&amp;gt;();
+context.put(&amp;quot;name&amp;quot;, &amp;quot;Mitchell&amp;quot;);
+
+Writer writer = new StringWriter();
+compiledTemplate.evaluate(writer, context);
+
+String output = writer.toString();
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We can easily translate this into Lisp:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs scheme"&gt;(defun hashmap (alist)
+  (let ((map (jss:new &amp;#39;HashMap)))
+    (loop for el in alist
+         do (#&amp;quot;put&amp;quot; map (car el) (cadr el)))
+    map))
+
+(defun template (filename context-alist)
+  (let* ((ctx (hashmap context-alist))
+         (path (java:jstatic &amp;quot;of&amp;quot; &amp;quot;java.nio.file.Path&amp;quot; filename))
+         (file (#&amp;quot;readString&amp;quot; &amp;#39;java.nio.file.Files path))
+         (engine (#&amp;quot;build&amp;quot; (jss:new &amp;#39;PebbleEngine$Builder)))
+         (compiledTmpl (#&amp;quot;getTemplate&amp;quot; engine filename))
+         (writer (jss:new &amp;#39;java.io.StringWriter)))
+    (#&amp;quot;evaluate&amp;quot; compiledTmpl writer ctx)
+    (#&amp;quot;toString&amp;quot; writer)))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;But if you run this &lt;code&gt;abcl --load main.lisp&lt;/code&gt; and hit this
+&lt;code&gt;/search&lt;/code&gt; endpoint, it will blow up saying "no such method"
+exists at the call to &lt;code&gt;Path.of(filename)&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;After digging around I saw it was because
+&lt;a href="https://docs.oracle.com/en/java/javase/16/docs/api/java.base/java/nio/file/Path.html#of(java.lang.String,java.lang.String..."&gt;Path.of&lt;/a&gt;)
+is a variadic function.&lt;/p&gt;
+&lt;p&gt;And while there are &lt;a href="https://abcl.org/trac/changeset/15234"&gt;examples
+of&lt;/a&gt; using variadic functions
+when the function only has a single parameter like
+&lt;code&gt;java.util.Arrays.asList(T ...)&lt;/code&gt;, employing that same
+technique here continued to result in "no such method":&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;         (path (java:jstatic "of" "java.nio.file.Path" filename (jnew-array "java.lang.String" 0)))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Eventually I found an &lt;a href="https://stackoverflow.com/questions/20440839/cant-invoke-method-with-varargs-parameters-with-reflection-nosuchmethodexcept"&gt;example of someone doing reflect/invoke on this
+kind of a function
+call&lt;/a&gt;
+and tried this logic on a local copy of the ABCL source code.&lt;/p&gt;
+&lt;p&gt;It worked. So I opened a &lt;a href="https://github.com/armedbear/abcl/pull/379"&gt;pull request&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;So the full working code for &lt;code&gt;template&lt;/code&gt; is:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs scheme"&gt;(defun template (filename context-alist)
+  (let* ((ctx (hashmap context-alist))
+         (path (java:jstatic &amp;quot;of&amp;quot; &amp;quot;java.nio.file.Path&amp;quot; filename (java:jnew-array &amp;quot;java.lang.String&amp;quot; 0)))
+         (file (#&amp;quot;readString&amp;quot; &amp;#39;java.nio.file.Files path))
+         (engine (#&amp;quot;build&amp;quot; (jss:new &amp;#39;PebbleEngine$Builder)))
+         (compiledTmpl (#&amp;quot;getTemplate&amp;quot; engine filename))
+         (writer (jss:new &amp;#39;java.io.StringWriter)))
+    (#&amp;quot;evaluate&amp;quot; compiledTmpl writer ctx)
+    (#&amp;quot;toString&amp;quot; writer)))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And to get this diff running locally:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ mkdir ~/vendor
+$ cd ~/vendor
+$ git clone https://github.com/eatonphil/abcl
+$ cd abcl
+$ git checkout pe/more-variadic
+$ sudo {dnf/brew/apt} install ant maven
+$ ant -f build.xml
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And to run &lt;code&gt;main.lisp&lt;/code&gt; using this diff:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ ~/vendor/abcl/abcl --load main.lisp
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And to hit the API:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ curl localhost:8080/search
+&amp;lt;html&amp;gt;
+&amp;lt;title&amp;gt;Version 1.0.0&amp;lt;/title&amp;gt;
+  &amp;lt;h2&amp;gt;cat&amp;lt;/h2&amp;gt;
+  &amp;lt;h2&amp;gt;dog&amp;lt;/h2&amp;gt;
+  &amp;lt;h2&amp;gt;mouse&amp;lt;/h2&amp;gt;
+&amp;lt;/html&amp;gt;
+$ curl localhost:8080/hello-world
+Hello world!%
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Phew! Easy peasy.&lt;/p&gt;
+&lt;h3 id="next-up"&gt;Next up&lt;/h3&gt;&lt;p&gt;I'm porting this example to Kawa to see how it fairs. Blog post to come.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/practical-common-lisp-on-the-jvm.html</guid><pubDate>Thu, 05 Aug 2021 00:00:00 +0000</pubDate></item><item><title>Leaders, you need to share organization success stories more frequently</title><link>http://notes.eatonphil.com/leaders-share-company-success-stories.html</link><description>&lt;p&gt;This post goes out to anyone who leads a team: managers, directors,
 VPs, executives. You need to share organization success stories with
 your organization on a regular and frequent basis. Talk about sales
 wins, talk about new services released, talk about the positive impact

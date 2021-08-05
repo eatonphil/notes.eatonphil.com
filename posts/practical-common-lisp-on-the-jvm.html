@@ -1,0 +1,416 @@
+# Practical? Common Lisp on the JVM: A quick intro to ABCL for modern web apps
+## August 5, 2021
+###### common lisp,lisp,armed bear common lisp,java,jvm
+
+In a ridiculous attempt to [prove an internet
+wrong](https://github.com/eatonphil/jvm-lisp-examples) about the
+practicality of Lisp (Common Lisp specifically), I tried to get a
+simple (but realistic) web app running. After four days and [a patch
+to ABCL](https://github.com/armedbear/abcl/pull/379) I got something
+working.
+
+The code I had in mind would look something like this:
+
+```lisp
+(let* ((port 8080)
+       (server (make-server 8080)))
+  (route server "GET" "/" (lambda (ctx) "My index!"))
+  (route server "GET" "/search"
+    (lambda (ctx)
+      (template "search.tmpl" '(("version" "0.1.0")
+                                ("results" ("cat" "dog" "mouse")))))))
+```
+
+And <code>search.tmpl</code> would be some Jinja-like text file:
+
+```html
+<html>
+  <title>Version {{ version }}</title>
+  {% for item in results %}
+    <h2>{{ item }}</h2>
+  {% endfor %}
+</html>
+```
+
+The source code for this post can be found [on Github](https://github.com/eatonphil/jvm-lisp-examples).
+
+### Picking a language, libraries
+
+[Armed Bear Common Lisp](abcl.org) (ABCL) is the only Common Lisp
+implementation I'm aware of that can hook into a major ecosystem of
+libraries like the JVM or CLR has. In theory, this makes it a safe
+suggestion for folks who want the stability and resources of the
+ecosystem even if they aren't using its flagship language.
+
+I wanted to use some micro web framework like
+[Spark](https://sparkjava.com/) or [Micronaut](https://micronaut.io/).
+
+The problem with libraries like Micronaut (and
+[Jersey](https://eclipse-ee4j.github.io/jersey/)) is that they do a
+lot of dynamic inspection to figure out how to register controllers
+and whatnot. This is certainly convenient for developers using the
+library in Java. But it becomes an ordeal when you're trying to use
+the library through a foreign function interface (FFI) in another
+language. An example of this is if a framework scans all files in a
+directory for a <code> @GET</code> annotation.
+
+On the other hand, Spark had a seeming hard-requirement about bringing
+in a Websocket library which caused some issues during
+configuration. So I ended up going with [Jooby](https://jooby.io/) and
+[Netty](https://netty.io/) (as the underlying server).
+
+Finally, I looked into a few Jinja-like template libraries and settled
+on [Pebble](https://pebbletemplates.io/) since
+[Jinjava](https://github.com/HubSpot/jinjava) [wouldn't load for
+me](https://github.com/HubSpot/jinjava/issues/317).
+
+### 3rd-party jars and foreign function calls
+
+So you've got your maven dependencies and ran <code>mvn
+install</code>. Your <code>pom.xml</code> looks like this:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  
+  <groupId>com.github.eatonphil</groupId>
+  <artifactId>abcl-rest-api-hello-world</artifactId>
+  <version>1</version>
+  
+  <dependencies>
+    <dependency>
+      <groupId>io.jooby</groupId>
+      <artifactId>jooby</artifactId>
+      <version>2.10.0</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.jooby</groupId>
+      <artifactId>jooby-netty</artifactId>
+      <version>2.10.0</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.pebbletemplates</groupId>
+      <artifactId>pebble</artifactId>
+      <version>3.1.5</version>
+    </dependency>
+  </dependencies>
+</project>
+```
+
+ABCL has a package called <code>abcl-asdf</code> that helps you resolve dependencies through Maven and your filesystem. We'll import it and a package it depends on (<code>abcl-contrib</code>):
+
+```lisp
+(require :abcl-contrib)
+(require :abcl-asdf)
+```
+
+All our code will go into a single <code>main.lisp</code> file.
+
+To import a specific package from Maven you
+call <code>abcl-asdf:resolve</code> with a colon-separated string
+containing the Maven package group id and artifact id. Then you pass
+that result to <code>abcl-asdf:as-classpath</code> and pass that
+result to <code>java:add-to-classpath</code>.
+
+It will look like this:
+
+```lisp
+(setf imports '("io.jooby:jooby"
+                "io.jooby:jooby-netty"
+                "io.pebbletemplates:pebble"))
+(loop for import in imports
+      do (java:add-to-classpath
+          (abcl-asdf:as-classpath (abcl-asdf:resolve import))))
+```
+
+Now you can call functions within these packages. If you want to call
+a Java method using only builtins it looks like <code>(jcall "method"
+"com.organization.package.Class" object arg1 arg2 ... argN)</code>. If
+you want to call a static Java method you use <code>(jstatic
+...)</code> instead of <code>(jcall ...)</code>.
+
+It seems that ABCL will automatically convert simple types from their
+Lisp representation to Java but it will not turn a list into an
+array. If a Java function requires an array you'll have to do that
+explicitly with a function like <code>(java:jnew-array-from-list
+"java.lang.String" my-string-list)</code>.
+
+When using the builtin Java FFI you always need to use the fully
+qualified name for classes like <code>java.lang.Object</code>
+for <code>Object</code> or <code>java.util.Array</code>
+for <code>Array</code>.
+
+Alternatively you can <code>(require :jss)</code> to get access to a
+simpler syntax for making Java calls. A method call looks
+like <code>(#"method" object arg1 arg2 ... argN)</code>. Creating a
+new instance of an object is calling <code>(jss:jnew
+'className)</code>. When you use JSS you don't need to fully qualify a
+class name unless there are more than one class with the same
+name. For example to create a new Jooby application instance we can
+call <code>(jss:jnew 'Jooby)</code>. As long as the class can be found
+in the class path JSS will resolve it.
+
+### Some real code
+
+The real code will look similar to the pseudo-code at the top of this
+article. We'll stub out the library-specific wrappers for rendering a
+template and for registering a route.
+
+Fumbling around the [Jooby source code](https://github.com/jooby-project/jooby/blob/2.x/jooby/src/main/java/io/jooby/Server.java#L35) we see this snippet of Java:
+
+```java
+ * Server server = new Netty(); // or Jetty or Utow
+ *
+ * App app = new App();
+ *
+ * server.start(app);
+ *
+ * ...
+ *
+ * server.stop();
+```
+
+<code>Netty</code> comes from the <code>jooby-netty</code> artifact in
+the <code>io.jooby</code> group on Maven. And <code>App</code> is some
+object that extends <code>io.jooby.Jooby</code>. Since we're not using
+an OOP language though we're going to try avoiding classes as much as
+possible. So we'll just create a new instance
+of <code>io.jooby.Jooby</code> and add routes directly to it.
+
+```lisp
+(defun template (filename context)
+  "")
+
+(defun route (app method path handler)
+  nil)
+
+(defun register-endpoints (app)
+  (route app "GET" "/"
+         (lambda (ctx) "An index!"))
+  (route app "GET" "/search"
+         (lambda (ctx)
+             (template "search.tmpl" `(("version" "1.0.0")
+                                       ("results" ,(java:jarray-from-list '("cat" "dog" "mouse")))))))
+  (route app "GET" "/hello-world"
+         (lambda (ctx) "Hello world!")))
+
+(let* ((port 8080)
+       (server (jss:new 'Netty))
+       (app (jss:new 'Jooby)))
+  (register-endpoints app)
+  (#"setOptions" server (#"setPort" (jss:new 'ServerOptions) port))
+  (#"start" server app)
+  (#"join" server))
+```
+
+Easy enough. Now we just need to implement <code>route</code>
+and <code>template</code>.
+
+### Implementing Java classes in ABCL
+
+We are again not going the happy path with fancy Java syntax (which is
+fine if you're using Java) like the Jooby documentation
+suggests. Scouring the [Jooby source code
+again](https://github.com/jooby-project/jooby/blob/2.x/jooby/src/main/java/io/jooby/Jooby.java#L546)
+it looks like we can call <code>route</code> on the <code>Jooby</code>
+class with a method string, a path string, and an instance of an
+object implementing the <code>io.jooby.Route.Handler</code> interface.
+
+Since this handler argument is an interface, we cannot cheat again by
+creating an instance of it we'll have to actually create a new class
+in Lisp that extends it. Thankfully there's only one method we need to
+implement to satisfy this interface,
+[apply](https://github.com/jooby-project/jooby/blob/2.x/jooby/src/main/java/io/jooby/Route.java#L256). It
+accepts a <code>io.jooby.Context</code> object and returns
+a <code>java.lang.Object</code>. The framework then does introspection
+to figure out what exactly the object is and if it needs to transform
+it into a string to be returned as an HTTP response body.
+
+To create a new class in ABCL we call <code>(java:jnew-runtime-class
+"classname" :interfaces '("an interface name") :methods '(("method
+name 1" "return type" ("first parameter type" ...) (lambda (this arg1
+  ...) body))))</code>:
+
+```lisp
+(defun route (app method path handler)
+  (#"route"
+   app
+   method
+   path
+   (jss:new (java:jnew-runtime-class
+             (substitute #\$ #\/ (substitute #\$ #\- path))
+             :interfaces '("io.jooby.Route$Handler")
+             :methods `(
+                       ("apply" "java.lang.Object" ("io.jooby.Context")
+                        (lambda (this ctx)
+                          (funcall ,handler ctx))))))))
+```
+
+One thing to note is that when referring to a subclass within a file
+we need to address it with the <code>io.jooby.Route$Handler</code>
+syntax rather than as you might refer to it in Java
+as <code>io.jooby.Route.Handler</code>. In the latter case ABCL
+thinks <code>Route</code> is a package when in fact it's just a class.
+
+If you run this now with <code>abcl --load main.lisp</code>. It will
+work until you hit an endpoint. The problem is how Jooby tries to
+figure out the real type of the returned object.
+
+The app will crash somewhere around
+[here](https://github.com/jooby-project/jooby/blob/2.x/jooby/src/main/java/io/jooby/internal/RouterImpl.java#L560)
+calling <code>analyzer.returnType(route.getHandle())</code>.
+
+In this case it tries to [open and parse the (Java) source
+code](https://github.com/jooby-project/jooby/blob/f47eda4500bc4b76b23d24d4d77aa2ab3cc19e95/jooby/src/main/java/io/jooby/internal/RouteAnalyzer.java#L44)
+of our application to try to find the return type for
+this <code>apply</code> function.
+
+That's a problem since our code isn't Java. Through trial and error I
+realized we can trick Jooby/Java/somebody into figuring out the
+correct return type by adding another implementation
+of <code>apply</code> that returns a <code>String</code> to our class.
+
+The full <code>route</code> code now looks like this:
+
+```lisp
+(defun route (app method path handler)
+  (#"route"
+   app
+   method
+   path
+   (jss:new (java:jnew-runtime-class
+             (substitute #\$ #\/ (substitute #\$ #\- path))
+             :interfaces '("io.jooby.Route$Handler")
+             :methods `(
+                       ;; Need to define this one to make Jooby figure out the return type
+                       ;; Otherwise it tries to read "this file" which isn't a Java file so cannot be parsed
+                       ("apply" "java.lang.String" ("io.jooby.Context")
+                        (lambda (this ctx) nil))
+                       ;; This one actually gets called
+                       ("apply" "java.lang.Object" ("io.jooby.Context")
+                        (lambda (this ctx)
+                          (funcall ,handler ctx))))))))
+```
+
+You may wonder, why keep the original method around? Well it's because
+during reflection, ABCL says no such method that
+returns <code>String</code> exists in the <code>Handler</code>
+interface. That's fair I guess.
+
+### Implementing the template
+
+The Java example on the [Pebble homepage](https://pebbletemplates.io/)
+is perfect:
+
+```java
+PebbleEngine engine = new PebbleEngine.Builder().build();
+PebbleTemplate compiledTemplate = engine.getTemplate("home.html");
+
+Map<String, Object> context = new HashMap<>();
+context.put("name", "Mitchell");
+
+Writer writer = new StringWriter();
+compiledTemplate.evaluate(writer, context);
+
+String output = writer.toString();
+```
+
+We can easily translate this into Lisp:
+
+```lisp
+(defun hashmap (alist)
+  (let ((map (jss:new 'HashMap)))
+    (loop for el in alist
+         do (#"put" map (car el) (cadr el)))
+    map))
+
+(defun template (filename context-alist)
+  (let* ((ctx (hashmap context-alist))
+         (path (java:jstatic "of" "java.nio.file.Path" filename))
+         (file (#"readString" 'java.nio.file.Files path))
+         (engine (#"build" (jss:new 'PebbleEngine$Builder)))
+         (compiledTmpl (#"getTemplate" engine filename))
+         (writer (jss:new 'java.io.StringWriter)))
+    (#"evaluate" compiledTmpl writer ctx)
+    (#"toString" writer)))
+```
+
+But if you run this <code>abcl --load main.lisp</code> and hit this
+<code>/search</code> endpoint, it will blow up saying "no such method"
+exists at the call to <code>Path.of(filename)</code>.
+
+After digging around I saw it was because
+[Path.of](https://docs.oracle.com/en/java/javase/16/docs/api/java.base/java/nio/file/Path.html#of(java.lang.String,java.lang.String...))
+is a variadic function.
+
+And while there are [examples
+of](https://abcl.org/trac/changeset/15234) using variadic functions
+when the function only has a single parameter like
+<code>java.util.Arrays.asList(T ...)</code>, employing that same
+technique here continued to result in "no such method":
+
+```
+         (path (java:jstatic "of" "java.nio.file.Path" filename (jnew-array "java.lang.String" 0)))
+```
+
+Eventually I found an [example of someone doing reflect/invoke on this
+kind of a function
+call](https://stackoverflow.com/questions/20440839/cant-invoke-method-with-varargs-parameters-with-reflection-nosuchmethodexcept)
+and tried this logic on a local copy of the ABCL source code.
+
+It worked. So I opened a [pull request](https://github.com/armedbear/abcl/pull/379).
+
+So the full working code for <code>template</code> is:
+
+```lisp
+(defun template (filename context-alist)
+  (let* ((ctx (hashmap context-alist))
+         (path (java:jstatic "of" "java.nio.file.Path" filename (java:jnew-array "java.lang.String" 0)))
+         (file (#"readString" 'java.nio.file.Files path))
+         (engine (#"build" (jss:new 'PebbleEngine$Builder)))
+         (compiledTmpl (#"getTemplate" engine filename))
+         (writer (jss:new 'java.io.StringWriter)))
+    (#"evaluate" compiledTmpl writer ctx)
+    (#"toString" writer)))
+```
+
+And to get this diff running locally:
+
+```bash
+$ mkdir ~/vendor
+$ cd ~/vendor
+$ git clone https://github.com/eatonphil/abcl
+$ cd abcl
+$ git checkout pe/more-variadic
+$ sudo {dnf/brew/apt} install ant maven
+$ ant -f build.xml
+```
+
+And to run <code>main.lisp</code> using this diff:
+
+```
+$ ~/vendor/abcl/abcl --load main.lisp
+```
+
+And to hit the API:
+
+```bash
+$ curl localhost:8080/search
+<html>
+<title>Version 1.0.0</title>
+  <h2>cat</h2>
+  <h2>dog</h2>
+  <h2>mouse</h2>
+</html>
+$ curl localhost:8080/hello-world
+Hello world!%
+```
+
+Phew! Easy peasy.
+
+### Next up
+
+I'm porting this example to Kawa to see how it fairs. Blog post to come.
