@@ -1,21 +1,25 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sat, 21 Aug 2021 17:54:59 +0000</lastBuildDate><item><title>Parser generators vs. handwritten parsers: surveying major language implementations in 2021</title><link>http://notes.eatonphil.com/parser-generators-vs-handwritten-parsers-survey-2021.html</link><description>&lt;p&gt;Developers often think parser generators are the sole legit way to
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sat, 21 Aug 2021 18:16:40 +0000</lastBuildDate><item><title>Parser generators vs. handwritten parsers: surveying major language implementations in 2021</title><link>http://notes.eatonphil.com/parser-generators-vs-handwritten-parsers-survey-2021.html</link><description>&lt;p&gt;Developers often think parser generators are the sole legit way to
 build programming language frontends, possibly because compiler
 courses in university teach lex/yacc variants. But do any modern
 programming languages actually use parser generators anymore?&lt;/p&gt;
 &lt;p&gt;To find out, this post presents a non-definitive survey of the parsing
 techniques used by various major programming language implementations.&lt;/p&gt;
 &lt;h3 id="cpython:-peg-parser"&gt;CPython: PEG parser&lt;/h3&gt;&lt;p&gt;Until CPython 3.10 (which hasn't been released yet) the default parser
-was handwritten. The team thought the PEG parser was a better fit for
-expressing the language, and at the time &lt;a href="https://www.python.org/dev/peps/pep-0617/#performance"&gt;took a reported 10% speed
-and memory usage
-hit&lt;/a&gt; switching
-off the handwritten parser.&lt;/p&gt;
+was built using &lt;a href="https://www.python.org/dev/peps/pep-0269/"&gt;pgen&lt;/a&gt;. The
+team thought the PEG parser was a &lt;a href="https://www.python.org/dev/peps/pep-0617/"&gt;better fit for expressing the
+language&lt;/a&gt;, and at the time
+took a reported 10% speed and memory usage hit switching off pgen.&lt;/p&gt;
 &lt;p&gt;The PEG grammar is defined
 &lt;a href="https://github.com/python/cpython/blob/v3.9.6/Grammar/python.gram"&gt;here&lt;/a&gt;. (It
 is getting renamed in 3.10 though so check the directory for a file of
 a similar name if you browse 3.10+).&lt;/p&gt;
-&lt;h3 id="gcc:-handwritten"&gt;GCC: Handwritten&lt;/h3&gt;&lt;p&gt;Source code for the C parser available
+&lt;p class="note"&gt;
+  This section was corrected
+  by &lt;a href="https://www.reddit.com/r/ProgrammingLanguages/comments/p8vvcs/parser_generators_vs_handwritten_parsers/h9tbuve/?utm_source=reddit&amp;utm_medium=web2x&amp;context=3"&gt;MegaIng&lt;/a&gt; on Reddit. Originally
+  I mistakenly claimed the previous parser was
+  handwritten. It was not.
+&lt;/p&gt;&lt;h3 id="gcc:-handwritten"&gt;GCC: Handwritten&lt;/h3&gt;&lt;p&gt;Source code for the C parser available
 &lt;a href="https://github.com/gcc-mirror/gcc/blob/master/gcc/c/c-parser.c"&gt;here&lt;/a&gt;. It
 used to use Bison until &lt;a href="The old Bison-based C and
 Objective-C parser has been replaced by a new, faster hand-written
@@ -68,8 +72,7 @@ grammary is available
 &lt;a href="https://github.com/sqlite/sqlite/blob/version-3.36.0/src/parse.y"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="summary"&gt;Summary&lt;/h3&gt;&lt;p&gt;Of the &lt;a href="https://redmonk.com/sogrady/2021/03/01/language-rankings-1-21/"&gt;2021 Redmonk top 10
 languages&lt;/a&gt;,
-9 of them have a handwritten parser. Ruby is the only one that does
-not. (I'm not counting Python since 3.10 still hasn't been released.)&lt;/p&gt;
+8 of them have a handwritten parser. Ruby and Python use parser generators.&lt;/p&gt;
 &lt;p&gt;Although parser generators are still used in major language
 implementations, maybe it's time for universities to start teaching
 handwritten parsing?&lt;/p&gt;

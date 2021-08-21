@@ -13,16 +13,22 @@ techniques used by various major programming language implementations.
 ### CPython: PEG parser
 
 Until CPython 3.10 (which hasn't been released yet) the default parser
-was handwritten. The team thought the PEG parser was a better fit for
-expressing the language, and at the time [took a reported 10% speed
-and memory usage
-hit](https://www.python.org/dev/peps/pep-0617/#performance) switching
-off the handwritten parser.
+was built using [pgen](https://www.python.org/dev/peps/pep-0269/). The
+team thought the PEG parser was a [better fit for expressing the
+language](https://www.python.org/dev/peps/pep-0617/), and at the time
+took a reported 10% speed and memory usage hit switching off pgen.
 
 The PEG grammar is defined
 [here](https://github.com/python/cpython/blob/v3.9.6/Grammar/python.gram). (It
 is getting renamed in 3.10 though so check the directory for a file of
 a similar name if you browse 3.10+).
+
+<p class="note">
+  This section was corrected
+  by <a href="https://www.reddit.com/r/ProgrammingLanguages/comments/p8vvcs/parser_generators_vs_handwritten_parsers/h9tbuve/?utm_source=reddit&utm_medium=web2x&context=3">MegaIng</a> on Reddit. Originally
+  I mistakenly claimed the previous parser was
+  handwritten. It was not.
+</p>
 
 ### GCC: Handwritten
 
@@ -135,8 +141,7 @@ grammary is available
 
 Of the [2021 Redmonk top 10
 languages](https://redmonk.com/sogrady/2021/03/01/language-rankings-1-21/),
-9 of them have a handwritten parser. Ruby is the only one that does
-not. (I'm not counting Python since 3.10 still hasn't been released.)
+8 of them have a handwritten parser. Ruby and Python use parser generators.
 
 Although parser generators are still used in major language
 implementations, maybe it's time for universities to start teaching
