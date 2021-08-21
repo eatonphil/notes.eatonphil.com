@@ -236,4 +236,8 @@
     <loc>https://notes.eatonphil.com/practical-common-lisp-on-the-jvm.html</loc>
     <lastmod>2021-08-05</lastmod>
  </url>
+  <url>
+    <loc>https://notes.eatonphil.com/parser-generators-vs-handwritten-parsers-survey-2021.html</loc>
+    <lastmod>2021-08-21</lastmod>
+ </url>
 </urlset>
