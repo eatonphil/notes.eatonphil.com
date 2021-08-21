@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sat, 21 Aug 2021 20:33:44 +0000</lastBuildDate><item><title>Parser generators vs. handwritten parsers: surveying major language implementations in 2021</title><link>http://notes.eatonphil.com/parser-generators-vs-handwritten-parsers-survey-2021.html</link><description>&lt;p&gt;Developers often think parser generators are the sole legit way to
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sat, 21 Aug 2021 23:31:58 +0000</lastBuildDate><item><title>Parser generators vs. handwritten parsers: surveying major language implementations in 2021</title><link>http://notes.eatonphil.com/parser-generators-vs-handwritten-parsers-survey-2021.html</link><description>&lt;p&gt;Developers often think parser generators are the sole legit way to
 build programming language frontends, possibly because compiler
 courses in university teach lex/yacc variants. But do any modern
 programming languages actually use parser generators anymore?&lt;/p&gt;
@@ -39,7 +39,7 @@ grammar for the language can be found
 &lt;h3 id="bash:-yacc-like-parser-generator"&gt;Bash: Yacc-like Parser Generator&lt;/h3&gt;&lt;p&gt;Source code for the grammar is available
 &lt;a href="http://git.savannah.gnu.org/cgit/bash.git/tree/parse.y?h=bash-5.1"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="chromium-css-parser:-handwritten"&gt;Chromium CSS Parser: Handwritten&lt;/h3&gt;&lt;p&gt;Source code available &lt;a href="https://github.com/chromium/chromium/blob/95.0.4617.2/third_party/blink/renderer/core/css/parser/css_parser_impl.cc"&gt;here&lt;/a&gt;.&lt;/p&gt;
-&lt;h3 id="openjdk:-handwritten"&gt;OpenJDK: Handwritten&lt;/h3&gt;&lt;p&gt;You can find the source code
+&lt;h3 id="java-(openjdk):-handwritten"&gt;Java (OpenJDK): Handwritten&lt;/h3&gt;&lt;p&gt;You can find the source code
 &lt;a href="https://github.com/openjdk/jdk/blob/jdk-18%2B11/src/jdk.compiler/share/classes/com/sun/tools/javac/parser/JavacParser.java"&gt;here&lt;/a&gt;. Some
 &lt;a href="https://openjdk.java.net/projects/compiler-grammar/"&gt;commentary&lt;/a&gt;
 calls this implementation fragile.&lt;/p&gt;
