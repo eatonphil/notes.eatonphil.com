@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sat, 21 Aug 2021 19:19:38 +0000</lastBuildDate><item><title>Parser generators vs. handwritten parsers: surveying major language implementations in 2021</title><link>http://notes.eatonphil.com/parser-generators-vs-handwritten-parsers-survey-2021.html</link><description>&lt;p&gt;Developers often think parser generators are the sole legit way to
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sat, 21 Aug 2021 20:33:44 +0000</lastBuildDate><item><title>Parser generators vs. handwritten parsers: surveying major language implementations in 2021</title><link>http://notes.eatonphil.com/parser-generators-vs-handwritten-parsers-survey-2021.html</link><description>&lt;p&gt;Developers often think parser generators are the sole legit way to
 build programming language frontends, possibly because compiler
 courses in university teach lex/yacc variants. But do any modern
 programming languages actually use parser generators anymore?&lt;/p&gt;
@@ -29,14 +29,14 @@ earlier&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="clang:-handwritten"&gt;Clang: Handwritten&lt;/h3&gt;&lt;p&gt;Not only handwritten but the same &lt;em&gt;file&lt;/em&gt; handles parsing C,
 Objective-C and C++. Source code is available
 &lt;a href="https://github.com/llvm/llvm-project/blob/llvmorg-12.0.1/clang/lib/Parse/Parser.cpp"&gt;here&lt;/a&gt;.&lt;/p&gt;
-&lt;h3 id="ruby:-yacc-like-parser-generator"&gt;Ruby: YACC-like Parser Generator&lt;/h3&gt;&lt;p&gt;Ruby includes a YACC-like parser generator called
+&lt;h3 id="ruby:-yacc-like-parser-generator"&gt;Ruby: Yacc-like Parser Generator&lt;/h3&gt;&lt;p&gt;Ruby includes a Yacc-like parser generator called
 &lt;a href="https://github.com/ruby/ruby/blob/v3_0_2/lib/racc/parser.rb"&gt;racc&lt;/a&gt;. The
 grammar for the language can be found
 &lt;a href="https://github.com/ruby/ruby/blob/v3_0_2/parse.y"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="v8-javascript:-handwritten"&gt;V8 JavaScript: Handwritten&lt;/h3&gt;&lt;p&gt;Source code available &lt;a href="https://github.com/v8/v8/blob/9.5.38/src/parsing/parser.cc"&gt;here&lt;/a&gt;.&lt;/p&gt;
-&lt;h3 id="zend-engine-php:-parser-generator"&gt;Zend Engine PHP: Parser Generator&lt;/h3&gt;&lt;p&gt;Source code available &lt;a href="https://github.com/php/php-src/blob/php-8.0.9/Zend/zend_language_parser.y"&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id="zend-engine-php:-yacc-like-parser-generator"&gt;Zend Engine PHP: Yacc-like Parser Generator&lt;/h3&gt;&lt;p&gt;Source code available &lt;a href="https://github.com/php/php-src/blob/php-8.0.9/Zend/zend_language_parser.y"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="typescript:-handwritten"&gt;TypeScript: Handwritten&lt;/h3&gt;&lt;p&gt;Source code available &lt;a href="https://github.com/microsoft/TypeScript/blob/v4.3.5/src/compiler/parser.ts"&gt;here&lt;/a&gt;.&lt;/p&gt;
-&lt;h3 id="bash:-yacc-based-parser-generator"&gt;Bash: Yacc-based parser generator&lt;/h3&gt;&lt;p&gt;Source code for the grammar is available
+&lt;h3 id="bash:-yacc-like-parser-generator"&gt;Bash: Yacc-like Parser Generator&lt;/h3&gt;&lt;p&gt;Source code for the grammar is available
 &lt;a href="http://git.savannah.gnu.org/cgit/bash.git/tree/parse.y?h=bash-5.1"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="chromium-css-parser:-handwritten"&gt;Chromium CSS Parser: Handwritten&lt;/h3&gt;&lt;p&gt;Source code available &lt;a href="https://github.com/chromium/chromium/blob/95.0.4617.2/third_party/blink/renderer/core/css/parser/css_parser_impl.cc"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="openjdk:-handwritten"&gt;OpenJDK: Handwritten&lt;/h3&gt;&lt;p&gt;You can find the source code
@@ -58,17 +58,17 @@ Visual Basic parser source code is
 &lt;a href="https://github.com/dotnet/roslyn/blob/Visual-Studio-2019-Version-16.11/src/Compilers/VisualBasic/Portable/Parser/Parser.vb"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="lua:-handwritten"&gt;Lua: Handwritten&lt;/h3&gt;&lt;p&gt;Source code available &lt;a href="https://github.com/lua/lua/blob/v5.4.3/lparser.c"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="swift:-handwritten"&gt;Swift: Handwritten&lt;/h3&gt;&lt;p&gt;Source code available &lt;a href="https://github.com/apple/swift/blob/swift-5.4.2-RELEASE/lib/Parse/Parser.cpp"&gt;here&lt;/a&gt;.&lt;/p&gt;
-&lt;h3 id="r:-yacc-based-parser-generator"&gt;R: Yacc-based Parser Generator&lt;/h3&gt;&lt;p&gt;I couldn't find it at first but
+&lt;h3 id="r:-yacc-like-parser-generator"&gt;R: Yacc-like Parser Generator&lt;/h3&gt;&lt;p&gt;I couldn't find it at first but
 &lt;a href="https://www.reddit.com/r/programming/comments/p8vv1l/parser_generators_vs_handwritten_parsers/h9tl763/?utm_source=reddit&amp;amp;utm_medium=web2x&amp;amp;context=3"&gt;Liorithiel&lt;/a&gt;
 showed me the parser source code is
 &lt;a href="https://github.com/wch/r-source/blob/trunk/src/main/gram.y"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="julia:-handwritten-...-in-scheme"&gt;Julia: Handwritten ... in Scheme&lt;/h3&gt;&lt;p&gt;Julia's parser is handwritten but not in Julia. It's in Scheme! Source code available &lt;a href="https://github.com/JuliaLang/julia/blob/v1.6.2/src/julia-parser.scm"&gt;here&lt;/a&gt;.&lt;/p&gt;
-&lt;h3 id="postgresql:-yacc-based-parser-generator"&gt;PostgreSQL: Yacc-based Parser Generator&lt;/h3&gt;&lt;p&gt;PostgreSQL uses Bison for parsing queries. Source code for the grammar
+&lt;h3 id="postgresql:-yacc-like-parser-generator"&gt;PostgreSQL: Yacc-like Parser Generator&lt;/h3&gt;&lt;p&gt;PostgreSQL uses Bison for parsing queries. Source code for the grammar
 available
 &lt;a href="https://github.com/postgres/postgres/blob/REL_13_STABLE/src/backend/parser/gram.y"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="mysql:-yacc-parser-generator"&gt;MySQL: Yacc Parser Generator&lt;/h3&gt;&lt;p&gt;Source code for the grammar available
 &lt;a href="https://github.com/mysql/mysql-server/blob/8.0/sql/sql_yacc.yy"&gt;here&lt;/a&gt;.&lt;/p&gt;
-&lt;h3 id="sqlite:-yacc-based-parser-generator"&gt;SQLite: Yacc-based Parser Generator&lt;/h3&gt;&lt;p&gt;SQLite uses its own parser generator called
+&lt;h3 id="sqlite:-yacc-like-parser-generator"&gt;SQLite: Yacc-like Parser Generator&lt;/h3&gt;&lt;p&gt;SQLite uses its own parser generator called
 &lt;a href="https://www.sqlite.org/lemon.html"&gt;Lemon&lt;/a&gt;. Source code for the
 grammary is available
 &lt;a href="https://github.com/sqlite/sqlite/blob/version-3.36.0/src/parse.y"&gt;here&lt;/a&gt;.&lt;/p&gt;
