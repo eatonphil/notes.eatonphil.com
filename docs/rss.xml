@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sat, 21 Aug 2021 18:25:41 +0000</lastBuildDate><item><title>Parser generators vs. handwritten parsers: surveying major language implementations in 2021</title><link>http://notes.eatonphil.com/parser-generators-vs-handwritten-parsers-survey-2021.html</link><description>&lt;p&gt;Developers often think parser generators are the sole legit way to
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sat, 21 Aug 2021 19:19:38 +0000</lastBuildDate><item><title>Parser generators vs. handwritten parsers: surveying major language implementations in 2021</title><link>http://notes.eatonphil.com/parser-generators-vs-handwritten-parsers-survey-2021.html</link><description>&lt;p&gt;Developers often think parser generators are the sole legit way to
 build programming language frontends, possibly because compiler
 courses in university teach lex/yacc variants. But do any modern
 programming languages actually use parser generators anymore?&lt;/p&gt;
@@ -58,8 +58,10 @@ Visual Basic parser source code is
 &lt;a href="https://github.com/dotnet/roslyn/blob/Visual-Studio-2019-Version-16.11/src/Compilers/VisualBasic/Portable/Parser/Parser.vb"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="lua:-handwritten"&gt;Lua: Handwritten&lt;/h3&gt;&lt;p&gt;Source code available &lt;a href="https://github.com/lua/lua/blob/v5.4.3/lparser.c"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="swift:-handwritten"&gt;Swift: Handwritten&lt;/h3&gt;&lt;p&gt;Source code available &lt;a href="https://github.com/apple/swift/blob/swift-5.4.2-RELEASE/lib/Parse/Parser.cpp"&gt;here&lt;/a&gt;.&lt;/p&gt;
-&lt;h3 id="r:-???"&gt;R: ???&lt;/h3&gt;&lt;p&gt;Not sure, I had a hard time reading its source. If you can point me at
-it's source code that would be great!&lt;/p&gt;
+&lt;h3 id="r:-yacc-based-parser-generator"&gt;R: Yacc-based Parser Generator&lt;/h3&gt;&lt;p&gt;I couldn't find it at first but
+&lt;a href="https://www.reddit.com/r/programming/comments/p8vv1l/parser_generators_vs_handwritten_parsers/h9tl763/?utm_source=reddit&amp;amp;utm_medium=web2x&amp;amp;context=3"&gt;Liorithiel&lt;/a&gt;
+showed me the parser source code is
+&lt;a href="https://github.com/wch/r-source/blob/trunk/src/main/gram.y"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="julia:-handwritten-...-in-scheme"&gt;Julia: Handwritten ... in Scheme&lt;/h3&gt;&lt;p&gt;Julia's parser is handwritten but not in Julia. It's in Scheme! Source code available &lt;a href="https://github.com/JuliaLang/julia/blob/v1.6.2/src/julia-parser.scm"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="postgresql:-yacc-based-parser-generator"&gt;PostgreSQL: Yacc-based Parser Generator&lt;/h3&gt;&lt;p&gt;PostgreSQL uses Bison for parsing queries. Source code for the grammar
 available
