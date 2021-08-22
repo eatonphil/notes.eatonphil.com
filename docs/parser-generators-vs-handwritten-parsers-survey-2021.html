@@ -84,9 +84,12 @@ grammar for the language can be found
 <a href="http://git.savannah.gnu.org/cgit/bash.git/tree/parse.y?h=bash-5.1">here</a>.</p>
 <h3 id="chromium-css-parser:-handwritten">Chromium CSS Parser: Handwritten</h3><p>Source code available <a href="https://github.com/chromium/chromium/blob/95.0.4617.2/third_party/blink/renderer/core/css/parser/css_parser_impl.cc">here</a>.</p>
 <h3 id="java-(openjdk):-handwritten">Java (OpenJDK): Handwritten</h3><p>You can find the source code
-<a href="https://github.com/openjdk/jdk/blob/jdk-18%2B11/src/jdk.compiler/share/classes/com/sun/tools/javac/parser/JavacParser.java">here</a>. Some
-<a href="https://openjdk.java.net/projects/compiler-grammar/">commentary</a>
-calls this implementation fragile.</p>
+<a href="https://github.com/openjdk/jdk/blob/jdk-18%2B11/src/jdk.compiler/share/classes/com/sun/tools/javac/parser/JavacParser.java">here</a>.</p>
+<p>Some <a href="https://openjdk.java.net/projects/compiler-grammar/">older
+commentary</a> calls
+this implementation fragile. But a Java contributor <a href="https://twitter.com/BrianGoetz/status/1429227723055042568">suggests the
+situation has improved since Java
+8</a>.</p>
 <h3 id="golang:-handwritten">Golang: Handwritten</h3><p>Until Go 1.6 the compiler used a yacc-based parser. The source code
 for that grammar is available
 <a href="https://github.com/golang/go/blob/go1.5/src/cmd/compile/internal/gc/y.go">here</a>.</p>
@@ -100,6 +103,7 @@ speed increase in building the compiler itself when switching.</p>
 <a href="https://github.com/dotnet/roslyn/blob/Visual-Studio-2019-Version-16.11/src/Compilers/CSharp/Portable/Parser/LanguageParser.cs">here</a>. The
 Visual Basic parser source code is
 <a href="https://github.com/dotnet/roslyn/blob/Visual-Studio-2019-Version-16.11/src/Compilers/VisualBasic/Portable/Parser/Parser.vb">here</a>.</p>
+<p>A C# contributor mentioned a few key reasons for using a handwritten parser <a href="https://news.ycombinator.com/item?id=13915150">here</a>.</p>
 <h3 id="lua:-handwritten">Lua: Handwritten</h3><p>Source code available <a href="https://github.com/lua/lua/blob/v5.4.3/lparser.c">here</a>.</p>
 <h3 id="swift:-handwritten">Swift: Handwritten</h3><p>Source code available <a href="https://github.com/apple/swift/blob/swift-5.4.2-RELEASE/lib/Parse/Parser.cpp">here</a>.</p>
 <h3 id="r:-yacc-like-parser-generator">R: Yacc-like Parser Generator</h3><p>I couldn't find it at first but

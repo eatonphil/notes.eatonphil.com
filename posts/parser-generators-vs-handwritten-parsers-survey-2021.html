@@ -77,9 +77,13 @@ Source code available [here](https://github.com/chromium/chromium/blob/95.0.4617
 ### Java (OpenJDK): Handwritten
 
 You can find the source code
-[here](https://github.com/openjdk/jdk/blob/jdk-18%2B11/src/jdk.compiler/share/classes/com/sun/tools/javac/parser/JavacParser.java). Some
-[commentary](https://openjdk.java.net/projects/compiler-grammar/)
-calls this implementation fragile.
+[here](https://github.com/openjdk/jdk/blob/jdk-18%2B11/src/jdk.compiler/share/classes/com/sun/tools/javac/parser/JavacParser.java).
+
+Some [older
+commentary](https://openjdk.java.net/projects/compiler-grammar/) calls
+this implementation fragile. But a Java contributor [suggests the
+situation has improved since Java
+8](https://twitter.com/BrianGoetz/status/1429227723055042568).
 
 ### Golang: Handwritten
 
@@ -101,6 +105,8 @@ The C# parser source code is available
 [here](https://github.com/dotnet/roslyn/blob/Visual-Studio-2019-Version-16.11/src/Compilers/CSharp/Portable/Parser/LanguageParser.cs). The
 Visual Basic parser source code is
 [here](https://github.com/dotnet/roslyn/blob/Visual-Studio-2019-Version-16.11/src/Compilers/VisualBasic/Portable/Parser/Parser.vb).
+
+A C# contributor mentioned a few key reasons for using a handwritten parser [here](https://news.ycombinator.com/item?id=13915150).
 
 ### Lua: Handwritten
 
