@@ -1,0 +1,71 @@
+# Writing a simple JSON library in modern C++
+## August 24, 2021
+###### json,parser,c++
+
+Modern C++ has a lot of cool features. Move semantics means passing
+around structs in functions is cheap. <code>std::shared_ptr</code>
+means I don't have to manage any memory; no
+more <code>new</code>/<code>delete</code>! (But try as I might to
+understand <code>std::unique_ptr</code>, I'm just not there yet.)
+
+The syntax has also gotten some treatment with <code>auto</code> and
+tuple destructuring.
+
+In order to test out this modern C++ I wanted a meaningful small
+project that operates on very dynamic data. The two that always come
+to mind are JSON parsers or Lisp interpreters. This post walks through
+writing a basic JSON library from scratch using only the standard
+library. The source code for the resulting library is available [on
+Github](https://github.com/eatonphil/cpp-json).
+
+The only simplification we'll make is that rather than full JSON
+numbers, we'll only allow integers.
+
+### Lexing
+
+First step, turn a JSON string into an array of tokens: a number,
+string, null keyword, boolean keyword, or syntax like comma or colon.
+
+The main lex loop
+
+```c++
+std::tuple<std::vector<JSONToken>, std::string> lex(std::string raw_json) {
+}
+```
+
+
+  std::vector<JSONToken> tokens;
+  auto original_copy = std::make_shared<std::string>(raw_json);
+  auto generic_lexers = {lex_syntax, lex_string, lex_number,
+                         lex_null,   lex_true,   lex_false};
+  for (int i = 0; i < raw_json.length(); i++) {
+    if (auto new_index = lex_whitespace(raw_json, i); i != new_index) {
+      i = new_index - 1;
+      continue;
+    }
+
+    auto found = false;
+    for (auto lexer : generic_lexers) {
+      if (auto [token, new_index, error] = lexer(raw_json, i); i != new_index) {
+        if (error.length()) {
+          return {{}, error};
+        }
+
+        token.full_source = original_copy;
+        tokens.push_back(token);
+        i = new_index - 1;
+        found = true;
+        break;
+      }
+    }
+
+    if (found) {
+      continue;
+    }
+
+    return {{}, format_error("Unable to lex", raw_json, i)};
+  }
+
+  return {tokens, ""};
+}
+```
