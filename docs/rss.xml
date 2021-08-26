@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 22 Aug 2021 16:32:42 +0000</lastBuildDate><item><title>Parser generators vs. handwritten parsers: surveying major language implementations in 2021</title><link>http://notes.eatonphil.com/parser-generators-vs-handwritten-parsers-survey-2021.html</link><description>&lt;p&gt;Developers often think parser generators are the sole legit way to
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 26 Aug 2021 15:23:13 +0000</lastBuildDate><item><title>Parser generators vs. handwritten parsers: surveying major language implementations in 2021</title><link>http://notes.eatonphil.com/parser-generators-vs-handwritten-parsers-survey-2021.html</link><description>&lt;p&gt;Developers often think parser generators are the sole legit way to
 build programming language frontends, possibly because compiler
 courses in university teach lex/yacc variants. But do any modern
 programming languages actually use parser generators anymore?&lt;/p&gt;
@@ -29,8 +29,8 @@ earlier&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="clang:-handwritten"&gt;Clang: Handwritten&lt;/h3&gt;&lt;p&gt;Not only handwritten but the same &lt;em&gt;file&lt;/em&gt; handles parsing C,
 Objective-C and C++. Source code is available
 &lt;a href="https://github.com/llvm/llvm-project/blob/llvmorg-12.0.1/clang/lib/Parse/Parser.cpp"&gt;here&lt;/a&gt;.&lt;/p&gt;
-&lt;h3 id="ruby:-yacc-like-parser-generator"&gt;Ruby: Yacc-like Parser Generator&lt;/h3&gt;&lt;p&gt;Ruby includes a Yacc-like parser generator called
-&lt;a href="https://github.com/ruby/ruby/blob/v3_0_2/lib/racc/parser.rb"&gt;racc&lt;/a&gt;. The
+&lt;h3 id="ruby:-yacc-like-parser-generator"&gt;Ruby: Yacc-like Parser Generator&lt;/h3&gt;&lt;p&gt;Ruby uses Bison (thanks for the
+&lt;a href="https://twitter.com/kddnewton/status/1430912896473739271"&gt;correction&lt;/a&gt;!). The
 grammar for the language can be found
 &lt;a href="https://github.com/ruby/ruby/blob/v3_0_2/parse.y"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="v8-javascript:-handwritten"&gt;V8 JavaScript: Handwritten&lt;/h3&gt;&lt;p&gt;Source code available &lt;a href="https://github.com/v8/v8/blob/9.5.38/src/parsing/parser.cc"&gt;here&lt;/a&gt;.&lt;/p&gt;
