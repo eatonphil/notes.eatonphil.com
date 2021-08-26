@@ -52,10 +52,13 @@ understand <code>std::unique_ptr</code>, I'm just not there yet.)</p>
 tuple destructuring.</p>
 <p>In order to test out this modern C++ I wanted a small but meaningful
 project that operates on very dynamic data. The two that always come
-to mind are JSON parsers or Lisp interpreters. This post walks through
+to mind are JSON parsers or Lisp interpreters.</p>
+<p>This post walks through
 writing a basic JSON library from scratch using only the standard
 library. The source code for the resulting library is available <a href="https://github.com/eatonphil/cpp-json">on
 Github</a>.</p>
+<p>In addition to showing off some awesome features, the goal is also
+to show how easy it can be to read <em>and</em> write modern C++.</p>
 <p>The biggest simplification we'll make is that rather than full JSON
 numbers, we'll only allow integers.</p>
 <p class="note">
@@ -273,7 +276,7 @@ std::string format_error(std::string base, std::string source, int index) {
 ...
 </code></pre>
 <p>The <code>printf</code> is annoying and Clang 12 (latest Clang on
-latest Fedora) doesn't seem to support <code>std::fmt</code> so we use
+latest Fedora) doesn't seem to support <code>std::format</code> so we use
 <code>std::sstream</code> to do string "formatting".</p>
 <p>But ok, back to lexing! Next up: whitespace.</p>
 <h4 id="lex_whitespace">lex_whitespace</h4><p>This function's job is to skip past whitespace. Thankfully we've got

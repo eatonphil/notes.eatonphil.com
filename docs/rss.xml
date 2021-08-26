@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 26 Aug 2021 21:10:04 +0000</lastBuildDate><item><title>Writing a simple JSON library from scratch: a tour through modern C++</title><link>http://notes.eatonphil.com/writing-a-simple-json-library-in-modern-cpp.html</link><description>&lt;p&gt;Modern C++ has a lot of cool features. Move semantics means passing
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 26 Aug 2021 21:53:37 +0000</lastBuildDate><item><title>Writing a simple JSON library from scratch: a tour through modern C++</title><link>http://notes.eatonphil.com/writing-a-simple-json-library-in-modern-cpp.html</link><description>&lt;p&gt;Modern C++ has a lot of cool features. Move semantics means passing
 around structs in functions is cheap. &lt;code&gt;std::shared_ptr&lt;/code&gt;
 means I don't have to manage any memory; no
 more &lt;code&gt;new&lt;/code&gt;/&lt;code&gt;delete&lt;/code&gt;! (But try as I might to
@@ -8,10 +8,13 @@ understand &lt;code&gt;std::unique_ptr&lt;/code&gt;, I'm just not there yet.)&lt
 tuple destructuring.&lt;/p&gt;
 &lt;p&gt;In order to test out this modern C++ I wanted a small but meaningful
 project that operates on very dynamic data. The two that always come
-to mind are JSON parsers or Lisp interpreters. This post walks through
+to mind are JSON parsers or Lisp interpreters.&lt;/p&gt;
+&lt;p&gt;This post walks through
 writing a basic JSON library from scratch using only the standard
 library. The source code for the resulting library is available &lt;a href="https://github.com/eatonphil/cpp-json"&gt;on
 Github&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;In addition to showing off some awesome features, the goal is also
+to show how easy it can be to read &lt;em&gt;and&lt;/em&gt; write modern C++.&lt;/p&gt;
 &lt;p&gt;The biggest simplification we'll make is that rather than full JSON
 numbers, we'll only allow integers.&lt;/p&gt;
 &lt;p class="note"&gt;
@@ -229,7 +232,7 @@ std::string format_error(std::string base, std::string source, int index) {
 ...
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;The &lt;code&gt;printf&lt;/code&gt; is annoying and Clang 12 (latest Clang on
-latest Fedora) doesn't seem to support &lt;code&gt;std::fmt&lt;/code&gt; so we use
+latest Fedora) doesn't seem to support &lt;code&gt;std::format&lt;/code&gt; so we use
 &lt;code&gt;std::sstream&lt;/code&gt; to do string "formatting".&lt;/p&gt;
 &lt;p&gt;But ok, back to lexing! Next up: whitespace.&lt;/p&gt;
 &lt;h4 id="lex_whitespace"&gt;lex_whitespace&lt;/h4&gt;&lt;p&gt;This function's job is to skip past whitespace. Thankfully we've got

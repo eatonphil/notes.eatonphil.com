@@ -13,7 +13,9 @@ tuple destructuring.
 
 In order to test out this modern C++ I wanted a small but meaningful
 project that operates on very dynamic data. The two that always come
-to mind are JSON parsers or Lisp interpreters. This post walks through
+to mind are JSON parsers or Lisp interpreters.
+
+This post walks through
 writing a basic JSON library from scratch using only the standard
 library. The source code for the resulting library is available [on
 Github](https://github.com/eatonphil/cpp-json).
@@ -271,7 +273,7 @@ std::string format_error(std::string base, std::string source, int index) {
 ```
 
 The <code>printf</code> is annoying and Clang 12 (latest Clang on
-latest Fedora) doesn't seem to support <code>std::fmt</code> so we use
+latest Fedora) doesn't seem to support <code>std::format</code> so we use
 <code>std::sstream</code> to do string "formatting".
 
 But ok, back to lexing! Next up: whitespace.
