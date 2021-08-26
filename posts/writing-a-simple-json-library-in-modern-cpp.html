@@ -1,0 +1,865 @@
+# Writing a simple JSON library from scratch: a tour through modern C++
+## August 26, 2021
+###### json,parsing,c++
+
+Modern C++ has a lot of cool features. Move semantics means passing
+around structs in functions is cheap. <code>std::shared_ptr</code>
+means I don't have to manage any memory; no
+more <code>new</code>/<code>delete</code>! (But try as I might to
+understand <code>std::unique_ptr</code>, I'm just not there yet.)
+
+The syntax has also gotten some treatment with <code>auto</code> and
+tuple destructuring.
+
+In order to test out this modern C++ I wanted a small but meaningful
+project that operates on very dynamic data. The two that always come
+to mind are JSON parsers or Lisp interpreters. This post walks through
+writing a basic JSON library from scratch using only the standard
+library. The source code for the resulting library is available [on
+Github](https://github.com/eatonphil/cpp-json).
+
+The biggest simplification we'll make is that rather than full JSON
+numbers, we'll only allow integers.
+
+<p class="note">
+  Big caveat! I couldn't be farther from a C++ expert! Email or tweet
+  me as you see mistakes, madness, lies.
+</p>
+
+### API
+
+The two big parts of the API will be about lexing (turning a string
+into an array of tokens) and parsing (turning an array of tokens into
+a JSON object-tree). A better implementation would implement the lexer
+as taking a character stream rather than a string, but taking a string
+is simpler. So we'll stick with that.
+
+Both of these functions can fail so we'll return a tuple in both cases
+with a string containing a possibly blank error message.
+
+We will define the header in <code>./include/json.hpp</code>.
+
+```c++
+#ifndef JSON_H
+#define JSON_H
+
+#include <tuple>
+#include <vector>
+#include <string>
+
+namespace json {
+std::tuple<std::vector<JSONToken>, std::string> lex(std::string);
+std::tuple<JSONValue, int, std::string> parse(std::vector<JSONToken>, int index = 0);
+} // namespace json
+
+#endif
+```
+
+The token returned by <code>lex</code> will need to contain the
+token's string value, the location (offset) in the original source, a
+pointer to the full source (for debugging), and the token's type. The
+token type itself will be an enum of either string, number, syntax
+(colon, bracket, etc.), boolean, or null.
+
+```c++
+...
+#include <string>
+#include <memory>
+
+namespace json {
+
+enum class JSONTokenType { String, Number, Syntax, Boolean, Null };
+struct JSONToken {
+  std::string value;
+  JSONTokenType type;
+  int location;
+  std::shared_ptr<std::string> full_source;
+};
+
+...
+
+} // namespace json
+
+...
+```
+
+This is the only place in the entire code we'll pass around a
+pointer. Using <code>std::shared_ptr</code> means we don't have to do
+any manual memory management either. No <code>new</code> or
+<code>delete</code>.
+
+Next, <code>JSONValue</code> is a struct containing optional string,
+boolean, number, array, and object fields with a type num to
+differentiate.
+
+```c++
+
+...
+#include <map>
+#include <optional>
+
+namespace json {
+
+enum class JSONValueType { String, Number, Object, Array, Boolean, Null };
+struct JSONValue {
+  std::optional<std::string> string;
+  std::optional<double> number;
+  std::optional<bool> boolean;
+  std::optional<std::vector<JSONValue>> array;
+  std::optional<std::map<std::string, JSONValue>> object;
+  JSONValueType type;
+};
+
+enum class JSONTokenType { String, Number, Syntax, Boolean, Null };
+
+...
+```
+
+Thanks to <code>std::optional</code> we can avoid using pointers to
+describe these fields. I did take a look at <code>std::variant</code>
+but it seemed like its API was overly complex.
+
+Finally, we'll add two more functions: a high level <code>parse</code>
+function that combines the job of lexing and parsing, and a
+<code>deparse</code> function for printing a <code>JSONValue</code> as
+a JSON string.
+
+```c++
+...
+std::tuple<JSONValue, int, std::string> parse(std::vector<JSONToken>, int index = 0);
+std::tuple<JSONValue, std::string> parse(std::string);
+std::string deparse(JSONValue, std::string whitespace = "");
+} // namespace json
+...
+```
+
+Now we're ready to start on the implementation.
+
+### Lexing
+
+First up is lexing; turning a JSON string into an array of tokens: a
+number, string, null keyword, boolean keyword, or syntax like comma or
+colon.
+
+The main lex loop skips whitespace and calls helper functions for each
+kind of token. If a token is found, we accumulate it and move to the
+end of that token (some tokens like <code>:</code> are a single
+character, some tokens like <code>"my great string"</code> are
+multiple characters.)
+
+Each token we find gets a pointer to the original JSON source for use
+in error messages if parsing fails. Again this will be the only time
+we explicitly pass around pointers in this implementation. We don't do
+any manual management because we're going to use
+<code>std::shared_ptr</code>.
+
+```c++
+#include "json.hpp"
+
+namespace json {
+std::tuple<std::vector<JSONToken>, std::string> lex(std::string raw_json) {
+  std::vector<JSONToken> tokens;
+  // All tokens will embed a pointer to the raw JSON for debugging purposes
+  auto original_copy = std::make_shared<std::string>(raw_json);
+
+  auto generic_lexers = {lex_syntax, lex_string, lex_number, lex_null, lex_true, lex_false};
+  for (int i = 0; i < raw_json.length(); i++) {
+    // Skip past whitespace
+    if (auto new_index = lex_whitespace(raw_json, i); i != new_index) {
+      i = new_index - 1;
+      continue;
+    }
+
+    auto found = false;
+    for (auto lexer : generic_lexers) {
+      if (auto [token, new_index, error] = lexer(raw_json, i); i != new_index) {
+        // Error while lexing, return early
+        if (error.length()) {
+          return {{}, error};
+        }
+
+        // Store reference to the original source
+        token.full_source = original_copy;
+        tokens.push_back(token);
+        i = new_index - 1;
+        found = true;
+        break;
+      }
+    }
+
+    if (found) {
+      continue;
+    }
+
+    return {{}, format_error("Unable to lex", raw_json, i)};
+  }
+
+  return {tokens, ""};
+}
+} // namespace json
+```
+
+Two neat things you'll notice in there are tuple literal syntax
+(<code>{tokens, ""}}</code>) and how easy it is to type a value
+containing an array of function pointers using auto
+(<code>generic_lexers</code>).
+
+#### format_error
+
+Since we referenced <code>format_error</code>, let's define it. This
+needs to accept a message prefix, the full JSON string, and the index
+offset where the error should point to.
+
+Inside the function we'll iterate over the string until we find the
+entire line containing this index offset. We'll display that line and
+a pointer to the character that is causing/starting the error.
+
+```c++
+...
+
+#include <sstream>
+
+namespace json {
+std::string format_error(std::string base, std::string source, int index) {
+  std::ostringstream s;
+  int counter = 0;
+  int line = 1;
+  int column = 0;
+  std::string lastline = "";
+  std::string whitespace = "";
+  for (auto c : source) {
+    if (counter == index) {
+      break;
+    }
+
+    if (c == '\n') {
+      line++;
+      column = 0;
+      lastline = "";
+      whitespace = "";
+    } else if (c == '\t') {
+      column++;
+      lastline += "  ";
+      whitespace += "  ";
+    } else {
+      column++;
+      lastline += c;
+      whitespace += " ";
+    }
+
+    counter++;
+  }
+
+  // Continue accumulating the lastline for debugging
+  while (counter < source.size()) {
+    auto c = source[counter];
+    if (c == '\n') {
+      break;
+    }
+    lastline += c;
+    counter++;
+  }
+
+  s << base << " at line " << line << ", column " << column << std::endl;
+  s << lastline << std::endl;
+  s << whitespace << "^";
+
+  return s.str();
+}
+
+...
+```
+
+The <code>printf</code> is annoying and Clang 12 (latest Clang on
+latest Fedora) doesn't seem to support <code>std::fmt</code> so we use
+<code>std::sstream</code> to do string "formatting".
+
+But ok, back to lexing! Next up: whitespace.
+
+#### lex_whitespace
+
+This function's job is to skip past whitespace. Thankfully we've got
+<code>std::isspace</code> to help.
+
+```c++
+int lex_whitespace(std::string raw_json, int index) {
+  while (std::isspace(raw_json[index])) {
+    if (index == raw_json.length()) {
+      break;
+    }
+
+    index++;
+  }
+
+  return index;
+}
+```
+
+It's very simple!
+
+#### lex_syntax
+
+All of the generic lexers follow the same pattern. They return either
+a valid token and the index where the token ends, or they return an
+error string.
+
+Since all the syntax elements in JSON (<code>,</code>, <code>:</code>,
+<code>{</code>, <code>}</code>, <code>[</code> and , <code>]</code>)
+are single characters, we don't need to write a "longest substring"
+helper function. We simply check if the current character is one of
+these characters and return a syntax token if so.
+
+```c++
+std::tuple<JSONToken, int, std::string> lex_syntax(std::string raw_json, int index) {
+  JSONToken token{"", JSONTokenType::Syntax, index};
+  std::string value = "";
+  auto c = raw_json[index];
+  if (c == '[' || c == ']' || c == '{' || c == '}' || c == ':' || c == ',') {
+    token.value += c;
+    index++;
+  }
+
+  return {token, index, ""};
+}
+```
+
+### lex_string
+
+This one manages state so it's a little more complex. We need to check
+if the current character is a double quote, then iterate over
+characters until we find the ending quote.
+
+It's possible to hit EOF here so we need to handle that case. And
+handling nested quotes is left as an exercise for the reader. :)
+
+```c++
+std::tuple<JSONToken, int, std::string> lex_string(std::string raw_json,
+                                                   int original_index) {
+  int index = original_index;
+  JSONToken token{"", JSONTokenType::String, index};
+  std::string value = "";
+  auto c = raw_json[index];
+  if (c != '"') {
+    return {token, original_index, ""};
+  }
+  index++;
+
+  // TODO: handle nested quotes
+  while (c = raw_json[index], c != '"') {
+    if (index == raw_json.length()) {
+      return {token, index, format_error("Unexpected EOF while lexing string", raw_json, index)};
+    }
+
+    token.value += c;
+    index++;
+  }
+  index++;
+
+  return {token, index, ""};
+}
+```
+
+Nothing too special to discuss here. So on to lexing numbers.
+
+### lex_number
+
+Since we're only supporting integers, this one has no internal
+state. We check characters until we stop seeing digits.
+
+```c++
+std::tuple<JSONToken, int, std::string> lex_number(std::string raw_json,
+                                                   int original_index) {
+  int index = original_index;
+  JSONToken token = {"", JSONTokenType::Number, index};
+  std::string value = "";
+  // TODO: handle not just integers
+  while (true) {
+    if (index == raw_json.length()) {
+      break;
+    }
+
+    auto c = raw_json[index];
+    if (!(c >= '0' && c <= '9')) {
+      break;
+    }
+
+    token.value += c;
+    index++;
+  }
+
+  return {token, index, ""};
+}
+```
+
+Done. On to keywords: <code>null</code>, <code>false</code>, <code>true</code>.
+
+### lex_keyword
+
+This is a helper function that will check for a literal keyword.
+
+```c++
+std::tuple<JSONToken, int, std::string> lex_keyword(std::string raw_json,
+                                                    std::string keyword,
+                                                    JSONTokenType type,
+                                                    int original_index) {
+  int index = original_index;
+  JSONToken token{"", type, index};
+  while (keyword[index - original_index] == raw_json[index]) {
+    if (index == raw_json.length()) {
+      break;
+    }
+
+    index++;
+  }
+
+  if (index - original_index == keyword.length()) {
+    token.value = keyword;
+  }
+  return {token, index, ""};
+}
+```
+
+With this defined we can now implement <code>lex_false</code>,
+<code>lex_true</code>, and <code>lex_null</code>.
+
+```c++
+std::tuple<JSONToken, int, std::string> lex_null(std::string raw_json,
+                                                 int index) {
+  return lex_keyword(raw_json, "null", JSONTokenType::Null, index);
+}
+
+std::tuple<JSONToken, int, std::string> lex_true(std::string raw_json,
+                                                 int index) {
+  return lex_keyword(raw_json, "true", JSONTokenType::Boolean, index);
+}
+
+std::tuple<JSONToken, int, std::string> lex_false(std::string raw_json,
+                                                  int index) {
+  return lex_keyword(raw_json, "false", JSONTokenType::Boolean, index);
+}
+```
+
+And that's it for lexing! And although we defined all of these
+top-down, you'll want to write them mostly in reverse order or put in
+forward declarations.
+
+If you wanted to you could now write a simple <code>main.cpp</code>
+like:
+
+```c++
+#include "json.hpp"
+
+#include <iostream>
+
+int main(int argc, char *argv[]) {
+  if (argc == 1) {
+    std::cerr << "Expected JSON input argument to parse" << std::endl;
+    return 1;
+  }
+
+  std::string in{argv[1]};
+
+  auto [tokens, error] = json::lex(in);
+  if (error.size()) {
+    std::cerr << error << std::endl;
+    return 1;
+  }
+
+  for (auto t : tokens) {
+    std::cout << t.value << std::endl;
+  }
+}
+```
+
+Set up a Makefile:
+
+```make
+main: *.cpp ./include/*.hpp
+        clang++ -g -Wall -std=c++2a -I./include *.cpp -o $@
+```
+
+Build with <code>make</code> and run `<code>./main '{"a": 1}'</code>`
+to see the list of tokens printed out.
+
+Now let's move on to parsing from the array of tokens.
+
+### Parsing
+
+This process takes the array of tokens and turns them into a tree
+structure. The tree develops children as we spot <code>[</code> or
+<code>{</code> tokens. The tree child ends when we spot <code>]</code>
+or <code>}</code> tokens.
+
+```c++
+std::tuple<JSONValue, int, std::string> parse(std::vector<JSONToken> tokens,
+                                              int index) {
+  auto token = tokens[index];
+  switch (token.type) {
+  case JSONTokenType::Number: {
+    auto n = std::stod(token.value);
+    return {JSONValue{.number = n, .type = JSONValueType::Number}, index + 1, ""};
+  }
+  case JSONTokenType::Boolean:
+    return {JSONValue{.boolean = token.value == "true", .type = JSONValueType::Boolean}, index + 1, ""};
+  case JSONTokenType::Null:
+    return {JSONValue{.type = JSONValueType::Null}, index + 1, ""};
+  case JSONTokenType::String:
+    return {JSONValue{.string = token.value, .type = JSONValueType::String}, index + 1, ""};
+  case JSONTokenType::Syntax:
+    if (token.value == "[") {
+      auto [array, new_index, error] = parse_array(tokens, index + 1);
+      return {JSONValue{.array = array, .type = JSONValueType::Array}, new_index, error};
+    }
+
+    if (token.value == "{") {
+      auto [object, new_index, error] = parse_object(tokens, index + 1);
+      return {JSONValue{.object = std::optional(object), .type = JSONValueType::Object}, new_index, error};
+    }
+  }
+
+  return {{}, index, format_parse_error("Failed to parse", token)};
+}
+```
+
+This in turn reference <code>format_parse_error</code> on failure
+which is an error-string-maker similar to
+<code>format_error</code>. It actually calls <code>format_error</code>
+with more details specific to parsing.
+
+```c++
+std::string JSONTokenType_to_string(JSONTokenType jtt) {
+  switch (jtt) {
+  case JSONTokenType::String:
+    return "String";
+  case JSONTokenType::Number:
+    return "Number";
+  case JSONTokenType::Syntax:
+    return "Syntax";
+  case JSONTokenType::Boolean:
+    return "Boolean";
+  case JSONTokenType::Null:
+    return "Null";
+  }
+}
+
+std::string format_parse_error(std::string base, JSONToken token) {
+  std::ostringstream s;
+  s << "Unexpected token '" << token.value << "', type '"
+    << JSONTokenType_to_string(token.type) << "', index ";
+  s << std::endl << base;
+  return format_error(s.str(), *token.full_source, token.location);
+}
+```
+
+<p class="note">
+  This function depended on a helper for turning the
+  <code>JSONTokenType</code> enum into a string. As a user it's very
+  annoying when langauges doesn't give you stringifier methods for enums
+  by default for debugging. I know there's some ways to do this with
+  reflection in C++ but it seemed hairy.
+
+  But I digest.
+</p>
+
+#### parse_array
+
+This function was called by <code>parse</code> when we found an
+opening bracket. This function needs to recursively call parse and
+then check for a comma and call parse again ... until it finds the
+closing bracket.
+
+It will fail if it every finds something other than a comma or closing
+bracket following a succesful call to <code>parse</code>.
+
+```c++
+std::tuple<std::vector<JSONValue>, int, std::string>
+parse_array(std::vector<JSONToken> tokens, int index) {
+  std::vector<JSONValue> children = {};
+  while (index < tokens.size()) {
+    auto t = tokens[index];
+    if (t.type == JSONTokenType::Syntax) {
+      if (t.value == "]") {
+        return {children, index + 1, ""};
+      }
+
+      if (t.value == ",") {
+        index++;
+        t = tokens[index];
+      } else if (children.size() > 0) {
+        return {{},
+                index,
+                format_parse_error("Expected comma after element in array", t)};
+      }
+    }
+
+    auto [child, new_index, error] = parse(tokens, index);
+    if (error.size()) {
+      return {{}, index, error};
+    }
+
+    children.push_back(child);
+    index = new_index;
+  }
+
+  return {
+      {},
+      index,
+      format_parse_error("Unexpected EOF while parsing array", tokens[index])};
+}
+```
+
+And finally we need to implement <code>parse_object</code>.
+
+#### parse_object
+
+This function is similar to <code>parse_array</code> but it needs to
+find <code>$string COLON $parse() COMMA</code> pattern pairs.
+
+```c++
+std::tuple<std::map<std::string, JSONValue>, int, std::string>
+parse_object(std::vector<JSONToken> tokens, int index) {
+  std::map<std::string, JSONValue> values = {};
+  while (index < tokens.size()) {
+    auto t = tokens[index];
+    if (t.type == JSONTokenType::Syntax) {
+      if (t.value == "}") {
+        return {values, index + 1, ""};
+      }
+
+      if (t.value == ",") {
+        index++;
+        t = tokens[index];
+      } else if (values.size() > 0) {
+        return {
+            {},
+            index,
+            format_parse_error("Expected comma after element in object", t)};
+      } else {
+        return {{},
+                index,
+                format_parse_error(
+                    "Expected key-value pair or closing brace in object", t)};
+      }
+    }
+
+    auto [key, new_index, error] = parse(tokens, index);
+    if (error.size()) {
+      return {{}, index, error};
+    }
+
+    if (key.type != JSONValueType::String) {
+      return {
+          {}, index, format_parse_error("Expected string key in object", t)};
+    }
+    index = new_index;
+    t = tokens[index];
+
+    if (!(t.type == JSONTokenType::Syntax && t.value == ":")) {
+      return {{},
+              index,
+              format_parse_error("Expected colon after key in object", t)};
+    }
+    index++;
+    t = tokens[index];
+
+    auto [value, new_index1, error1] = parse(tokens, index);
+    if (error1.size()) {
+      return {{}, index, error1};
+    }
+
+    values[key.string.value()] = value;
+    index = new_index1;
+  }
+
+  return {values, index + 1, ""};
+}
+```
+
+These parse functions are all slightly tedious but still very
+simple. And thankfully, we're done!
+
+We can now implement the variation of <code>parse</code> that ties
+together lexing and parsing.
+
+```c++
+std::tuple<JSONValue, std::string> parse(std::string source) {
+  auto [tokens, error] = json::lex(source);
+  if (error.size()) {
+    return {{}, error};
+  }
+
+  auto [ast, _, error1] = json::parse(tokens);
+  return {ast, error1};
+}
+```
+
+And we're completely done the string to <code>JSONValue</code> code.
+
+### deparse
+
+The very last piece of the implementation is to do the reverse of the
+past operations: generate a string from a <code>JSONValue</code>.
+
+This is a recursive function and the only mildly tricky part is
+deciding how to do whitespace if we want a prettier output.
+
+```c++
+
+std::string deparse(JSONValue v, std::string whitespace) {
+  switch (v.type) {
+  case JSONValueType::String:
+    return "\"" + v.string.value() + "\"";
+  case JSONValueType::Boolean:
+    return (v.boolean.value() ? "true" : "false");
+  case JSONValueType::Number:
+    return std::to_string(v.number.value());
+  case JSONValueType::Null:
+    return "null";
+  case JSONValueType::Array: {
+    std::string s = "[\n";
+    auto a = v.array.value();
+    for (int i = 0; i < a.size(); i++) {
+      auto value = a[i];
+      s += whitespace + "  " + deparse(value, whitespace + "  ");
+      if (i < a.size() - 1) {
+        s += ",";
+      }
+
+      s += "\n";
+    }
+
+    return s + whitespace + "]";
+  }
+  case JSONValueType::Object: {
+    std::string s = "{\n";
+    auto values = v.object.value();
+    auto i = 0;
+    for (auto const &[key, value] : values) {
+      s += whitespace + "  " + "\"" + key +
+           "\": " + deparse(value, whitespace + "  ");
+
+      if (i < values.size() - 1) {
+        s += ",";
+      }
+
+      s += "\n";
+      i++;
+    }
+
+    return s + whitespace + "}";
+  }
+  }
+}
+```
+
+Done. Done. Done.
+
+### main.cpp
+
+This program will simply accept a JSON input, parse it, and pretty
+print it right back out. Kind of like a simplified <code>jq</code>.
+
+```c++
+#include "json.hpp"
+
+#include <iostream>
+
+int main(int argc, char *argv[]) {
+  if (argc == 1) {
+    std::cerr << "Expected JSON input argument to parse" << std::endl;
+    return 1;
+  }
+
+  std::string in{argv[1]};
+
+  auto [ast, error] = json::parse(in);
+  if (error.size()) {
+    std::cerr << error << std::endl;
+    return 1;
+  }
+
+  std::cout << json::deparse(ast);
+}
+```
+
+Build it with `make` that we already defined, and run it against
+something big like
+[this](https://github.com/eatonphil/cpp-json/blob/main/test/glossary.json).
+
+```bash
+$ cd cpp-json
+$ make
+$ ./main "$(cat ./test/glossary.json)"
+{
+  "glossary": {
+    "GlossDiv": {
+      "GlossList": {
+        "GlossEntry": {
+          "Abbrev": "ISO 8879:1986",
+          "Acronym": "SGML",
+          "GlossDef": {
+            "GlossSeeAlso": [
+              "GML",
+              "XML"
+            ],
+            "para": "A meta-markup language, used to create markup languages such as DocBook."
+          },
+          "GlossSee": "markup",
+          "GlossTerm": "Standard Generalized Markup Language",
+          "ID": "SGML",
+          "SortAs": "SGML"
+        }
+      },
+      "title": "S"
+    },
+    "title": "example glossary"
+  }
+}
+```
+
+Or something incorrect like:
+
+```bash
+./main '{"foo": [{ 1: 2 }]}'
+Unexpected token '1', type 'Number', index
+Expected string key in object at line 1, column 11
+{"foo": [{ 1: 2 }]}
+           ^
+```
+
+And give Valgrind the old try:
+
+```bash
+valgrind ./main '{"a": [1, 2, null, { "c": 129 }]}'
+==153027== Memcheck, a memory error detector
+==153027== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
+==153027== Using Valgrind-3.17.0 and LibVEX; rerun with -h for copyright info
+==153027== Command: ./main {"a":\ [1,\ 2,\ null,\ {\ "c":\ 129\ }]}
+==153027==
+{
+  "a": [
+    1.000000,
+    2.000000,
+    null,
+    {
+      "c": 129.000000
+    }
+  ]
+}==153027==
+==153027== HEAP SUMMARY:
+==153027==     in use at exit: 0 bytes in 0 blocks
+==153027==   total heap usage: 128 allocs, 128 frees, 105,386 bytes allocated
+==153027==
+==153027== All heap blocks were freed -- no leaks are possible
+==153027==
+==153027== For lists of detected and suppressed errors, rerun with: -s
+==153027== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+```
+
+Pretty sweet. Modern C++, I like it!
+
+#### Feedback
+
+As always, please [email](phil@eatonphil.com) or [tweet
+me](https://twitter.com/phil_eaton) with questions, corrections, or
+ideas.
