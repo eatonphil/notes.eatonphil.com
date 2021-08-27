@@ -57,8 +57,6 @@ to mind are JSON parsers or Lisp interpreters.</p>
 writing a basic JSON library from scratch using only the standard
 library. The source code for the resulting library is available <a href="https://github.com/eatonphil/cpp-json">on
 Github</a>.</p>
-<p>In addition to showing off some awesome features, the goal is also
-to show how easy it can be to read <em>and</em> write modern C++.</p>
 <p>The biggest simplification we'll make is that rather than full JSON
 numbers, we'll only allow integers.</p>
 <p class="note">
@@ -212,7 +210,7 @@ std::tuple&lt;std::vector&lt;JSONToken&gt;, std::string&gt; lex(std::string raw_
 } // namespace json
 </code></pre>
 <p>Two neat things you'll notice in there are tuple literal syntax
-(<code>{tokens, ""}}</code>) and how easy it is to type a value
+(<code>{tokens, ""}</code>) and how easy it is to type a value
 containing an array of function pointers using auto
 (<code>generic_lexers</code>).</p>
 <h4 id="format_error">format_error</h4><p>Since we referenced <code>format_error</code>, let's define it. This
