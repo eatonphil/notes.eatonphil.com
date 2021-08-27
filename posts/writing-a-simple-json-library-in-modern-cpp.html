@@ -272,8 +272,9 @@ std::string format_error(std::string base, std::string source, int index) {
 ...
 ```
 
-The <code>printf</code> is annoying and Clang 12 (latest Clang on
-latest Fedora) doesn't seem to support <code>std::format</code> so we use
+The <code>printf</code> API is annoying and Clang 12 (latest Clang on
+latest Fedora) doesn't seem to support <code>std::format</code>. So we
+just use
 <code>std::sstream</code> to do string "formatting".
 
 But ok, back to lexing! Next up: whitespace.
@@ -480,7 +481,7 @@ main: *.cpp ./include/*.hpp
         clang++ -g -Wall -std=c++2a -I./include *.cpp -o $@
 ```
 
-Build with <code>make</code> and run `<code>./main '{"a": 1}'</code>`
+Build with <code>make</code> and run <code>./main '{"a": 1}'</code>
 to see the list of tokens printed out.
 
 Now let's move on to parsing from the array of tokens.

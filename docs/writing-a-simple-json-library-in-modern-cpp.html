@@ -273,8 +273,9 @@ std::string format_error(std::string base, std::string source, int index) {
 
 ...
 </code></pre>
-<p>The <code>printf</code> is annoying and Clang 12 (latest Clang on
-latest Fedora) doesn't seem to support <code>std::format</code> so we use
+<p>The <code>printf</code> API is annoying and Clang 12 (latest Clang on
+latest Fedora) doesn't seem to support <code>std::format</code>. So we
+just use
 <code>std::sstream</code> to do string "formatting".</p>
 <p>But ok, back to lexing! Next up: whitespace.</p>
 <h4 id="lex_whitespace">lex_whitespace</h4><p>This function's job is to skip past whitespace. Thankfully we've got
@@ -439,7 +440,7 @@ int main(int argc, char *argv[]) {
 <pre><code class="hljs make">main: *.cpp ./include/*.hpp
         clang++ -g -Wall -std=c++2a -I./include *.cpp -o $@
 </code></pre>
-<p>Build with <code>make</code> and run <code>&lt;code&gt;./main '{"a": 1}'&lt;/code&gt;</code>
+<p>Build with <code>make</code> and run <code>./main '{"a": 1}'</code>
 to see the list of tokens printed out.</p>
 <p>Now let's move on to parsing from the array of tokens.</p>
 <h3 id="parsing">Parsing</h3><p>This process takes the array of tokens and turns them into a tree
