@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Fri, 27 Aug 2021 00:56:14 +0000</lastBuildDate><item><title>Writing a simple JSON library from scratch: a tour through modern C++</title><link>http://notes.eatonphil.com/writing-a-simple-json-library-in-modern-cpp.html</link><description>&lt;p&gt;Modern C++ has a lot of cool features. Move semantics means passing
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 30 Aug 2021 19:00:01 +0000</lastBuildDate><item><title>Writing a simple JSON library from scratch: a tour through modern C++</title><link>http://notes.eatonphil.com/writing-a-simple-json-library-in-modern-cpp.html</link><description>&lt;p&gt;Modern C++ has a lot of cool features. Move semantics means passing
 around structs in functions is cheap. &lt;code&gt;std::shared_ptr&lt;/code&gt;
 means I don't have to manage any memory; no
 more &lt;code&gt;new&lt;/code&gt;/&lt;code&gt;delete&lt;/code&gt;! (But try as I might to
@@ -725,9 +725,6 @@ Expected string key in object at line 1, column 11
 ==153027== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Pretty sweet. Modern C++, I like it!&lt;/p&gt;
-&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, please &lt;a href="phil@eatonphil.com"&gt;email&lt;/a&gt; or &lt;a href="https://twitter.com/phil_eaton"&gt;tweet
-me&lt;/a&gt; with questions, corrections, or
-ideas.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;I don&amp;#39;t do a lot of C++ so I wanted to get a sense for what it can look like today.&lt;br&gt;&lt;br&gt;This post walks through a number of new-ish C++ features as we build a handwritten recursive descent parser for JSON using only the standard library.&lt;a href="https://t.co/cCN6nP0pDi"&gt;https://t.co/cCN6nP0pDi&lt;/a&gt; &lt;a href="https://t.co/0AZNEZv4Ss"&gt;pic.twitter.com/0AZNEZv4Ss&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1431000902710796292?ref_src=twsrc%5Etfw"&gt;August 26, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/writing-a-simple-json-library-in-modern-cpp.html</guid><pubDate>Thu, 26 Aug 2021 00:00:00 +0000</pubDate></item><item><title>Parser generators vs. handwritten parsers: surveying major language implementations in 2021</title><link>http://notes.eatonphil.com/parser-generators-vs-handwritten-parsers-survey-2021.html</link><description>&lt;p&gt;Developers often think parser generators are the sole legit way to
 build programming language frontends, possibly because compiler
@@ -812,8 +809,6 @@ languages&lt;/a&gt;,
 &lt;p&gt;Although parser generators are still used in major language
 implementations, maybe it's time for universities to start teaching
 handwritten parsing?&lt;/p&gt;
-&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
-questions or ideas.&lt;/p&gt;
 &lt;p class="note"&gt;
   This tweet was published before I was corrected about Python's
   parser. It should say 8/10 but I cannot edit the tweet.
@@ -1142,8 +1137,6 @@ Hello world!%
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Phew! Easy peasy.&lt;/p&gt;
 &lt;h3 id="next-up"&gt;Next up&lt;/h3&gt;&lt;p&gt;I'm porting this example to Kawa to see how it fares. Blog post to come.&lt;/p&gt;
-&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:phil@eatonphil.com"&gt;hear from you&lt;/a&gt; with
-questions or ideas.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;In a ridiculous attempt to prove an internet wrong about the practicality of Lisp (Common Lisp specifically), I tried to get a simple (but realistic) web app running. After four days and a patch to ABCL I got something working.&lt;a href="https://t.co/5UUWNR8Wnn"&gt;https://t.co/5UUWNR8Wnn&lt;/a&gt; &lt;a href="https://t.co/cZsx32IlKD"&gt;pic.twitter.com/cZsx32IlKD&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1423345414279942150?ref_src=twsrc%5Etfw"&gt;August 5, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/practical-common-lisp-on-the-jvm.html</guid><pubDate>Thu, 05 Aug 2021 00:00:00 +0000</pubDate></item><item><title>Leaders, you need to share organization success stories more frequently</title><link>http://notes.eatonphil.com/leaders-share-company-success-stories.html</link><description>&lt;p&gt;This post goes out to anyone who leads a team: managers, directors,
 VPs, executives. You need to share organization success stories with
@@ -1166,8 +1159,6 @@ positive impact, they're going to forget it. You'll miss out on the
 freely available chance to give reassurance to your best people.&lt;/p&gt;
 &lt;p&gt;Talented folks want to be invested in an organization that is
 succeeding.&lt;/p&gt;
-&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
-questions or ideas.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Wrote a post for all the people managers, directors, VPs out there: you need to regularly share success stories with your whole organization. Everyone wants to be part of an organization that is doing good work.&lt;a href="https://t.co/XgaY5Ri1tA"&gt;https://t.co/XgaY5Ri1tA&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1407451413156929537?ref_src=twsrc%5Etfw"&gt;June 22, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/leaders-share-company-success-stories.html</guid><pubDate>Tue, 22 Jun 2021 00:00:00 +0000</pubDate></item><item><title>Coolest hard-tech companies in NYC 2021</title><link>http://notes.eatonphil.com/coolest-tech-companies-in-nyc-2021.html</link><description>&lt;p&gt;For years I've kept a private list of really cool tech companies in
 NYC. Now that I'm funemployed it's the perfect time to publish. This
@@ -1255,8 +1246,6 @@ platforms.&lt;/p&gt;
 &lt;p&gt;&lt;a href="https://stackoverflow.com/"&gt;https://stackoverflow.com/&lt;/a&gt;&lt;/p&gt;
 &lt;h3 id="that's-it!"&gt;That's it!&lt;/h3&gt;&lt;p&gt;Tell me what you think and if I'm missing any hard-tech companies in
 NYC. I'm sure I am.&lt;/p&gt;
-&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
-questions or ideas.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Here&amp;#39;s my light-hearted take on some of the coolest tech companies in NYC in 2021&lt;a href="https://twitter.com/Frame_io?ref_src=twsrc%5Etfw"&gt;@Frame_io&lt;/a&gt; &lt;a href="https://twitter.com/equinixmetal?ref_src=twsrc%5Etfw"&gt;@equinixmetal&lt;/a&gt; &lt;a href="https://twitter.com/digitalocean?ref_src=twsrc%5Etfw"&gt;@digitalocean&lt;/a&gt; &lt;a href="https://twitter.com/capsule8?ref_src=twsrc%5Etfw"&gt;@capsule8&lt;/a&gt; &lt;a href="https://twitter.com/NS1?ref_src=twsrc%5Etfw"&gt;@NS1&lt;/a&gt; &lt;a href="https://twitter.com/grafana?ref_src=twsrc%5Etfw"&gt;@grafana&lt;/a&gt; &lt;a href="https://twitter.com/CockroachDB?ref_src=twsrc%5Etfw"&gt;@CockroachDB&lt;/a&gt; &lt;a href="https://twitter.com/squarespace?ref_src=twsrc%5Etfw"&gt;@squarespace&lt;/a&gt; &lt;a href="https://twitter.com/chronosphereio?ref_src=twsrc%5Etfw"&gt;@chronosphereio&lt;/a&gt; &lt;a href="https://twitter.com/datadoghq?ref_src=twsrc%5Etfw"&gt;@datadoghq&lt;/a&gt; &lt;a href="https://twitter.com/MongoDB?ref_src=twsrc%5Etfw"&gt;@MongoDB&lt;/a&gt; &lt;a href="https://twitter.com/trailofbits?ref_src=twsrc%5Etfw"&gt;@trailofbits&lt;/a&gt; &lt;a href="https://twitter.com/twosigma?ref_src=twsrc%5Etfw"&gt;@twosigma&lt;/a&gt; &lt;a href="https://twitter.com/Vimeo?ref_src=twsrc%5Etfw"&gt;@Vimeo&lt;/a&gt; &lt;a href="https://twitter.com/Etsy?ref_src=twsrc%5Etfw"&gt;@Etsy&lt;/a&gt; and more&lt;a href="https://t.co/ZAcvptvLbZ"&gt;https://t.co/ZAcvptvLbZ&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1400815765117353989?ref_src=twsrc%5Etfw"&gt;June 4, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/coolest-tech-companies-in-nyc-2021.html</guid><pubDate>Fri, 04 Jun 2021 00:00:00 +0000</pubDate></item><item><title>Writing a Jinja-inspired template library in Python</title><link>http://notes.eatonphil.com/writing-a-template-library-in-python.html</link><description>&lt;p&gt;In this post we'll build a minimal text templating library in Python
 inspired by Jinja. It will be able to display variables and iterate
@@ -1763,8 +1752,6 @@ error.&lt;/p&gt;
 &amp;lt;/html&amp;gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Pretty sweet for only 300 lines of Python!&lt;/p&gt;
-&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
-questions or ideas.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Been wanting to write a Python template library ever since I failed trying to do so years ago in Standard ML. Here&amp;#39;s my take on a Jinja-like library!&lt;a href="https://t.co/P1nAV6fSxk"&gt;https://t.co/P1nAV6fSxk&lt;/a&gt; &lt;a href="https://t.co/DbXQt1JYx8"&gt;pic.twitter.com/DbXQt1JYx8&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1396535283190046722?ref_src=twsrc%5Etfw"&gt;May 23, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/writing-a-template-library-in-python.html</guid><pubDate>Sun, 23 May 2021 00:00:00 +0000</pubDate></item><item><title>Learning a new codebase: hacking on nginx</title><link>http://notes.eatonphil.com/learning-a-new-codebase-hacking-nginx.html</link><description>&lt;p&gt;I have never contributed to nginx. My C skills are 1/10. But
 downloading the source, hacking it up, compiling it, and running it
@@ -2150,8 +2137,6 @@ bit about nginx modules as a user it's clear that as a developer this
 command could have been implemented much more cleanly as a module too.&lt;/p&gt;
 &lt;p&gt;There also has to be higher-level tooling for returning constructing
 responses rather than writing out headers manually.&lt;/p&gt;
-&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
-questions or ideas.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Been wanting to write some posts like this for a long time showing some techniques for hacking on an unfamiliar project using very basic programming/Linux tools. In this post it&amp;#39;s nginx&lt;a href="https://t.co/t7Y43Zmxhk"&gt;https://t.co/t7Y43Zmxhk&lt;/a&gt; &lt;a href="https://t.co/EOatURm5wx"&gt;pic.twitter.com/EOatURm5wx&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1378906317004361732?ref_src=twsrc%5Etfw"&gt;April 5, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/learning-a-new-codebase-hacking-nginx.html</guid><pubDate>Sun, 04 Apr 2021 00:00:00 +0000</pubDate></item><item><title>How to get better at recursion</title><link>http://notes.eatonphil.com/practicing-recursion.html</link><description>&lt;p&gt;tldr; reimplement standard library functions in your favorite
 language &lt;em&gt;without loops&lt;/em&gt;.&lt;/p&gt;
@@ -2220,8 +2205,6 @@ in Python:&lt;/p&gt;
 &lt;/p&gt;&lt;p&gt;For bonus points, avoid all mutation in your implementations and use
 only tail recursion.&lt;/p&gt;
 &lt;p&gt;Happy recursion!&lt;/p&gt;
-&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
-questions or ideas.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Reimplementing standard library functions without for loops is a great way to get better at recursion and you don&amp;#39;t need to use a functional programming language to do so&lt;a href="https://t.co/JiPnXMQW3l"&gt;https://t.co/JiPnXMQW3l&lt;/a&gt; &lt;a href="https://t.co/MHwX5t70HT"&gt;pic.twitter.com/MHwX5t70HT&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1368602496168497154?ref_src=twsrc%5Etfw"&gt;March 7, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/practicing-recursion.html</guid><pubDate>Sun, 07 Mar 2021 00:00:00 +0000</pubDate></item><item><title>Four books professional developers should read (and a few you don't need to)</title><link>http://notes.eatonphil.com/books-developers-should-read.html</link><description>&lt;p&gt;These are the books I recommend to developers wanting to improve their
 skills as professional programmers because of high information
@@ -2251,8 +2234,6 @@ me:&lt;/p&gt;
 &lt;/ul&gt;
 &lt;p&gt;They're not all bad but give nowhere near as much return for the
 investment of your time.&lt;/p&gt;
-&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
-questions or ideas.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Four books I recommend to professional developers wanting to improve their craft, and a few I&amp;#39;d not&lt;a href="https://t.co/1aTrfqZ9bd"&gt;https://t.co/1aTrfqZ9bd&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1356391931274756096?ref_src=twsrc%5Etfw"&gt;February 2, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/books-developers-should-read.html</guid><pubDate>Mon, 01 Feb 2021 00:00:00 +0000</pubDate></item><item><title>Extending gosql to supporting LIMIT and OFFSET</title><link>http://notes.eatonphil.com/extending-gosql-to-support-limit-and-offset.html</link><description>&lt;p&gt;It's been a few months since I picked up
 &lt;a href="https://github.com/eatonphil/gosql"&gt;gosql&lt;/a&gt; and I wanted to use it to
@@ -2521,8 +2502,6 @@ ok
 ok
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Not so hard to hack is it? Make sure to include some tests!&lt;/p&gt;
-&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
-questions or ideas.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Working on a prototype SQL-based explorer for data stored in S3 and I needed OFFSET/LIMIT support in the gosql parser. Wrote up a short post on how you can hack in additional syntax and functionality into this SQL engine written in Go.&lt;a href="https://t.co/PyVozTPZ5S"&gt;https://t.co/PyVozTPZ5S&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1353372050023456768?ref_src=twsrc%5Etfw"&gt;January 24, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/extending-gosql-to-support-limit-and-offset.html</guid><pubDate>Sat, 23 Jan 2021 00:00:00 +0000</pubDate></item><item><title>The year in books: 20 to recommend in 2020</title><link>http://notes.eatonphil.com/year-in-books-2020.html</link><description>&lt;p&gt;This year I finished 47 books, up from last year but not a personal
 best. The breakdown was 17 non-fiction and 30 fiction. Another 20-30
@@ -2647,8 +2626,6 @@ I'd love to hear from you.&lt;/p&gt;
 &lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/19792871-the-bat"&gt;The Bat&lt;/a&gt; by Jo Nesbø (Norwegian)&lt;/li&gt;
 &lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/26167126-the-mouse-that-roared"&gt;The Mouse That Roared&lt;/a&gt; by Leonard Wibberley (Irish-born American)&lt;/li&gt;
 &lt;/ul&gt;
-&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
-questions or ideas.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Out of 47 books read this year, here&amp;#39;s the 20 I recommend to you (gave them 4/5 stars or better). I&amp;#39;m trying to read more non-English authors so I&amp;#39;d love to hear if there are authors with similar style on this list you&amp;#39;d recommend!&lt;a href="https://t.co/FjHcvHpRSr"&gt;https://t.co/FjHcvHpRSr&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1343242325791805447?ref_src=twsrc%5Etfw"&gt;December 27, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/year-in-books-2020.html</guid><pubDate>Sun, 27 Dec 2020 00:00:00 +0000</pubDate></item><item><title>Static analysis with semgrep: practical examples using Docker</title><link>http://notes.eatonphil.com/static-analysis-with-semgrep.html</link><description>&lt;p&gt;In this post we'll get a basic semgrep environment set up in Docker
 running some custom rules against our code.&lt;/p&gt;
@@ -2913,8 +2890,6 @@ write rules for things that don't already have linters like YAML
 or JSON configuration or Vagrantfiles.&lt;/p&gt;
 &lt;p&gt;It can be annoying to work around some missing docs in semgrep but
 overall it's a great tool for the kit.&lt;/p&gt;
-&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
-questions or ideas.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;&lt;a href="https://twitter.com/hashtag/semgrep?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#semgrep&lt;/a&gt; is a really neat tool for syntactic analysis. Here are a few simple examples (catch print statements, triple nested loops, etc.) using Docker. Includes some necessary info the docs don&amp;#39;t get into&lt;a href="https://t.co/UDHEH5JmOa"&gt;https://t.co/UDHEH5JmOa&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1340785372364738562?ref_src=twsrc%5Etfw"&gt;December 20, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/static-analysis-with-semgrep.html</guid><pubDate>Sun, 20 Dec 2020 00:00:00 +0000</pubDate></item><item><title>Emulating linux/AMD64 userland: interpreting an ELF binary</title><link>http://notes.eatonphil.com/emulating-amd64-starting-with-elf.html</link><description>&lt;p&gt;In this post we'll stumble toward a working emulator for a barebones C
 program compiled for linux/AMD64. The approach will be slightly more
@@ -3785,8 +3760,6 @@ goal.&lt;/p&gt;
 &lt;p&gt;Otherwise the typical goals are around getting syscall support,
 function call support, and porting these simple examples to Windows
 and macOS for the experience.&lt;/p&gt;
-&lt;h4 id="feedback"&gt;Feedback&lt;/h4&gt;&lt;p&gt;As always, I'd love to &lt;a href="mailto:me@eatonphil.com"&gt;hear from you&lt;/a&gt; with
-questions or ideas.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Here&amp;#39;s take two on writing an emulator for linux/amd64 in Go.  This time we&amp;#39;re starting with ELF binaries, but still ignoring libc and jumping straight to main.&lt;a href="https://t.co/A87r2RY21c"&gt;https://t.co/A87r2RY21c&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1332111601814691840?ref_src=twsrc%5Etfw"&gt;November 26, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/emulating-amd64-starting-with-elf.html</guid><pubDate>Thu, 26 Nov 2020 00:00:00 +0000</pubDate></item><item><title>The impact of management teams as a decision-making group, in startups and enterprise</title><link>http://notes.eatonphil.com/the-impact-of-management-teams-on-startups-and-enterprises.html</link><description>&lt;p&gt;Ambitious companies form management teams at every level above you,
 sometimes including you. Management teams meet periodically and have
@@ -3816,7 +3789,6 @@ important, or even necessary.&lt;/p&gt;
 &lt;p&gt;Or maybe management teams as a decision-making group are too easily a
 substitute for developing a grassroots culture of collaboration and
 trust between marketing, sales, product and development.&lt;/p&gt;
-&lt;h4 id="share"&gt;Share&lt;/h4&gt;&lt;p&gt;&lt;small&gt;&lt;a href="mailto:me@eatonphil.com"&gt;Tell me&lt;/a&gt; what you think!&lt;/small&gt;&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;New post! &amp;quot;management teams as a decision-making group are too easily a substitute for developing a grassroots culture of collaboration and trust between marketing, sales, product and development.&amp;quot;&lt;a href="https://t.co/7RukBMI59h"&gt;https://t.co/7RukBMI59h&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1328482381314084864?ref_src=twsrc%5Etfw"&gt;November 16, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/the-impact-of-management-teams-on-startups-and-enterprises.html</guid><pubDate>Wed, 11 Nov 2020 00:00:00 +0000</pubDate></item><item><title>Standard ML in 2020</title><link>http://notes.eatonphil.com/standard-ml-in-2020.html</link><description>&lt;p&gt;Incredibly, Standard ML implementations are still actively
 developed. &lt;a href="http://mlton.org/"&gt;MLton&lt;/a&gt;, &lt;a href="https://polyml.org"&gt;Poly/ML&lt;/a&gt;,
@@ -3867,7 +3839,7 @@ its small but definitely, surprisingly, not dead community. :)&lt;/p&gt;
 &lt;li&gt;&lt;a href="https://reddit.com/r/sml"&gt;/r/sml&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;Are you using Standard ML? &lt;a href="mailto:me@eatonphil.com"&gt;Let me know how/why!&lt;/a&gt;&lt;/p&gt;
-&lt;h4 id="share"&gt;Share&lt;/h4&gt;&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Standard ML implementations are still in active development! There have even been some interesting new implementations pop up in the last few years.&lt;a href="https://t.co/6kOcMKVfQa"&gt;https://t.co/6kOcMKVfQa&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1320487302418845696?ref_src=twsrc%5Etfw"&gt;October 25, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
+&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Standard ML implementations are still in active development! There have even been some interesting new implementations pop up in the last few years.&lt;a href="https://t.co/6kOcMKVfQa"&gt;https://t.co/6kOcMKVfQa&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1320487302418845696?ref_src=twsrc%5Etfw"&gt;October 25, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/standard-ml-in-2020.html</guid><pubDate>Sun, 25 Oct 2020 00:00:00 +0000</pubDate></item><item><title>The case for comments in code</title><link>http://notes.eatonphil.com/the-case-for-comments-in-code.html</link><description>&lt;p&gt;When I first started programming, especially when asked for code
 samples, my comments lacked purpose and would often duplicate in
 English what the code clearly indicated. I knew that "commenting is
@@ -3914,7 +3886,6 @@ immediate cause for that code to be modified with comments.&lt;/p&gt;
 &lt;p&gt;Maybe I wouldn't do this if Github/Gitlab exposed a Google Docs-like
 interface for browsing code line by line with links to all pull
 request comment threads.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;The biggest reason to add comments in code (often linking to documented oddities or bug reports) is because it&amp;#39;s impossible to search pull request threads historically in every source control management UI I&amp;#39;ve used.&lt;a href="https://t.co/JlHWfbUH5z"&gt;https://t.co/JlHWfbUH5z&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1303130504993136642?ref_src=twsrc%5Etfw"&gt;September 8, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/the-case-for-comments-in-code.html</guid><pubDate>Mon, 07 Sep 2020 00:00:00 +0000</pubDate></item><item><title>Writing a simple Python compiler: 1. hello, fibonacci</title><link>http://notes.eatonphil.com/writing-a-simple-python-compiler.html</link><description>&lt;p&gt;In this post we'll write a Python to C compiler in Python. This is
 especially easy to do since Python has a &lt;a href="https://docs.python.org/3/library/ast.html"&gt;builtin parser
@@ -4622,7 +4593,6 @@ compiler project for JavaScript targeting
 C++/libV8&lt;/a&gt;,
 the generated code was about the same or a little slower in speed.&lt;/p&gt;
 &lt;p&gt;I haven't gotten &lt;em&gt;that much&lt;/em&gt; better at writing these compilers.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Latest post up, on writing a simple Python to C compiler (in Python).&lt;a href="https://t.co/4kkji0XXbp"&gt;https://t.co/4kkji0XXbp&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1295134027335204865?ref_src=twsrc%5Etfw"&gt;August 16, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/writing-a-simple-python-compiler.html</guid><pubDate>Sun, 16 Aug 2020 00:00:00 +0000</pubDate></item><item><title>A single-node Kubernetes cluster without virtualization or a container registry</title><link>http://notes.eatonphil.com/a-single-node-kubernetes-cluster-without-virtualization-or-a-container-registry.html</link><description>&lt;p&gt;This post is a recipe for setting up a minimal Kubernetes cluster on
 Fedora without requiring virtualization or a container registry. These
@@ -4715,7 +4685,6 @@ $ curl localhost:5000
 Hello World, Flask
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;And that's it!&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Latest post is a recipe for creating a self-contained, single-node Kubernetes cluster for CI environments using a basic Flask app.&lt;a href="https://t.co/fegAZFEQzO"&gt;https://t.co/fegAZFEQzO&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1287163839306444800?ref_src=twsrc%5Etfw"&gt;July 25, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/a-single-node-kubernetes-cluster-without-virtualization-or-a-container-registry.html</guid><pubDate>Sat, 25 Jul 2020 00:00:00 +0000</pubDate></item><item><title>Generating a full-stack application from a database</title><link>http://notes.eatonphil.com/generating-a-full-stack-application-from-a-database.html</link><description>&lt;p&gt;&lt;a href="https://dbcore.org"&gt;DBCore&lt;/a&gt; can now generate a TypeScript/React CRUD
 UI that is automatically hooked up to the generated REST API (in Go).&lt;/p&gt;
@@ -4757,8 +4726,7 @@ browser application is hooked up to the similarly auto-generated API.&lt;/p&gt;
 &lt;div&gt;
   &lt;small&gt;Editing a table entity&lt;/small&gt;
   &lt;img style="border: 1px solid #ddd;" src="https://i.imgur.com/f2sRN1p.png"&gt;
-&lt;/div&gt;&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
-&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;What&amp;#39;s new in DBCore: a TypeScript/React UI generated from your database schema and hooked up to the similarly generated Go REST API.&lt;br&gt;&lt;br&gt;So you can now generate an entire full stack application from your database schema. Screenshots in the post.&lt;a href="https://t.co/BTGRVBsfUR"&gt;https://t.co/BTGRVBsfUR&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1272295312900661250?ref_src=twsrc%5Etfw"&gt;June 14, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;What&amp;#39;s new in DBCore: a TypeScript/React UI generated from your database schema and hooked up to the similarly generated Go REST API.&lt;br&gt;&lt;br&gt;So you can now generate an entire full stack application from your database schema. Screenshots in the post.&lt;a href="https://t.co/BTGRVBsfUR"&gt;https://t.co/BTGRVBsfUR&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1272295312900661250?ref_src=twsrc%5Etfw"&gt;June 14, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/generating-a-full-stack-application-from-a-database.html</guid><pubDate>Sun, 14 Jun 2020 00:00:00 +0000</pubDate></item><item><title>Generating a REST API from a database</title><link>http://notes.eatonphil.com/generating-a-rest-api-from-a-database.html</link><description>&lt;p&gt;I recently published an &lt;a href="https://eatonphil.github.io/dbcore/"&gt;alpha version of a code generation tool,
 DBCore,&lt;/a&gt; that reads a database
 schema from PostgreSQL or MySQL and generates an entire Go API with
@@ -4803,7 +4771,6 @@ delete.&lt;/p&gt;
 &lt;p&gt;Finally, while the tool only currently has a concept of "browser" and
 "api" templates, the project should be able to accept any kind of
 template and generate any text based on any database schema.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;New blog post, background and goals for dbcore&lt;a href="https://t.co/XW9gUCtvr0"&gt;https://t.co/XW9gUCtvr0&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1269467766727327745?ref_src=twsrc%5Etfw"&gt;June 7, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/generating-a-rest-api-from-a-database.html</guid><pubDate>Sat, 06 Jun 2020 00:00:00 +0000</pubDate></item><item><title>RFCs and asynchronous-first culture</title><link>http://notes.eatonphil.com/rfcs-and-asynchronous-first-culture.html</link><description>&lt;p&gt;I hated writing documentation before working on features. But after a
 while I realized I couldn't communicate well enough, even with folks I
@@ -4847,7 +4814,6 @@ understand and agree on &lt;em&gt;the problem&lt;/em&gt;.&lt;/p&gt;
 &lt;p&gt;Spending 30-60 minutes to draft a proposal is almost always easier. It
 makes the decision-making process faster and produces more accurate
 results.&lt;/p&gt;
-&lt;h4 id="comment"&gt;Comment&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Spending 30-60 minutes to draft a technical (or organizational) proposal is almost always easier for discussion and action than just scheduling a meeting. Or &amp;quot;my asynchronous-first manifesto&amp;quot;&lt;a href="https://t.co/gm4SUzBD2W"&gt;https://t.co/gm4SUzBD2W&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1261767623592869896?ref_src=twsrc%5Etfw"&gt;May 16, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/rfcs-and-asynchronous-first-culture.html</guid><pubDate>Sat, 16 May 2020 00:00:00 +0000</pubDate></item><item><title>Writing a SQL database from scratch in Go: 4. a database/sql driver</title><link>http://notes.eatonphil.com/database-basics-a-database-sql-driver.html</link><description>&lt;p class="note"&gt;
   Previously in database basics:
@@ -5146,7 +5112,6 @@ $ ./main
 Name: Terry, Age: 45
 Name: Anette, Age: 57
 &lt;/code&gt;&lt;/pre&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Next post in the database basics series, implementing a database/sql driver for more seamless interactions in Go.&lt;a href="https://t.co/AUZfUByNGE"&gt;https://t.co/AUZfUByNGE&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1259594720315047942?ref_src=twsrc%5Etfw"&gt;May 10, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/database-basics-a-database-sql-driver.html</guid><pubDate>Sun, 10 May 2020 00:00:00 +0000</pubDate></item><item><title>Writing a SQL database from scratch in Go: 3. indexes</title><link>http://notes.eatonphil.com/database-basics-indexes.html</link><description>&lt;p class="note"&gt;
   Previously in database basics:
@@ -5833,7 +5798,6 @@ Alloc = 341 MiB
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;The basic tradeoff that you can see is that for more memory and longer
 insertion times, you get a significantly faster lookup.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Very excited to share the latest database basics post on implementing indexes in gosql.&lt;a href="https://t.co/QHfjCe1XsC"&gt;https://t.co/QHfjCe1XsC&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1256209468133650433?ref_src=twsrc%5Etfw"&gt;May 1, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/database-basics-indexes.html</guid><pubDate>Fri, 01 May 2020 00:00:00 +0000</pubDate></item><item><title>Writing a SQL database from scratch in Go: 2. binary expressions and WHERE filters</title><link>http://notes.eatonphil.com/database-basics-expressions-and-where.html</link><description>&lt;p class="note"&gt;
   Previously in database basics:
@@ -6725,7 +6689,6 @@ ok
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;And that's it for now! In future posts we'll get into indices, joining
 tables, etc.&lt;/p&gt;
-&lt;h4 id="comment"&gt;Comment&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Latest post up in the database basics series: adding support for binary expressions and WHERE filtering in SELECTs.&lt;br&gt;&lt;br&gt;Much nicer to have a real table rendering library and readline implementation in the REPL too.&lt;a href="https://t.co/GYzn3FUNon"&gt;https://t.co/GYzn3FUNon&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1249426633347473408?ref_src=twsrc%5Etfw"&gt;April 12, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/database-basics-expressions-and-where.html</guid><pubDate>Sun, 12 Apr 2020 00:00:00 +0000</pubDate></item><item><title>Studying foreign languages with inbox zero</title><link>http://notes.eatonphil.com/studying-with-inbox-zero.html</link><description>&lt;p&gt;The only time I've been able to seriously, rapidly improve my ability
 to speak a foreign language was through intensive language courses in
@@ -6764,7 +6727,6 @@ interested. And if you know a service that can build and manage
 scheduled notifications against a spreadsheet or database I'd rather
 be looking at that.&lt;/p&gt;
 &lt;p&gt;We'll see how this works out.&lt;/p&gt;
-&lt;h4 id="comment"&gt;Comment&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Daily new words in my inbox feels like the only way I can &amp;quot;force&amp;quot; myself to get exposed to new vocabulary. Wish there were a service for scheduling notifications from a spreadsheet. Finally got to scripting GCal&amp;#39;s API populating daily events from 1000 most common Korean words&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1246557948068925441?ref_src=twsrc%5Etfw"&gt;April 4, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/studying-with-inbox-zero.html</guid><pubDate>Sat, 04 Apr 2020 00:00:00 +0000</pubDate></item><item><title>Reviewing the Surface Book 2</title><link>http://notes.eatonphil.com/reviewing-the-surface-book-2.html</link><description>&lt;p&gt;The first few paragraphs cover what I was looking for and what I
 considered. Then the review.&lt;/p&gt;
@@ -6889,7 +6851,6 @@ or Surface Laptop 3 next time.&lt;/p&gt;
 &lt;p&gt;But above all I can't shake the expectation that a laptop built in
 2020 running GMail and Slack in Chrome, Spotify, and a terminal
 application should last at least 10 hours.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Wrote a short post reviewing Microsoft&amp;#39;s Surface Book 2&lt;a href="https://t.co/0n6K3y6FBC"&gt;https://t.co/0n6K3y6FBC&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1241503107806384133?ref_src=twsrc%5Etfw"&gt;March 21, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/reviewing-the-surface-book-2.html</guid><pubDate>Wed, 18 Mar 2020 00:00:00 +0000</pubDate></item><item><title>Writing a SQL database from scratch in Go: 1. SELECT, INSERT, CREATE and a REPL</title><link>http://notes.eatonphil.com/database-basics.html</link><description>&lt;p class="note"&gt;
   Next in database basics:
@@ -8217,7 +8178,6 @@ ok
 &lt;/ul&gt;
 &lt;/li&gt;
 &lt;/ul&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet" data-conversation="none"&gt;&lt;p lang="en" dir="ltr"&gt;Latest blog post: writing a simple SQL database from scratch in Go &lt;a href="https://t.co/csQmNhWIEf"&gt;https://t.co/csQmNhWIEf&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1237522975143776256?ref_src=twsrc%5Etfw"&gt;March 10, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/database-basics.html</guid><pubDate>Fri, 06 Mar 2020 00:00:00 +0000</pubDate></item><item><title>A minimal REST API in Java</title><link>http://notes.eatonphil.com/a-minimal-rest-api-in-java.html</link><description>&lt;p&gt;There's a style of Java that is a joy to write. This post will cover
 how to set up a basic PostgreSQL-integrated REST API using
@@ -8727,7 +8687,6 @@ $ mvn exec:java
 ]
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;And we're done!&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;I really enjoy using Java for REST APIs, avoiding Spring and Play. Use simple but mature libraries that are no more difficult to cobble together than everything you must do in Go or Flask for a REST API. vs Go you get generics and vs python you get safety&lt;a href="https://t.co/twmjZprow6"&gt;https://t.co/twmjZprow6&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1223733417453465601?ref_src=twsrc%5Etfw"&gt;February 1, 2020&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/a-minimal-rest-api-in-java.html</guid><pubDate>Sat, 01 Feb 2020 00:00:00 +0000</pubDate></item><item><title>Writing a lisp compiler from scratch in JavaScript: 6. an x86 upgrade</title><link>http://notes.eatonphil.com/compiler-basics-an-x86-upgrade.html</link><description>&lt;p class="note"&gt;
   Previously in compiler basics:
@@ -9589,7 +9548,6 @@ $ ./build/prog
 6765
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;And we're in business!&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet" data-conversation="none"&gt;&lt;p lang="en" dir="ltr"&gt;Latest post in the compiler basics series: an x86 upgrade. We&amp;#39;ve got basic syscall support, &amp;quot;infinite&amp;quot; locals and parameters, and if/else. More than enough to handle printing integers to stdout and recursive fibonacci. &lt;a href="https://t.co/B3OV0vEX1V"&gt;https://t.co/B3OV0vEX1V&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1203816831456284677?ref_src=twsrc%5Etfw"&gt;December 8, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/compiler-basics-an-x86-upgrade.html</guid><pubDate>Sun, 08 Dec 2019 00:00:00 +0000</pubDate></item><item><title>Confusion and disengagement in meetings</title><link>http://notes.eatonphil.com/confusion-disengagement-in-meetings.html</link><description>&lt;p&gt;The quickest way to cut through confusion or disagreement among
 otherwise amiable and honest folks is to ask questions.&lt;/p&gt;
@@ -9606,7 +9564,6 @@ of the group and be willing to sound dumb.&lt;/p&gt;
 &lt;p&gt;If you aren't aware of confusion or disengagement, start paying
 attention. Addressing doesn't need to be hard and is personally
 meaningful.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Address confusion and disengagement in meetings by asking questions and summarizing, whether you&amp;#39;re confused or not. Question outcomes _and_ assumptions. &lt;a href="https://t.co/2OPifEBSq5"&gt;https://t.co/2OPifEBSq5&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1200972237756674049?ref_src=twsrc%5Etfw"&gt;December 1, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/confusion-disengagement-in-meetings.html</guid><pubDate>Sat, 30 Nov 2019 00:00:00 +0000</pubDate></item><item><title>Interpreting Go</title><link>http://notes.eatonphil.com/interpreting-go.html</link><description>&lt;p&gt;After spending some time at work on tooling for keeping documentation
 in sync with Go struct definitions I had enough exposure to Go's
@@ -10124,7 +10081,6 @@ $ ./goi fib.go
 233
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;We've got the basics of an interpreter for Golang.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet" data-conversation="none"&gt;&lt;p lang="en" dir="ltr"&gt;Here&amp;#39;s a blog post on building a simple AST interpreter for Go to support running a recursive fibonacci implementation &lt;a href="https://t.co/5Zz388d8ZN"&gt;https://t.co/5Zz388d8ZN&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1183039387170430976?ref_src=twsrc%5Etfw"&gt;October 12, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/interpreting-go.html</guid><pubDate>Sat, 12 Oct 2019 00:00:00 +0000</pubDate></item><item><title>Administering Kubernetes is hard</title><link>http://notes.eatonphil.com/administering-kubernetes-is-hard.html</link><description>&lt;p&gt;Kubernetes is easy to use after some exposure; it's pretty convenient
 too. But it is super hard to set up.&lt;/p&gt;
@@ -10494,7 +10450,6 @@ Total Test time (real) =   0.01 sec
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Now we're in a good place with most of the challenges of unit testing
 C code (i.e. ignoring mocks) past us.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;In preparation for a couple new articles on some C projects, here&amp;#39;s a foundational post on building C code and writing/running unit tests with gtest and cmake &lt;a href="https://t.co/aMVyr7LO73"&gt;https://t.co/aMVyr7LO73&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1167826536298405894?ref_src=twsrc%5Etfw"&gt;August 31, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/unit-testing-c-code-with-gtest.html</guid><pubDate>Sat, 31 Aug 2019 00:00:00 +0000</pubDate></item><item><title>Writing an x86 emulator from scratch in JavaScript: 2. system calls</title><link>http://notes.eatonphil.com/emulator-basics-system-calls.html</link><description>&lt;p class="note"&gt;
   Previously in emulator basics:
@@ -10670,7 +10625,6 @@ so that's low-hanging fruit. There are some other fun syscalls to
 implement that would also give us access to an emulated VGA card so we
 could render graphics. Syntactic support for string constants would
 also be convenient and more efficient.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Latest post in the emulator basics series up: implementing some syscalls starting with sys_exit and sys_write so we can print a nice hello message. &lt;a href="https://t.co/NEfId0lnJx"&gt;https://t.co/NEfId0lnJx&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/javascript?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#javascript&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/x86?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#x86&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1152689255900176386?ref_src=twsrc%5Etfw"&gt;July 20, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/emulator-basics-system-calls.html</guid><pubDate>Sat, 20 Jul 2019 00:00:00 +0000</pubDate></item><item><title>Writing a lisp compiler from scratch in JavaScript: 6. LLVM system calls</title><link>http://notes.eatonphil.com/compiler-basics-llvm-system-calls.html</link><description>&lt;p class="note"&gt;
   Previously in compiler basics:
@@ -10920,9 +10874,13 @@ $ ./build/a.out
 1234
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Looks good! In the next post we'll talk about tail call elimination.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;It&amp;#39;s been a slow month for the blog. But new post on compiler basics is up! Printing integers to stdout and making syscalls in LLVM (all without arrays). This was a pre-req for playing with tail-call elimination (post coming soon) &lt;a href="https://t.co/fDtblUZRI8"&gt;https://t.co/fDtblUZRI8&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1142808835700252678?ref_src=twsrc%5Etfw"&gt;June 23, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/compiler-basics-llvm-system-calls.html</guid><pubDate>Sat, 22 Jun 2019 00:00:00 +0000</pubDate></item><item><title>Writing an x86 emulator from scratch in JavaScript: 1. a stack and register machine</title><link>http://notes.eatonphil.com/emulator-basics-a-stack-and-register-machine.html</link><description>&lt;p class="note"&gt;
+  Better yet, take a look at this post walking through emulating x86 ELF binaries in Go:
+  &lt;br /&gt;
+  &lt;a href="/emulating-amd64-starting-with-elf.html"&gt;Emulating linux/AMD64 userland: interpreting an ELF binary&lt;/a&gt;
+  &lt;br /&gt;
+  &lt;br /&gt;
   Next up in emulator basics:
   &lt;! forgive me, for I have sinned &gt;
   &lt;br /&gt;
@@ -11412,7 +11370,6 @@ debugger&lt;/a&gt; around this emulator to
 help out with the logic and off-by-one errors. But ultimately it's
 been surprising to me how easy it is to get started -- especially when
 I'm not concerned about absolute correctness (yet).&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Here&amp;#39;s my first post on a series on emulator basics. It&amp;#39;s baby&amp;#39;s first stack and register virtual machine and it turns out it runs x86 code. &lt;a href="https://t.co/WiWmGedawt"&gt;https://t.co/WiWmGedawt&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/linux?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#linux&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/assembly?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#assembly&lt;/a&gt; &lt;a href="https://t.co/xjiMkhgpdN"&gt;https://t.co/xjiMkhgpdN&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1132036835964870657?ref_src=twsrc%5Etfw"&gt;May 24, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/emulator-basics-a-stack-and-register-machine.html</guid><pubDate>Tue, 21 May 2019 00:00:00 +0000</pubDate></item><item><title>Tail call elimination</title><link>http://notes.eatonphil.com/tail-call-elimination.html</link><description>&lt;p&gt;In this post we'll explore what tail calls are, why they are useful,
 and how they can be eliminated in an interpreter, a compiler targeting
@@ -11758,7 +11715,6 @@ function name to the tail state.&lt;/p&gt;
 post in my &lt;a href="http://notes.eatonphil.com/compiler-basics-llvm-conditionals.html"&gt;compiler
 basics&lt;/a&gt;
 series.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Put together a survey and summary of tail call elimination, the effect and implementation, in an interpreter, a compiler targeting C++, and a compiler targeting LLVM IR. &lt;a href="https://t.co/pXiLoXjw2u"&gt;https://t.co/pXiLoXjw2u&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1128640717679734784?ref_src=twsrc%5Etfw"&gt;May 15, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/tail-call-elimination.html</guid><pubDate>Tue, 14 May 2019 00:00:00 +0000</pubDate></item><item><title>Writing a lisp compiler from scratch in JavaScript: 4. LLVM conditionals and compiling fibonacci</title><link>http://notes.eatonphil.com/compiler-basics-llvm-conditionals.html</link><description>&lt;p class="note"&gt;
   Previously in compiler basics:
@@ -12015,7 +11971,6 @@ $ echo $?
 &lt;li&gt;Foreign function calls?&lt;/li&gt;
 &lt;li&gt;Self-hosting?&lt;/li&gt;
 &lt;/ul&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Latest post in the compiler basics series: using LLVM conditionals in compiling a fibonacci program &lt;a href="https://t.co/A72yEDQ8sd"&gt;https://t.co/A72yEDQ8sd&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1125072731408666624?ref_src=twsrc%5Etfw"&gt;May 5, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/compiler-basics-llvm-conditionals.html</guid><pubDate>Sat, 04 May 2019 00:00:00 +0000</pubDate></item><item><title>Responsibility and ownership</title><link>http://notes.eatonphil.com/responsibility-and-ownership.html</link><description>&lt;p&gt;Responsibility is only possible by granting ownership and setting
 expectations. If you don't turn over ownership, don't expect folks to
@@ -12346,7 +12301,6 @@ $ node interpreter.js test.ts
 &lt;p&gt;We're well on our way to interpreting TypeScript, and have gained some
 familiarity with the TypeScript Compiler API.&lt;/p&gt;
 &lt;p&gt;&lt;a href="https://github.com/eatonphil/jsi"&gt;All code is available on Github.&lt;/a&gt;&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Quick intro to the TypeScript Compiler API by writing an interpreter &lt;a href="https://t.co/QKz3XtOuP9"&gt;https://t.co/QKz3XtOuP9&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1117461518801604613?ref_src=twsrc%5Etfw"&gt;April 14, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/interpreting-typescript.html</guid><pubDate>Sun, 14 Apr 2019 00:00:00 +0000</pubDate></item><item><title>Writing a web server from scratch: 1. HTTP and sockets</title><link>http://notes.eatonphil.com/web-server-basics-http-and-sockets.html</link><description>&lt;p&gt;Say we have some HTML:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs html"&gt;&amp;lt;html&amp;gt;
@@ -12722,7 +12676,6 @@ the request. But we're a far shot from a more general library, a web
 framework. Future posts will explore this transition as well as
 performance and more features.&lt;/p&gt;
 &lt;p&gt;&lt;a href="https://github.com/eatonphil/uweb"&gt;Code is available on Github&lt;/a&gt;.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;First post in a new series on web server basics starting with HTTP and sockets (using JavaScript/Node.js). &lt;a href="https://t.co/uBiNfOBJeZ"&gt;https://t.co/uBiNfOBJeZ&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1114988522702823424?ref_src=twsrc%5Etfw"&gt;April 7, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/web-server-basics-http-and-sockets.html</guid><pubDate>Sat, 06 Apr 2019 00:00:00 +0000</pubDate></item><item><title>Writing a simple JSON path parser</title><link>http://notes.eatonphil.com/writing-a-simple-json-path-parser.html</link><description>&lt;p&gt;Let's say we want to implement a simple list filtering language so
 we can enter &lt;code&gt;a.b = 12&lt;/code&gt; and return only results in a
@@ -12934,7 +12887,6 @@ require(&amp;#39;assert&amp;#39;).deepEqual(getJsonPathParts(&amp;#39;foo.bar[0]
 course we wouldn't want to use this little library in production until
 we had some serious test coverage. But writing tests and calling out
 my mistakes will be left here as an exercise for the reader. :)&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;New (short) post on parsing JSON paths in JavaScript &lt;a href="https://t.co/mIjOMugA7C"&gt;https://t.co/mIjOMugA7C&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1111262461074784256?ref_src=twsrc%5Etfw"&gt;March 28, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/writing-a-simple-json-path-parser.html</guid><pubDate>Wed, 27 Mar 2019 00:00:00 +0000</pubDate></item><item><title>Writing a lisp compiler from scratch in JavaScript: 3. LLVM</title><link>http://notes.eatonphil.com/compiler-basics-llvm.html</link><description>&lt;p class="note"&gt;
   Previously in compiler basics:
@@ -13441,7 +13393,6 @@ _plus_two:                              ## @plus_two
 &lt;li&gt;Foreign function calls?&lt;/li&gt;
 &lt;li&gt;Self-hosting?&lt;/li&gt;
 &lt;/ul&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Adding an LLVM backend to ulisp (small Lisp compiler in JavaScript) &lt;a href="https://t.co/VIddKW1r3N"&gt;https://t.co/VIddKW1r3N&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1104795606365757442?ref_src=twsrc%5Etfw"&gt;March 10, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/compiler-basics-llvm.html</guid><pubDate>Sun, 10 Mar 2019 00:00:00 +0000</pubDate></item><item><title>AOT-compilation of Javascript with V8</title><link>http://notes.eatonphil.com/aot-compilation-of-javascript-with-v8.html</link><description>&lt;p&gt;tldr; I'm working on a AOT-compiled Javascript implementation called
 &lt;a href="https://github.com/eatonphil/jsc"&gt;jsc&lt;/a&gt;.&lt;/p&gt;
@@ -13749,7 +13700,6 @@ comparative performance to Node.js/V8 but isn't saying much).&lt;/p&gt;
 &lt;li&gt;Self-hosting&lt;/li&gt;
 &lt;li&gt;Node-API compatible runtime without Node&lt;/li&gt;
 &lt;/ul&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Companion blog post to my talk on an AOT-compiled Javascript implementation built on Typescript &lt;a href="https://t.co/0aHVJ9UzYh"&gt;https://t.co/0aHVJ9UzYh&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1100397733867859968?ref_src=twsrc%5Etfw"&gt;February 26, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/aot-compilation-of-javascript-with-v8.html</guid><pubDate>Tue, 26 Feb 2019 00:00:00 +0000</pubDate></item><item><title>Transparency and communication on small teams</title><link>http://notes.eatonphil.com/transparency-and-communication-on-small-teams.html</link><description>&lt;p&gt;I saw a post on
 &lt;a href="https://dev.to/vcarl/symptoms-of-a-dysfunctional-team-1c0"&gt;dev.to&lt;/a&gt;
@@ -13809,7 +13759,6 @@ every team member to report honestly and to do so without fear.&lt;/p&gt;
 senior/lead member of a small team to push responsibility for your
 team's work up to your stakeholders. This is the best position to be
 in.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;tldr; don&amp;#39;t let your folks overwork unnecessarily when you could be reporting more frequently/honestly on understood priorities and accomplishments achieved/not achieved &lt;a href="https://t.co/PeTe2Bq0Xz"&gt;https://t.co/PeTe2Bq0Xz&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1087722536236957697?ref_src=twsrc%5Etfw"&gt;January 22, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/transparency-and-communication-on-small-teams.html</guid><pubDate>Tue, 22 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Writing a lisp compiler from scratch in JavaScript: 2. user-defined functions and variables</title><link>http://notes.eatonphil.com/compiler-basics-functions.html</link><description>&lt;p class="note"&gt;
   Previously in compiler basics:
@@ -14229,7 +14178,6 @@ $ echo $?
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;And that's all there is to it! Stay tuned for the next post on
 conditionals and tail-call optimization.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Part two on compiler basics using JavaScript: user-defined functions and variables &lt;a href="https://t.co/XOam67HO8h"&gt;https://t.co/XOam67HO8h&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1087103061590446083?ref_src=twsrc%5Etfw"&gt;January 20, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/compiler-basics-functions.html</guid><pubDate>Sun, 20 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Windows</title><link>http://notes.eatonphil.com/windows.html</link><description>&lt;p&gt;It has been six years since I last used Windows for any remotely
 serious software development. I've used Ubuntu, Arch, or FreeBSD
@@ -14303,7 +14251,6 @@ excuse not to. You should run Linux or FreeBSD for the experience. But
 if you've reached diminishing returns in your Linux/FreeBSD use,
 Windows as a development environment has come a long way. It may be
 the best platform available for software development, the profession.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Some notes on my experience having replaced Arch Linux with Windows on my work laptop &lt;a href="https://t.co/8asxZmspwR"&gt;https://t.co/8asxZmspwR&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1086994000182153222?ref_src=twsrc%5Etfw"&gt;January 20, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/windows.html</guid><pubDate>Sun, 20 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Make small changes and solve the problems you have</title><link>http://notes.eatonphil.com/make-small-changes-and-solve-the-problems-you-have.html</link><description>&lt;p&gt;Two frustrating things that can happen in an organization are 1) big
 changes and 2) changes that aren’t clearly associated with a known
@@ -14357,7 +14304,6 @@ and has worked effectively in teams I’ve run so far.&lt;/p&gt;
 &lt;li&gt;&lt;a href="https://amzn.to/2LA34Ar"&gt;Thinking, Fast and Slow&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="https://amzn.to/2LDfQOz"&gt;Site Reliability Engineering: How Google Runs Production Systems&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Wrote a post expanding on a side of this: make small changes and solve the problems you have &lt;a href="https://t.co/FXepELSHMx"&gt;https://t.co/FXepELSHMx&lt;/a&gt; &lt;a href="https://t.co/mVsT1KFhKc"&gt;https://t.co/mVsT1KFhKc&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1078312937348059136?ref_src=twsrc%5Etfw"&gt;December 27, 2018&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/make-small-changes-and-solve-the-problems-you-have.html</guid><pubDate>Thu, 27 Dec 2018 00:00:00 +0000</pubDate></item><item><title>Writing a lisp compiler from scratch in JavaScript: 1. lisp to assembly</title><link>http://notes.eatonphil.com/compiler-basics-lisp-to-assembly.html</link><description>&lt;p class="note"&gt;
   Next in compiler basics:
@@ -14814,8 +14760,7 @@ available &lt;a href="https://github.com/eatonphil/ulisp"&gt;here&lt;/a&gt;.&lt;
 &lt;/ul&gt;
 &lt;/li&gt;
 &lt;/ul&gt;
-&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/languages/x86asm.min.js"&gt;&lt;/script&gt;&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
-&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Finished that intro to compilers post :) lisp to assembly in Javascript &lt;a href="https://t.co/0HDIn4Mv7a"&gt;https://t.co/0HDIn4Mv7a&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1066863077000441856?ref_src=twsrc%5Etfw"&gt;November 26, 2018&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
+&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/languages/x86asm.min.js"&gt;&lt;/script&gt;&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Finished that intro to compilers post :) lisp to assembly in Javascript &lt;a href="https://t.co/0HDIn4Mv7a"&gt;https://t.co/0HDIn4Mv7a&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1066863077000441856?ref_src=twsrc%5Etfw"&gt;November 26, 2018&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/compiler-basics-lisp-to-assembly.html</guid><pubDate>Tue, 20 Nov 2018 00:00:00 +0000</pubDate></item><item><title>On NYC, Tokyo and Seoul</title><link>http://notes.eatonphil.com/on-nyc-tokyo-and-seoul.html</link><description>&lt;p&gt;I’ve lived in NYC for the past year — moved here after years in Philly
 and after growing up in a rural community a few hours west of
 there. My wife is South Korean and last week concluded my second trip
@@ -15037,8 +14982,7 @@ policy, corporate structure, and life.&lt;/p&gt;
   P.s. I’m looking for book recommendations on the last 20 years of
   economic/political history in Japan and South Korean and on the last
   100 years of economic/political history in the US and NYC.
-&lt;/p&gt;&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
-&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Wrote a few points of comparison between &lt;a href="https://twitter.com/hashtag/nyc?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#nyc&lt;/a&gt;, &lt;a href="https://twitter.com/hashtag/seoul?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#seoul&lt;/a&gt;, and &lt;a href="https://twitter.com/hashtag/tokyo?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#tokyo&lt;/a&gt; after finishing a recent trip. &lt;a href="https://t.co/oKo4YlTZV3"&gt;https://t.co/oKo4YlTZV3&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1053645222402416641?ref_src=twsrc%5Etfw"&gt;October 20, 2018&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
+&lt;/p&gt;&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Wrote a few points of comparison between &lt;a href="https://twitter.com/hashtag/nyc?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#nyc&lt;/a&gt;, &lt;a href="https://twitter.com/hashtag/seoul?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#seoul&lt;/a&gt;, and &lt;a href="https://twitter.com/hashtag/tokyo?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#tokyo&lt;/a&gt; after finishing a recent trip. &lt;a href="https://t.co/oKo4YlTZV3"&gt;https://t.co/oKo4YlTZV3&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1053645222402416641?ref_src=twsrc%5Etfw"&gt;October 20, 2018&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/on-nyc-tokyo-and-seoul.html</guid><pubDate>Sat, 20 Oct 2018 00:00:00 +0000</pubDate></item><item><title>Why (and how) to read books</title><link>http://notes.eatonphil.com/why-and-how-to-read-books.html</link><description>&lt;p&gt;The last time I read for fun was in elementary school. Since college I
 knew I must read more, but I never forced myself to build the
 habit. Then three years ago I spent time around my brother and a
@@ -15991,8 +15935,7 @@ allow you to dynamically extend the lexer and parser in one step with
   code would look like in Standard ML, check out the &lt;a
   href="https://github.com/eatonphil/ponyo/blob/master/src/Encoding/Json.sml"&gt;JSON
   code in Ponyo&lt;/a&gt;.
-&lt;/p&gt;&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
-&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;I wrote a short post (and a corresponding Python library) explaining lexing and parsing with JSON &lt;a href="https://t.co/3yEZlcU6i5"&gt;https://t.co/3yEZlcU6i5&lt;/a&gt; &lt;a href="https://t.co/FbksvUO9aT"&gt;https://t.co/FbksvUO9aT&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/json?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#json&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/python?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#python&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/993251098931712005?ref_src=twsrc%5Etfw"&gt;May 6, 2018&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
+&lt;/p&gt;&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;I wrote a short post (and a corresponding Python library) explaining lexing and parsing with JSON &lt;a href="https://t.co/3yEZlcU6i5"&gt;https://t.co/3yEZlcU6i5&lt;/a&gt; &lt;a href="https://t.co/FbksvUO9aT"&gt;https://t.co/FbksvUO9aT&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/json?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#json&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/python?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#python&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/993251098931712005?ref_src=twsrc%5Etfw"&gt;May 6, 2018&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/writing-a-simple-json-parser.html</guid><pubDate>Sun, 06 May 2018 00:00:00 +0000</pubDate></item><item><title>Finishing up a FreeBSD experiment</title><link>http://notes.eatonphil.com/finishing-up-a-freebsd-experiment.html</link><description>&lt;p&gt;I've been using FreeBSD as my daily driver at work since
 December. I've successfully done my job and I've learned a hell of a
 lot forcing myself on CURRENT... But there's been a number of issues
@@ -16458,7 +16401,6 @@ was making poor use of Racket.&lt;/p&gt;
 &lt;h4 id="on-the-other-hand"&gt;On the other hand&lt;/h4&gt;&lt;p&gt;Common Lisp (its implementations and ecosystem) seems more robust and
 developed. SBCL, with it's great performance and native-thread
 support, is a promising candidate for backend web development.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;I wrote a post on putting together a Common Lisp project. It&amp;#39;s easy! I also included some of my favorite CL books and a digression on Scheme. &lt;a href="https://t.co/2LEDoFnAjk"&gt;https://t.co/2LEDoFnAjk&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/commonlisp?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#commonlisp&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/lisp?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#lisp&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/scheme?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#scheme&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/971398435856371712?ref_src=twsrc%5Etfw"&gt;March 7, 2018&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/starting-a-minimal-common-lisp-project.html</guid><pubDate>Mon, 05 Mar 2018 00:00:00 +0000</pubDate></item><item><title>First few hurdles writing a Scheme interpreter</title><link>http://notes.eatonphil.com/first-few-hurdles-writing-a-scheme-interpreter.html</link><description>&lt;p&gt;I started working on &lt;a href="https://github.com/eatonphil/bsdscheme"&gt;BSDScheme&lt;/a&gt; last October, inspired to get back
 into language implementation after my coworker built &lt;a href="https://github.com/briansteffens/bshift"&gt;bshift&lt;/a&gt;, a
@@ -16536,7 +16478,6 @@ tests, combining the needlessly split out lexing and parsing stage
 into a single read function that can be exposed into the language,
 fleshing out R7RS library support, and looking more into LLVM as a
 backend.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Wrote a full post on the first few hurdles faced writing a Scheme interpreter in D &lt;a href="https://t.co/Cyjy7pk3OB"&gt;https://t.co/Cyjy7pk3OB&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/scheme?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#scheme&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/schemelang?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#schemelang&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/lisp?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#lisp&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/dlang?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#dlang&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/951091952740651008?ref_src=twsrc%5Etfw"&gt;January 10, 2018&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/first-few-hurdles-writing-a-scheme-interpreter.html</guid><pubDate>Wed, 10 Jan 2018 00:00:00 +0000</pubDate></item><item><title>Deploying FreeBSD on Linode unattended in minutes</title><link>http://notes.eatonphil.com/deploying-freebsd-on-linode-unattended-in-minutes.html</link><description>&lt;p&gt;I became a FreeBSD user over 2 years ago when I wanted to see what all
 the fuss was about. I swapped my y410p dual-booting Windows / Ubuntu
@@ -16608,7 +16549,6 @@ need help, you are probably limited to community support. You can also
 find me with any questions (peaton on OFTC). But for me this is at
 least a slight improvement on having to run through the install
 process every time I need a new FreeBSD Linode.&lt;/p&gt;
-&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Deploy FreeBSD and OpenBSD unattended on Linode &lt;a href="https://t.co/j5A46ROqNM"&gt;https://t.co/j5A46ROqNM&lt;/a&gt; &lt;a href="https://t.co/HSqrIvBMFj"&gt;https://t.co/HSqrIvBMFj&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/840736360864591872?ref_src=twsrc%5Etfw"&gt;March 12, 2017&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/deploying-freebsd-on-linode-unattended-in-minutes.html</guid><pubDate>Sat, 11 Mar 2017 00:00:00 +0000</pubDate></item><item><title>Walking through a basic Racket web service</title><link>http://notes.eatonphil.com/walking-through-a-basic-racket-web-service.html</link><description>&lt;p&gt;Racket is an impressive language and ecosystem. Compared to Python,
 Racket (an evolution of Scheme &lt;a href="https://en.wikipedia.org/wiki/Scheme_(programming_language)"&gt;R5RS&lt;/a&gt; is three years younger. It is
@@ -16825,6 +16765,5 @@ more advanced web service.&lt;/p&gt;
   racket.org docs would link directly to the source of a function when
   the function is documented. Of course I could just download the
   Racket source and start grepping... but I'm only so interested.
-&lt;/p&gt;&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/languages/scheme.min.js"&gt;&lt;/script&gt;&lt;h4 id="comments"&gt;Comments&lt;/h4&gt;&lt;p&gt;Please reply on Twitter with questions or comments.&lt;/p&gt;
-&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Walking through a basic Racket web service &lt;a href="https://t.co/J3us48kzga"&gt;https://t.co/J3us48kzga&lt;/a&gt; &lt;a href="https://twitter.com/racketlang?ref_src=twsrc%5Etfw"&gt;@racketlang&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/814674473681121280?ref_src=twsrc%5Etfw"&gt;December 30, 2016&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
+&lt;/p&gt;&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/languages/scheme.min.js"&gt;&lt;/script&gt;&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Walking through a basic Racket web service &lt;a href="https://t.co/J3us48kzga"&gt;https://t.co/J3us48kzga&lt;/a&gt; &lt;a href="https://twitter.com/racketlang?ref_src=twsrc%5Etfw"&gt;@racketlang&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/814674473681121280?ref_src=twsrc%5Etfw"&gt;December 30, 2016&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/walking-through-a-basic-racket-web-service.html</guid><pubDate>Thu, 29 Dec 2016 00:00:00 +0000</pubDate></item></channel></rss>

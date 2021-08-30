@@ -118,6 +118,7 @@ HOME_PAGE = """
   </div>
 </div>
 -->
+<style>.feedback{{display:none;}}</style>
 """
 TEMPLATE = open('template.html').read()
 TAG = "Notes on software, organizations, product development, and professional growth"
