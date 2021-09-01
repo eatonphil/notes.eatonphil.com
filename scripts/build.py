@@ -48,6 +48,12 @@ HOME_PAGE = """
     and <a
     href="https://www.goodreads.com/user/show/50930981-phil-eaton">Goodreads</a>.
   </p>
+  <p>
+    I run a <a href="https://discord.gg/xGPcYTMNwW">Discord community
+    for developers</a> working on or interested in challenging
+    programming projects like compilers, databases, emulators,
+    etc. Come to share and learn from other folks!
+  </p>
 </div>
 <div class="fp-section fp-section--notes">
   <h2 class="fp-h2">Archive</h2>
