@@ -2,14 +2,19 @@
 ## September 21, 2021
 ###### javascript,nodejs,compilers,interpreters
 
-V8 gets all the attention! It's used in Chrome, (by extension)
-Microsoft Edge, and Node.js. The other extremely mainstream JavaScript
-implementations after that are 1) JavaScriptCore used in Safari and
-other WebKit browsers and 2) SpiderMonkey used in Firefox.
+V8 is, I'm sure, the most used implementation of JavaScript
+today. Used in Chrome, (and by extension) Microsoft Edge, Node.js,
+etc. Safari's JavaScriptCore and Firefox's SpiderMonkey are also
+contenders for extremely mainstream implementations.
 
-I'm not going to cover the details of V8, JavaScriptCore, or
-SpiderMonkey because they are massive and hide multiple various
-interpreters and compilers inside. Plus, you already know about them.
+But what else is out there? What if I want to embed JavaScript in a C
+program, or a Go program, or a Rust program, or a Java program(, and so
+on)? It turns out there are a ton of high-quality implementations out there.
+
+This post describes a number of them and their implementation choices
+in detail. I'm not going to cover V8, JavaScriptCore, or SpiderMonkey
+because they are massive and hide multiple various interpreters and
+compilers inside. Plus, you already know about them.
 
 <p class="note">
   I'm going to miss some implementations and get some details
