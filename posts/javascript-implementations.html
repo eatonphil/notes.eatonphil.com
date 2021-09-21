@@ -197,14 +197,32 @@ AssemblyScript's case, not JavaScript.
   * Implementation language: AssemblyScript subset of TypeScript
   * Runtime: [webassembly](https://github.com/AssemblyScript/assemblyscript/blob/main/src/compiler.ts)
   * Parser: [Hand-written](https://github.com/AssemblyScript/assemblyscript/blob/main/src/parser.ts)
+* [JavaScript in Kawa Scheme](https://github.com/nickmain/kawa-scheme/tree/master/gnu/ecmascript)
+* [JavaScript in GNU Guile Scheme](https://wingolog.org/archives/2009/02/22/ecmascript-for-guile)
+
+### Research Implementations
+
+* [Higgs](https://github.com/higgsjs/Higgs)
+  * Support: Unclear
+  * Implementation language: D
+  * Runtime: [Bytecode VM](https://github.com/higgsjs/Higgs/blob/master/source/runtime/vm.d) and [JIT compileron x64](https://github.com/higgsjs/Higgs/tree/master/source/jit)
+  * Parser: [Hand-written](https://github.com/higgsjs/Higgs/blob/master/source/parser/parser.d)
+* [eJS](https://github.com/tugawa/ejs-new)
+  * Support: Unclear
+  * Implementation language: Java
+  * Runtime: Bytecode VM
+  * Parser: ANTLR
+  * Notes: eJS is a framework to generate JavaScript VMs that are specialised for applications.
 * [Jessie](https://github.com/endojs/Jessie): safe subset of JavaScript non-exploitable smart contracts
   * Support: some subset of ES2017
   * ???
   * See [https://github.com/agoric-labs/jessica](https://github.com/agoric-labs/jessica) for more info.
-* [JavaScript in Kawa Scheme](https://github.com/nickmain/kawa-scheme/tree/master/gnu/ecmascript)
-* [JavaScript in GNU Guile Scheme](https://wingolog.org/archives/2009/02/22/ecmascript-for-guile)
 
-#### Notable Abandoned
+<p class="note">
+  Thanks to <a href="https://twitter.com/smarr">@smarr</a> for contributing eJS and Higgs!
+</p>
+
+### Notable Abandoned
 
 * [twostroke](https://github.com/haileys/twostroke)
   * Support: Unclear
@@ -232,7 +250,7 @@ AssemblyScript's case, not JavaScript.
   * Runtime: [AST interpreter](https://github.com/polydojo/jispy/blob/master/jispy.py#L730)
   * Parser: [Unclear](https://github.com/polydojo/jispy/blob/master/jispy.py#L311)
 
-#### Notable toy implementations
+### Notable toy implementations
 
 Great for inspiriration if you've never implemented a language before.
 

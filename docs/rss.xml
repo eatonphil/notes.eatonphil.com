@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 21 Sep 2021 22:07:54 +0000</lastBuildDate><item><title>Enumerating and analyzing 40+ non-V8 JavaScript implementations</title><link>http://notes.eatonphil.com/javascript-implementations.html</link><description>&lt;p&gt;V8 is, I'm sure, the most used implementation of JavaScript
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 21 Sep 2021 22:28:27 +0000</lastBuildDate><item><title>Enumerating and analyzing 40+ non-V8 JavaScript implementations</title><link>http://notes.eatonphil.com/javascript-implementations.html</link><description>&lt;p&gt;V8 is, I'm sure, the most used implementation of JavaScript
 today. Used in Chrome, (and by extension) Microsoft Edge, Node.js,
 etc. Safari's JavaScriptCore and Firefox's SpiderMonkey are also
 contenders for extremely mainstream implementations.&lt;/p&gt;
@@ -225,16 +225,35 @@ AssemblyScript's case, not JavaScript.&lt;/p&gt;
 &lt;li&gt;Parser: &lt;a href="https://github.com/AssemblyScript/assemblyscript/blob/main/src/parser.ts"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
 &lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/nickmain/kawa-scheme/tree/master/gnu/ecmascript"&gt;JavaScript in Kawa Scheme&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://wingolog.org/archives/2009/02/22/ecmascript-for-guile"&gt;JavaScript in GNU Guile Scheme&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id="research-implementations"&gt;Research Implementations&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://github.com/higgsjs/Higgs"&gt;Higgs&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: Unclear&lt;/li&gt;
+&lt;li&gt;Implementation language: D&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/higgsjs/Higgs/blob/master/source/runtime/vm.d"&gt;Bytecode VM&lt;/a&gt; and &lt;a href="https://github.com/higgsjs/Higgs/tree/master/source/jit"&gt;JIT compileron x64&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/higgsjs/Higgs/blob/master/source/parser/parser.d"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/tugawa/ejs-new"&gt;eJS&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: Unclear&lt;/li&gt;
+&lt;li&gt;Implementation language: Java&lt;/li&gt;
+&lt;li&gt;Runtime: Bytecode VM&lt;/li&gt;
+&lt;li&gt;Parser: ANTLR&lt;/li&gt;
+&lt;li&gt;Notes: eJS is a framework to generate JavaScript VMs that are specialised for applications.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
 &lt;li&gt;&lt;a href="https://github.com/endojs/Jessie"&gt;Jessie&lt;/a&gt;: safe subset of JavaScript non-exploitable smart contracts&lt;ul&gt;
 &lt;li&gt;Support: some subset of ES2017&lt;/li&gt;
 &lt;li&gt;???&lt;/li&gt;
 &lt;li&gt;See &lt;a href="https://github.com/agoric-labs/jessica"&gt;https://github.com/agoric-labs/jessica&lt;/a&gt; for more info.&lt;/li&gt;
 &lt;/ul&gt;
 &lt;/li&gt;
-&lt;li&gt;&lt;a href="https://github.com/nickmain/kawa-scheme/tree/master/gnu/ecmascript"&gt;JavaScript in Kawa Scheme&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="https://wingolog.org/archives/2009/02/22/ecmascript-for-guile"&gt;JavaScript in GNU Guile Scheme&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
-&lt;h4 id="notable-abandoned"&gt;Notable Abandoned&lt;/h4&gt;&lt;ul&gt;
+&lt;p class="note"&gt;
+  Thanks to &lt;a href="https://twitter.com/smarr"&gt;@smarr&lt;/a&gt; for contributing eJS and Higgs!
+&lt;/p&gt;&lt;h3 id="notable-abandoned"&gt;Notable Abandoned&lt;/h3&gt;&lt;ul&gt;
 &lt;li&gt;&lt;a href="https://github.com/haileys/twostroke"&gt;twostroke&lt;/a&gt;&lt;ul&gt;
 &lt;li&gt;Support: Unclear&lt;/li&gt;
 &lt;li&gt;Implementation language: Ruby&lt;/li&gt;
@@ -271,7 +290,7 @@ AssemblyScript's case, not JavaScript.&lt;/p&gt;
 &lt;/ul&gt;
 &lt;/li&gt;
 &lt;/ul&gt;
-&lt;h4 id="notable-toy-implementations"&gt;Notable toy implementations&lt;/h4&gt;&lt;p&gt;Great for inspiriration if you've never implemented a language before.&lt;/p&gt;
+&lt;h3 id="notable-toy-implementations"&gt;Notable toy implementations&lt;/h3&gt;&lt;p&gt;Great for inspiriration if you've never implemented a language before.&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="https://github.com/thomasebsmith/armadillo"&gt;https://github.com/thomasebsmith/armadillo&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="https://github.com/DelSkayn/toyjs"&gt;https://github.com/DelSkayn/toyjs&lt;/a&gt;&lt;/li&gt;
