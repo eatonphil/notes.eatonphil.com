@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Enumerating and analyzing 40 non-V8 JavaScript implementations | notes.eatonphil.com</title>
+    <meta name="description" content="Enumerating and analyzing 40 non-V8 JavaScript implementations" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <div class="row">
+	    <a href="/" class="sm-link">
+              Home
+            </a>
+	    <a href="/rss.xml" class="sm-link">
+              RSS
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+
+          <h2>September 21, 2021</h2>
+          <h1>Enumerating and analyzing 40 non-V8 JavaScript implementations</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/javascript.html" class="tag">javascript</a><a href="/tags/nodejs.html" class="tag">nodejs</a><a href="/tags/compilers.html" class="tag">compilers</a><a href="/tags/interpreters.html" class="tag">interpreters</a></div>
+          </div>
+	</div>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="col-6">
+        <p>V8 gets all the attention! It's used in Chrome, (by extension)
+Microsoft Edge, and Node.js. The other extremely mainstream JavaScript
+implementations after that are 1) JavaScriptCore used in Safari and
+other WebKit browsers and 2) SpiderMonkey used in Firefox.</p>
+<p>I'm not going to cover the details of V8, JavaScriptCore, or
+SpiderMonkey because they are massive and hide multiple various
+interpreters and compilers inside. Plus, you already know about them.</p>
+<p class="note">
+  I'm going to miss some implementations and get some details
+  wrong. Please <a href="https://twitter.com/phil_eaton">Tweet</a> or
+  <a href="mailto:phil@eatonphil.com">email</a> with your corrections! I'd be
+  particularly interested to hear about pure-research; and commercial,
+  closed-source implementations of JavaScript.
+</p><h3 id="corporate-backed">Corporate-backed</h3><p>These are implementations that would make sense to look into for your
+own commercial, production applications.</p>
+<h4 id="on-the-jvm">On the JVM</h4><ul>
+<li><a href="https://github.com/oracle/graaljs">Oracle's GraalJS</a>: compiles JavaScript to JVM bytecode or GraalVM<ul>
+<li>Support: Full compatibility with latest ECMAScript specification</li>
+<li>Corporate backer: Oracle</li>
+<li>Implementation language: Java</li>
+<li>Runtime: <a href="https://www.graalvm.org/">GraalVM</a> or <a href="https://www.graalvm.org/reference-manual/js/RunOnJDK/">stock JDK</a></li>
+<li>Parser: <a href="https://github.com/oracle/graaljs/blob/master/graal-js/src/com.oracle.js.parser/src/com/oracle/js/parser/Parser.java">Hand-written</a></li>
+<li>First release: <a href="https://github.com/oracle/graaljs/releases/tag/vm-19.0.0">2019?</a></li>
+<li>Notes: Replaced Nashorn as the default JavaScript implementation in JDK.</li>
+</ul>
+</li>
+<li><a href="https://github.com/mozilla/rhino">Mozilla's Rhino</a>: interprets and compiles JavaScript to JVM bytecode<ul>
+<li>Support: ES6</li>
+<li>Implementation language: Java</li>
+<li>Runtime: Both <a href="https://github.com/mozilla/rhino/blob/master/src/org/mozilla/javascript/Interpreter.java">interpreted through custom bytecode VM</a> and interpreted <a href="https://github.com/mozilla/rhino/blob/master/src/org/mozilla/javascript/optimizer/Codegen.java">after compiling to JVM bytecode</a> as an optimization</li>
+<li>Parser: <a href="https://github.com/mozilla/rhino/blob/master/src/org/mozilla/javascript/Parser.java">Hand-written</a></li>
+<li>First release: <a href="http://udn.realityripple.com/docs/Mozilla/Projects/Rhino/History">1998?</a></li>
+<li>Notes: Replaced by Nashorn as the default JavaScript engine on the JVM, but remains actively developed.</li>
+</ul>
+</li>
+<li><a href="https://github.com/openjdk/nashorn">Oracle's Nashorn</a>: compiles JavaScript to JVM bytecode<ul>
+<li>Support: ES5</li>
+<li>Corporate backer: Oracle</li>
+<li>Implementation language: Java</li>
+<li>Runtime: compiles to <a href="https://github.com/openjdk/nashorn/tree/main/src/org.openjdk.nashorn/share/classes/org/openjdk/nashorn/internal/codegen">JVM bytecode</a></li>
+<li>Parser: <a href="https://github.com/openjdk/nashorn/blob/main/src/org.openjdk.nashorn/share/classes/org/openjdk/nashorn/internal/parser/Parser.java">Hand-written</a></li>
+<li>First release: <a href="https://blogs.oracle.com/nashorn/open-for-business">2012?</a></li>
+<li>Notes: Replaced Rhino as default JavaScript implementation on JVM. Replaced by GraalJS more recently, but remains actively developed.</li>
+</ul>
+</li>
+</ul>
+<h4 id="embeddable">Embeddable</h4><ul>
+<li><a href="https://github.com/bellard/quickjs">Fabrice Bellard's QuickJS</a><ul>
+<li>Support: ES2020</li>
+<li>Implementation language: C</li>
+<li>Runtime: <a href="https://raw.githubusercontent.com/bellard/quickjs/master/quickjs.c">Bytecode VM</a> (this is a single large file)</li>
+<li>Parser: <a href="https://raw.githubusercontent.com/bellard/quickjs/master/quickjs.c">Hand-written</a> (this is a single large file)</li>
+<li>First release: <a href="https://github.com/bellard/quickjs/commit/91459fb6723e29e923380cec0023af93819ae69d#diff-ead07c84baac57a9542f388a07a2a5209456ce790b04251bc9bd7d179ea85cb1R84">2019</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/nginx/njs">Nginx's njs</a><ul>
+<li>Support: ES5</li>
+<li>Implementation language: C</li>
+<li>Runtime: <a href="https://github.com/nginx/njs/blob/master/src/njs_vmcode.c">Bytecode VM</a></li>
+<li>Parser: <a href="https://github.com/nginx/njs/blob/master/src/njs_parser.c">Hand-written</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/svaarala/duktape">DuktapeJS</a><ul>
+<li>Support: ES5, some parts of ES6/ES7</li>
+<li>Implementation language: C</li>
+<li>Runtime: <a href="https://github.com/svaarala/duktape/blob/master/src-input/duk_js_executor.c">Bytecode VM</a></li>
+<li>Parser: <a href="https://github.com/svaarala/duktape/blob/master/src-input/duk_js_compiler.c">Hand-written</a>, notably with no AST. It just directly compiles to its own bytecode.</li>
+<li>First release: <a href="https://duktape.org/download.html">2013</a></li>
+</ul>
+</li>
+<li><a href="https://mp2.dk/techblog/chowjs/">ChowJS</a>: proprietary AOT compiler based on QuickJS for game developers<ul>
+<li>Support: everything QuickJS does presumably</li>
+<li>Implementation language: C presumably</li>
+<li>Runtime: QuickJS's bytecode interpreter but also an AOT compiler</li>
+<li>Parser: QuickJS's presumably</li>
+<li>First release: <a href="https://mp2.dk/techblog/chowjs/">2021</a></li>
+<li>Notes: Code is not available so exact analysis on these points is not possible at the moment.</li>
+</ul>
+</li>
+</ul>
+<h4 id="embedded-systems">Embedded Systems</h4><ul>
+<li><a href="https://github.com/Samsung/escargot">Samsung's Escargot</a><ul>
+<li>Support: ES2020</li>
+<li>Implementation language: C++</li>
+<li>Runtime: <a href="https://github.com/Samsung/escargot/tree/master/src/interpreter">Bytecode VM</a></li>
+<li>Parser: <a href="https://github.com/Samsung/escargot/tree/master/src/parser">Hand-written</a></li>
+<li>First release: <a href="https://github.com/Samsung/escargot/graphs/contributors">2017?</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/espruino/Espruino">Espruino</a><ul>
+<li>Support: parts of ES5, ES6, ES7/8</li>
+<li>Implementation language: C</li>
+<li>Runtime: Seems like direct recursive interpreting without an AST/intermediate form</li>
+<li>Parser: <a href="https://github.com/espruino/Espruino/blob/master/src/jsparse.c">Hand-written</a></li>
+<li>First release: <a href="https://github.com/espruino/Espruino/releases/tag/BEFORE_FUNCTION_REFACTOR">2012?</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/cesanta/elk">Cesanta's Elk</a><ul>
+<li>Support: subset of ES6</li>
+<li>Implementation language: C</li>
+<li>Runtime: <a href="https://github.com/cesanta/elk/blob/master/elk.c">Direct recursive interpreter without AST or bytecode VM</a></li>
+<li>Parser: <a href="https://github.com/cesanta/elk/blob/master/elk.c">Hand-written</a></li>
+<li>First release: <a href="https://github.com/cesanta/elk/releases/tag/0.0.1">2019?</a></li>
+<li>Notes: It does all of this with a GC and FFI in &lt;1400 lines of readable C code. Damn.</li>
+</ul>
+</li>
+<li><a href="https://github.com/cesanta/mjs">Cesanta's mJS</a><ul>
+<li>Support: subset of ES6</li>
+<li>Implementation language: C</li>
+<li>Runtime: <a href="https://github.com/cesanta/mjs/blob/master/mjs.c#L3411">Bytecode VM</a></li>
+<li>Parser: <a href="https://github.com/cesanta/mjs/blob/master/mjs.c#L12780">Hand-written</a></li>
+<li>First release: <a href="https://github.com/cesanta/mjs/releases/tag/1.5">2017?</a></li>
+</ul>
+</li>
+</ul>
+<h4 id="other">Other</h4><ul>
+<li><a href="https://github.com/facebook/hermes">Facebook's Hermes</a><ul>
+<li>Support: ES6 <a href="https://hermesengine.dev/docs/language-features">with exceptions</a></li>
+<li>Implementation language: C++</li>
+<li>Runtime: <a href="https://github.com/facebook/hermes/tree/main/lib/VM">Bytecode VM</a></li>
+<li>Parser: <a href="https://github.com/facebook/hermes/blob/main/lib/Parser/JSParserImpl.cpp">Hand-written</a></li>
+<li>First release: <a href="https://github.com/facebook/hermes/releases/tag/v0.0.1">2019?</a></li>
+</ul>
+</li>
+</ul>
+<h3 id="mature,-community-driven">Mature, community-driven</h3><p>Although these are all at least somewhat mature, some are also
+experimental and don't yet support various specifications.</p>
+<p>If you are a looking to get involved in language development, these
+implementations can be a great place to start since they typically
+need work in documentation, testing, and language features.</p>
+<ul>
+<li><a href="https://github.com/engine262/engine262">engine262</a><ul>
+<li>Support: 100% spec compliance</li>
+<li>Implementation language: JavaScript</li>
+<li>Runtime: <a href="https://github.com/engine262/engine262/blob/14f50592362d889289e133fff4200e8e304c995a/src/runtime-semantics/IfStatement.mjs">AST interpreter</a></li>
+<li>Parser: <a href="https://github.com/engine262/engine262/blob/main/src/parser/ExpressionParser.mjs">Hand-written</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/jerryscript-project/jerryscript">JerryScript</a><ul>
+<li>Support: ES5</li>
+<li>Implementation language: C</li>
+<li>Runtime: <a href="https://github.com/jerryscript-project/jerryscript/blob/master/jerry-core/vm/vm.c">Bytecode VM</a></li>
+<li>Parser: <a href="https://github.com/jerryscript-project/jerryscript/blob/master/jerry-core/parser/js/js-parser.c">Hand-written</a></li>
+<li>First release: <a href="https://github.com/jerryscript-project/jerryscript/releases/tag/v1.0">2016?</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/dop251/goja">goja</a>: JavaScript interpreter for Go<ul>
+<li>Support: ES5</li>
+<li>Implementation language: Go</li>
+<li>Runtime: <a href="https://github.com/dop251/goja/blob/master/vm.go">Bytecode VM</a></li>
+<li>Parser: <a href="https://github.com/dop251/goja/blob/master/parser/statement.go">Hand-written</a></li>
+<li>First release: <a href="https://github.com/dop251/goja/graphs/contributors">2017?</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/robertkrimen/otto">otto</a>: JavaScript interpreter for Go<ul>
+<li>Support: ES5</li>
+<li>Implementation language: Go</li>
+<li>Runtime: <a href="https://github.com/robertkrimen/otto/blob/373ff54384526e8336b5b597619d0923a4a83ae0/cmpl_evaluate_expression.go#L183">AST interpreter</a></li>
+<li>Parser: <a href="https://github.com/robertkrimen/otto/blob/master/parser/statement.go">Hand-written</a></li>
+<li>First release: <a href="https://github.com/robertkrimen/otto/graphs/contributors">2012?</a></li>
+<li>Notes: The AST interpreter-only implementation might suggest this implementation is slower than Goja. I don't have benchmarks for that.</li>
+</ul>
+</li>
+<li><a href="https://github.com/paulbartrum/jurassic">Jurassic</a>: JavaScript parser and interpreter for .NET<ul>
+<li>Support: ES5</li>
+<li>Implementation language: C#</li>
+<li>Runtime: Compiles to <a href="https://github.com/paulbartrum/jurassic/blob/ee6f4fa17e6205e15412a214b24d7575b0bd461c/Jurassic/Compiler/MethodGenerator/GlobalOrEvalMethodGenerator.cs#L139">.NET</a></li>
+<li>Parser: <a href="https://github.com/paulbartrum/jurassic/blob/master/Jurassic/Compiler/Parser/Parser.cs">Hand-written</a></li>
+<li>First release: <a href="https://github.com/paulbartrum/jurassic/graphs/contributors">2011?</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/nilproject/NiL.JS">NiL.JS</a><ul>
+<li>Support: ES6</li>
+<li>Implementation language: C#</li>
+<li>Runtime: <a href="https://github.com/nilproject/NiL.JS/blob/develop/NiL.JS/Expressions/Assignment.cs">AST interpreter</a></li>
+<li>Parser: <a href="https://github.com/nilproject/NiL.JS/blob/develop/NiL.JS/Core/Parser.cs">Hand-written</a></li>
+<li>First release: <a href="https://github.com/nilproject/NiL.JS/graphs/contributors">2014?</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS">Serenity's LibJS</a><ul>
+<li>Support: <a href="https://github.com/linusg/libjs-test262">Maybe most of it? Unclear</a></li>
+<li>Implementation language: C++</li>
+<li>Runtime: <a href="https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS/Bytecode">Bytecode VM</a></li>
+<li>Parser: <a href="https://github.com/SerenityOS/serenity/blob/master/Userland/Libraries/LibJS/Parser.cpp">Hand-written</a></li>
+<li>Notes: Doesn't seem to be available for other operating systems. But that would be neat!</li>
+</ul>
+</li>
+<li><a href="https://github.com/NeilFraser/JS-Interpreter">Neil Fraser's JS-Interpreter</a><ul>
+<li>Support: ES5</li>
+<li>Implementation language: JavaScript</li>
+<li>Runtime: <a href="https://github.com/NeilFraser/JS-Interpreter/blob/master/interpreter.js">AST interpreter</a></li>
+<li>Parser: <a href="https://github.com/NeilFraser/JS-Interpreter/blob/master/acorn.js">Hand-written, uses Acorn</a></li>
+<li>First release: <a href="https://github.com/NeilFraser/JS-Interpreter/graphs/contributors">2014?</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/BeRo1985/besen">BESEN</a>: Bytecode VM and JIT compiler in Object Pascal<ul>
+<li>Support: ES5</li>
+<li>Implementation language: Object Pascal</li>
+<li>Runtime: <a href="https://github.com/BeRo1985/besen/blob/master/src/BESENCode.pas">Bytecode VM</a> with <a href="https://github.com/BeRo1985/besen/blob/master/src/BESENCodeJITx86.pas">JIT for x86</a> and <a href="https://github.com/BeRo1985/besen/blob/master/src/BESENCodeJITx64.pas">x86_64</a></li>
+<li>Parser: <a href="https://github.com/BeRo1985/besen/blob/master/src/BESENParser.pas">Hand-written</a></li>
+<li>First release: <a href="https://github.com/BeRo1985/besen/graphs/contributors">2015?</a></li>
+</ul>
+</li>
+</ul>
+<p>These last few are not toys but they are also more experimental or, in
+AssemblyScript's case, not JavaScript.</p>
+<ul>
+<li><a href="https://github.com/boa-dev/boa">boa</a>: JavaScript interpreter for Rust<ul>
+<li>Support: <a href="https://boa-dev.github.io/boa/test262/">Unclear</a></li>
+<li>Implementation language: Rust</li>
+<li>Runtime: <a href="https://github.com/boa-dev/boa/tree/master/boa/src/vm">Bytecode VM</a></li>
+<li>Parser: <a href="https://github.com/boa-dev/boa/tree/master/boa/src/syntax/parser">Hand-written</a></li>
+<li>First release: <a href="https://github.com/boa-dev/boa/releases/tag/v0.2.0">2019?</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/AssemblyScript/assemblyscript">AssemblyScript</a><ul>
+<li>Support: Subset of TypeScript</li>
+<li>Implementation language: AssemblyScript subset of TypeScript</li>
+<li>Runtime: <a href="https://github.com/AssemblyScript/assemblyscript/blob/main/src/compiler.ts">webassembly</a></li>
+<li>Parser: <a href="https://github.com/AssemblyScript/assemblyscript/blob/main/src/parser.ts">Hand-written</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/endojs/Jessie">Jessie</a>: safe subset of JavaScript non-exploitable smart contracts<ul>
+<li>Support: some subset of ES2017</li>
+<li>???</li>
+<li>See <a href="https://github.com/agoric-labs/jessica">https://github.com/agoric-labs/jessica</a> for more info.</li>
+</ul>
+</li>
+<li><a href="https://github.com/nickmain/kawa-scheme/tree/master/gnu/ecmascript">JavaScript in Kawa Scheme</a></li>
+<li><a href="https://wingolog.org/archives/2009/02/22/ecmascript-for-guile">JavaScript in GNU Guile Scheme</a></li>
+</ul>
+<h4 id="notable-abandoned">Notable Abandoned</h4><ul>
+<li><a href="https://github.com/haileys/twostroke">twostroke</a><ul>
+<li>Support: Unclear</li>
+<li>Implementation language: Ruby</li>
+<li>Runtime: <a href="https://github.com/haileys/twostroke/blob/master/lib/twostroke/runtime/vm_frame.rb">Bytecode VM</a></li>
+<li>Parser: <a href="https://github.com/haileys/twostroke/blob/master/lib/twostroke/parser.rb">Hand-written</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/progval/rpython-langjs">PyPy-JS</a><ul>
+<li>Support: Unclear</li>
+<li>Implementation language: RPython</li>
+<li>Runtime: <a href="https://github.com/progval/rpython-langjs/blob/master/js/jscode.py">RPython</a></li>
+<li>Parser: <a href="https://github.com/progval/rpython-langjs/blob/master/js/jsgrammar.txt">EBNF parser generator</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/jterrace/js.js/">js.js</a><ul>
+<li>Support: Unclear</li>
+<li>Implementation language: JavaScript</li>
+<li>Runtime: Too scared to look at the gigantic files in this repo.</li>
+<li>Parser: Ditto.</li>
+</ul>
+</li>
+<li><a href="https://github.com/fholm/IronJS">IronJS</a><ul>
+<li>Support: ES3</li>
+<li>Implementation language: F#</li>
+<li>Runtime: .NET through <a href="https://docs.microsoft.com/en-us/dotnet/framework/reflection-and-codedom/dynamic-language-runtime-overview">DLR</a>, I think.</li>
+<li>Parser: <a href="https://github.com/fholm/IronJS/blob/master/Src/IronJS/Compiler.Parser.fs">Hand-written</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/polydojo/jispy">jispy</a><ul>
+<li>Support: Unclear</li>
+<li>Implementation language: Python</li>
+<li>Runtime: <a href="https://github.com/polydojo/jispy/blob/master/jispy.py#L730">AST interpreter</a></li>
+<li>Parser: <a href="https://github.com/polydojo/jispy/blob/master/jispy.py#L311">Unclear</a></li>
+</ul>
+</li>
+</ul>
+<h4 id="notable-toy-implementations">Notable toy implementations</h4><p>Great for inspiriration if you've never implemented a language before.</p>
+<ul>
+<li><a href="https://github.com/thomasebsmith/armadillo">https://github.com/thomasebsmith/armadillo</a></li>
+<li><a href="https://github.com/DelSkayn/toyjs">https://github.com/DelSkayn/toyjs</a></li>
+<li><a href="https://github.com/yisar/joke">https://github.com/yisar/joke</a></li>
+<li><a href="https://github.com/yanmingsohu/Polydeuces">https://github.com/yanmingsohu/Polydeuces</a></li>
+<li><a href="https://github.com/danfragoso/sausage">https://github.com/danfragoso/sausage</a></li>
+<li><a href="https://github.com/CrimsonAS/v2">https://github.com/CrimsonAS/v2</a></li>
+<li><a href="https://github.com/githubyang/SparrowJS">https://github.com/githubyang/SparrowJS</a></li>
+<li><a href="https://github.com/danfragoso/sausage">https://github.com/danfragoso/sausage</a></li>
+<li><a href="https://github.com/gojisvm/gojis">https://github.com/gojisvm/gojis</a></li>
+<li><a href="https://github.com/eatonphil/jsc">https://github.com/eatonphil/jsc</a></li>
+</ul>
+
+	<div class="feedback">
+	  <h4>Feedback</h4>
+	  As always,
+	  please <a href="mailto:phil@eatonphil.com">email</a>
+	  or <a href="https://twitter.com/phil_eaton">tweet me</a>
+	  with questions, corrections, or ideas!
+	</div>
+      </div>
+    </div>
+
+    <footer>
+      <div class="container">
+	<div>
+	  <div class="row">
+	    <a href="/" class="sm-link">
+              Home
+            </a>
+	    <a href="/rss.xml" class="sm-link">
+              RSS
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+	</div>
+      </div>
+    </footer>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>
