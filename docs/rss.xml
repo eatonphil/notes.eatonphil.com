@@ -1,5 +1,286 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 01 Sep 2021 15:41:47 +0000</lastBuildDate><item><title>Writing a simple JSON library from scratch: a tour through modern C++</title><link>http://notes.eatonphil.com/writing-a-simple-json-library-in-modern-cpp.html</link><description>&lt;p&gt;Modern C++ has a lot of cool features. Move semantics means passing
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 21 Sep 2021 21:55:52 +0000</lastBuildDate><item><title>Enumerating and analyzing 40 non-V8 JavaScript implementations</title><link>http://notes.eatonphil.com/javascript-implementations.html</link><description>&lt;p&gt;V8 gets all the attention! It's used in Chrome, (by extension)
+Microsoft Edge, and Node.js. The other extremely mainstream JavaScript
+implementations after that are 1) JavaScriptCore used in Safari and
+other WebKit browsers and 2) SpiderMonkey used in Firefox.&lt;/p&gt;
+&lt;p&gt;I'm not going to cover the details of V8, JavaScriptCore, or
+SpiderMonkey because they are massive and hide multiple various
+interpreters and compilers inside. Plus, you already know about them.&lt;/p&gt;
+&lt;p class="note"&gt;
+  I'm going to miss some implementations and get some details
+  wrong. Please &lt;a href="https://twitter.com/phil_eaton"&gt;Tweet&lt;/a&gt; or
+  &lt;a href="mailto:phil@eatonphil.com"&gt;email&lt;/a&gt; with your corrections! I'd be
+  particularly interested to hear about pure-research; and commercial,
+  closed-source implementations of JavaScript.
+&lt;/p&gt;&lt;h3 id="corporate-backed"&gt;Corporate-backed&lt;/h3&gt;&lt;p&gt;These are implementations that would make sense to look into for your
+own commercial, production applications.&lt;/p&gt;
+&lt;h4 id="on-the-jvm"&gt;On the JVM&lt;/h4&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://github.com/oracle/graaljs"&gt;Oracle's GraalJS&lt;/a&gt;: compiles JavaScript to JVM bytecode or GraalVM&lt;ul&gt;
+&lt;li&gt;Support: Full compatibility with latest ECMAScript specification&lt;/li&gt;
+&lt;li&gt;Corporate backer: Oracle&lt;/li&gt;
+&lt;li&gt;Implementation language: Java&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://www.graalvm.org/"&gt;GraalVM&lt;/a&gt; or &lt;a href="https://www.graalvm.org/reference-manual/js/RunOnJDK/"&gt;stock JDK&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/oracle/graaljs/blob/master/graal-js/src/com.oracle.js.parser/src/com/oracle/js/parser/Parser.java"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/oracle/graaljs/releases/tag/vm-19.0.0"&gt;2019?&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Notes: Replaced Nashorn as the default JavaScript implementation in JDK.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/mozilla/rhino"&gt;Mozilla's Rhino&lt;/a&gt;: interprets and compiles JavaScript to JVM bytecode&lt;ul&gt;
+&lt;li&gt;Support: ES6&lt;/li&gt;
+&lt;li&gt;Implementation language: Java&lt;/li&gt;
+&lt;li&gt;Runtime: Both &lt;a href="https://github.com/mozilla/rhino/blob/master/src/org/mozilla/javascript/Interpreter.java"&gt;interpreted through custom bytecode VM&lt;/a&gt; and interpreted &lt;a href="https://github.com/mozilla/rhino/blob/master/src/org/mozilla/javascript/optimizer/Codegen.java"&gt;after compiling to JVM bytecode&lt;/a&gt; as an optimization&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/mozilla/rhino/blob/master/src/org/mozilla/javascript/Parser.java"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="http://udn.realityripple.com/docs/Mozilla/Projects/Rhino/History"&gt;1998?&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Notes: Replaced by Nashorn as the default JavaScript engine on the JVM, but remains actively developed.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/openjdk/nashorn"&gt;Oracle's Nashorn&lt;/a&gt;: compiles JavaScript to JVM bytecode&lt;ul&gt;
+&lt;li&gt;Support: ES5&lt;/li&gt;
+&lt;li&gt;Corporate backer: Oracle&lt;/li&gt;
+&lt;li&gt;Implementation language: Java&lt;/li&gt;
+&lt;li&gt;Runtime: compiles to &lt;a href="https://github.com/openjdk/nashorn/tree/main/src/org.openjdk.nashorn/share/classes/org/openjdk/nashorn/internal/codegen"&gt;JVM bytecode&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/openjdk/nashorn/blob/main/src/org.openjdk.nashorn/share/classes/org/openjdk/nashorn/internal/parser/Parser.java"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://blogs.oracle.com/nashorn/open-for-business"&gt;2012?&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Notes: Replaced Rhino as default JavaScript implementation on JVM. Replaced by GraalJS more recently, but remains actively developed.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id="embeddable"&gt;Embeddable&lt;/h4&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://github.com/bellard/quickjs"&gt;Fabrice Bellard's QuickJS&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: ES2020&lt;/li&gt;
+&lt;li&gt;Implementation language: C&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://raw.githubusercontent.com/bellard/quickjs/master/quickjs.c"&gt;Bytecode VM&lt;/a&gt; (this is a single large file)&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://raw.githubusercontent.com/bellard/quickjs/master/quickjs.c"&gt;Hand-written&lt;/a&gt; (this is a single large file)&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/bellard/quickjs/commit/91459fb6723e29e923380cec0023af93819ae69d#diff-ead07c84baac57a9542f388a07a2a5209456ce790b04251bc9bd7d179ea85cb1R84"&gt;2019&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/nginx/njs"&gt;Nginx's njs&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: ES5&lt;/li&gt;
+&lt;li&gt;Implementation language: C&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/nginx/njs/blob/master/src/njs_vmcode.c"&gt;Bytecode VM&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/nginx/njs/blob/master/src/njs_parser.c"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/svaarala/duktape"&gt;DuktapeJS&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: ES5, some parts of ES6/ES7&lt;/li&gt;
+&lt;li&gt;Implementation language: C&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/svaarala/duktape/blob/master/src-input/duk_js_executor.c"&gt;Bytecode VM&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/svaarala/duktape/blob/master/src-input/duk_js_compiler.c"&gt;Hand-written&lt;/a&gt;, notably with no AST. It just directly compiles to its own bytecode.&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://duktape.org/download.html"&gt;2013&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://mp2.dk/techblog/chowjs/"&gt;ChowJS&lt;/a&gt;: proprietary AOT compiler based on QuickJS for game developers&lt;ul&gt;
+&lt;li&gt;Support: everything QuickJS does presumably&lt;/li&gt;
+&lt;li&gt;Implementation language: C presumably&lt;/li&gt;
+&lt;li&gt;Runtime: QuickJS's bytecode interpreter but also an AOT compiler&lt;/li&gt;
+&lt;li&gt;Parser: QuickJS's presumably&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://mp2.dk/techblog/chowjs/"&gt;2021&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Notes: Code is not available so exact analysis on these points is not possible at the moment.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id="embedded-systems"&gt;Embedded Systems&lt;/h4&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://github.com/Samsung/escargot"&gt;Samsung's Escargot&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: ES2020&lt;/li&gt;
+&lt;li&gt;Implementation language: C++&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/Samsung/escargot/tree/master/src/interpreter"&gt;Bytecode VM&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/Samsung/escargot/tree/master/src/parser"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/Samsung/escargot/graphs/contributors"&gt;2017?&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/espruino/Espruino"&gt;Espruino&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: parts of ES5, ES6, ES7/8&lt;/li&gt;
+&lt;li&gt;Implementation language: C&lt;/li&gt;
+&lt;li&gt;Runtime: Seems like direct recursive interpreting without an AST/intermediate form&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/espruino/Espruino/blob/master/src/jsparse.c"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/espruino/Espruino/releases/tag/BEFORE_FUNCTION_REFACTOR"&gt;2012?&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/cesanta/elk"&gt;Cesanta's Elk&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: subset of ES6&lt;/li&gt;
+&lt;li&gt;Implementation language: C&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/cesanta/elk/blob/master/elk.c"&gt;Direct recursive interpreter without AST or bytecode VM&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/cesanta/elk/blob/master/elk.c"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/cesanta/elk/releases/tag/0.0.1"&gt;2019?&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Notes: It does all of this with a GC and FFI in &amp;lt;1400 lines of readable C code. Damn.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/cesanta/mjs"&gt;Cesanta's mJS&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: subset of ES6&lt;/li&gt;
+&lt;li&gt;Implementation language: C&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/cesanta/mjs/blob/master/mjs.c#L3411"&gt;Bytecode VM&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/cesanta/mjs/blob/master/mjs.c#L12780"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/cesanta/mjs/releases/tag/1.5"&gt;2017?&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id="other"&gt;Other&lt;/h4&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://github.com/facebook/hermes"&gt;Facebook's Hermes&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: ES6 &lt;a href="https://hermesengine.dev/docs/language-features"&gt;with exceptions&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Implementation language: C++&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/facebook/hermes/tree/main/lib/VM"&gt;Bytecode VM&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/facebook/hermes/blob/main/lib/Parser/JSParserImpl.cpp"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/facebook/hermes/releases/tag/v0.0.1"&gt;2019?&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id="mature,-community-driven"&gt;Mature, community-driven&lt;/h3&gt;&lt;p&gt;Although these are all at least somewhat mature, some are also
+experimental and don't yet support various specifications.&lt;/p&gt;
+&lt;p&gt;If you are a looking to get involved in language development, these
+implementations can be a great place to start since they typically
+need work in documentation, testing, and language features.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://github.com/engine262/engine262"&gt;engine262&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: 100% spec compliance&lt;/li&gt;
+&lt;li&gt;Implementation language: JavaScript&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/engine262/engine262/blob/14f50592362d889289e133fff4200e8e304c995a/src/runtime-semantics/IfStatement.mjs"&gt;AST interpreter&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/engine262/engine262/blob/main/src/parser/ExpressionParser.mjs"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/jerryscript-project/jerryscript"&gt;JerryScript&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: ES5&lt;/li&gt;
+&lt;li&gt;Implementation language: C&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/jerryscript-project/jerryscript/blob/master/jerry-core/vm/vm.c"&gt;Bytecode VM&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/jerryscript-project/jerryscript/blob/master/jerry-core/parser/js/js-parser.c"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/jerryscript-project/jerryscript/releases/tag/v1.0"&gt;2016?&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/dop251/goja"&gt;goja&lt;/a&gt;: JavaScript interpreter for Go&lt;ul&gt;
+&lt;li&gt;Support: ES5&lt;/li&gt;
+&lt;li&gt;Implementation language: Go&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/dop251/goja/blob/master/vm.go"&gt;Bytecode VM&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/dop251/goja/blob/master/parser/statement.go"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/dop251/goja/graphs/contributors"&gt;2017?&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/robertkrimen/otto"&gt;otto&lt;/a&gt;: JavaScript interpreter for Go&lt;ul&gt;
+&lt;li&gt;Support: ES5&lt;/li&gt;
+&lt;li&gt;Implementation language: Go&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/robertkrimen/otto/blob/373ff54384526e8336b5b597619d0923a4a83ae0/cmpl_evaluate_expression.go#L183"&gt;AST interpreter&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/robertkrimen/otto/blob/master/parser/statement.go"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/robertkrimen/otto/graphs/contributors"&gt;2012?&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Notes: The AST interpreter-only implementation might suggest this implementation is slower than Goja. I don't have benchmarks for that.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/paulbartrum/jurassic"&gt;Jurassic&lt;/a&gt;: JavaScript parser and interpreter for .NET&lt;ul&gt;
+&lt;li&gt;Support: ES5&lt;/li&gt;
+&lt;li&gt;Implementation language: C#&lt;/li&gt;
+&lt;li&gt;Runtime: Compiles to &lt;a href="https://github.com/paulbartrum/jurassic/blob/ee6f4fa17e6205e15412a214b24d7575b0bd461c/Jurassic/Compiler/MethodGenerator/GlobalOrEvalMethodGenerator.cs#L139"&gt;.NET&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/paulbartrum/jurassic/blob/master/Jurassic/Compiler/Parser/Parser.cs"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/paulbartrum/jurassic/graphs/contributors"&gt;2011?&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/nilproject/NiL.JS"&gt;NiL.JS&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: ES6&lt;/li&gt;
+&lt;li&gt;Implementation language: C#&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/nilproject/NiL.JS/blob/develop/NiL.JS/Expressions/Assignment.cs"&gt;AST interpreter&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/nilproject/NiL.JS/blob/develop/NiL.JS/Core/Parser.cs"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/nilproject/NiL.JS/graphs/contributors"&gt;2014?&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS"&gt;Serenity's LibJS&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: &lt;a href="https://github.com/linusg/libjs-test262"&gt;Maybe most of it? Unclear&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Implementation language: C++&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS/Bytecode"&gt;Bytecode VM&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/SerenityOS/serenity/blob/master/Userland/Libraries/LibJS/Parser.cpp"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Notes: Doesn't seem to be available for other operating systems. But that would be neat!&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/NeilFraser/JS-Interpreter"&gt;Neil Fraser's JS-Interpreter&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: ES5&lt;/li&gt;
+&lt;li&gt;Implementation language: JavaScript&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/NeilFraser/JS-Interpreter/blob/master/interpreter.js"&gt;AST interpreter&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/NeilFraser/JS-Interpreter/blob/master/acorn.js"&gt;Hand-written, uses Acorn&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/NeilFraser/JS-Interpreter/graphs/contributors"&gt;2014?&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/BeRo1985/besen"&gt;BESEN&lt;/a&gt;: Bytecode VM and JIT compiler in Object Pascal&lt;ul&gt;
+&lt;li&gt;Support: ES5&lt;/li&gt;
+&lt;li&gt;Implementation language: Object Pascal&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/BeRo1985/besen/blob/master/src/BESENCode.pas"&gt;Bytecode VM&lt;/a&gt; with &lt;a href="https://github.com/BeRo1985/besen/blob/master/src/BESENCodeJITx86.pas"&gt;JIT for x86&lt;/a&gt; and &lt;a href="https://github.com/BeRo1985/besen/blob/master/src/BESENCodeJITx64.pas"&gt;x86_64&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/BeRo1985/besen/blob/master/src/BESENParser.pas"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/BeRo1985/besen/graphs/contributors"&gt;2015?&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;These last few are not toys but they are also more experimental or, in
+AssemblyScript's case, not JavaScript.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://github.com/boa-dev/boa"&gt;boa&lt;/a&gt;: JavaScript interpreter for Rust&lt;ul&gt;
+&lt;li&gt;Support: &lt;a href="https://boa-dev.github.io/boa/test262/"&gt;Unclear&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Implementation language: Rust&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/boa-dev/boa/tree/master/boa/src/vm"&gt;Bytecode VM&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/boa-dev/boa/tree/master/boa/src/syntax/parser"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/boa-dev/boa/releases/tag/v0.2.0"&gt;2019?&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/AssemblyScript/assemblyscript"&gt;AssemblyScript&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: Subset of TypeScript&lt;/li&gt;
+&lt;li&gt;Implementation language: AssemblyScript subset of TypeScript&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/AssemblyScript/assemblyscript/blob/main/src/compiler.ts"&gt;webassembly&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/AssemblyScript/assemblyscript/blob/main/src/parser.ts"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/endojs/Jessie"&gt;Jessie&lt;/a&gt;: safe subset of JavaScript non-exploitable smart contracts&lt;ul&gt;
+&lt;li&gt;Support: some subset of ES2017&lt;/li&gt;
+&lt;li&gt;???&lt;/li&gt;
+&lt;li&gt;See &lt;a href="https://github.com/agoric-labs/jessica"&gt;https://github.com/agoric-labs/jessica&lt;/a&gt; for more info.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/nickmain/kawa-scheme/tree/master/gnu/ecmascript"&gt;JavaScript in Kawa Scheme&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://wingolog.org/archives/2009/02/22/ecmascript-for-guile"&gt;JavaScript in GNU Guile Scheme&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id="notable-abandoned"&gt;Notable Abandoned&lt;/h4&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://github.com/haileys/twostroke"&gt;twostroke&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: Unclear&lt;/li&gt;
+&lt;li&gt;Implementation language: Ruby&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/haileys/twostroke/blob/master/lib/twostroke/runtime/vm_frame.rb"&gt;Bytecode VM&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/haileys/twostroke/blob/master/lib/twostroke/parser.rb"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/progval/rpython-langjs"&gt;PyPy-JS&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: Unclear&lt;/li&gt;
+&lt;li&gt;Implementation language: RPython&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/progval/rpython-langjs/blob/master/js/jscode.py"&gt;RPython&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/progval/rpython-langjs/blob/master/js/jsgrammar.txt"&gt;EBNF parser generator&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/jterrace/js.js/"&gt;js.js&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: Unclear&lt;/li&gt;
+&lt;li&gt;Implementation language: JavaScript&lt;/li&gt;
+&lt;li&gt;Runtime: Too scared to look at the gigantic files in this repo.&lt;/li&gt;
+&lt;li&gt;Parser: Ditto.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/fholm/IronJS"&gt;IronJS&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: ES3&lt;/li&gt;
+&lt;li&gt;Implementation language: F#&lt;/li&gt;
+&lt;li&gt;Runtime: .NET through &lt;a href="https://docs.microsoft.com/en-us/dotnet/framework/reflection-and-codedom/dynamic-language-runtime-overview"&gt;DLR&lt;/a&gt;, I think.&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/fholm/IronJS/blob/master/Src/IronJS/Compiler.Parser.fs"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/polydojo/jispy"&gt;jispy&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: Unclear&lt;/li&gt;
+&lt;li&gt;Implementation language: Python&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/polydojo/jispy/blob/master/jispy.py#L730"&gt;AST interpreter&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/polydojo/jispy/blob/master/jispy.py#L311"&gt;Unclear&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id="notable-toy-implementations"&gt;Notable toy implementations&lt;/h4&gt;&lt;p&gt;Great for inspiriration if you've never implemented a language before.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://github.com/thomasebsmith/armadillo"&gt;https://github.com/thomasebsmith/armadillo&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/DelSkayn/toyjs"&gt;https://github.com/DelSkayn/toyjs&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/yisar/joke"&gt;https://github.com/yisar/joke&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/yanmingsohu/Polydeuces"&gt;https://github.com/yanmingsohu/Polydeuces&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/danfragoso/sausage"&gt;https://github.com/danfragoso/sausage&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/CrimsonAS/v2"&gt;https://github.com/CrimsonAS/v2&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/githubyang/SparrowJS"&gt;https://github.com/githubyang/SparrowJS&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/danfragoso/sausage"&gt;https://github.com/danfragoso/sausage&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/gojisvm/gojis"&gt;https://github.com/gojisvm/gojis&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/eatonphil/jsc"&gt;https://github.com/eatonphil/jsc&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/javascript-implementations.html</guid><pubDate>Tue, 21 Sep 2021 00:00:00 +0000</pubDate></item><item><title>Writing a simple JSON library from scratch: a tour through modern C++</title><link>http://notes.eatonphil.com/writing-a-simple-json-library-in-modern-cpp.html</link><description>&lt;p&gt;Modern C++ has a lot of cool features. Move semantics means passing
 around structs in functions is cheap. &lt;code&gt;std::shared_ptr&lt;/code&gt;
 means I don't have to manage any memory; no
 more &lt;code&gt;new&lt;/code&gt;/&lt;code&gt;delete&lt;/code&gt;! (But try as I might to
@@ -13760,7 +14041,80 @@ senior/lead member of a small team to push responsibility for your
 team's work up to your stakeholders. This is the best position to be
 in.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;tldr; don&amp;#39;t let your folks overwork unnecessarily when you could be reporting more frequently/honestly on understood priorities and accomplishments achieved/not achieved &lt;a href="https://t.co/PeTe2Bq0Xz"&gt;https://t.co/PeTe2Bq0Xz&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1087722536236957697?ref_src=twsrc%5Etfw"&gt;January 22, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/transparency-and-communication-on-small-teams.html</guid><pubDate>Tue, 22 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Writing a lisp compiler from scratch in JavaScript: 2. user-defined functions and variables</title><link>http://notes.eatonphil.com/compiler-basics-functions.html</link><description>&lt;p class="note"&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/transparency-and-communication-on-small-teams.html</guid><pubDate>Tue, 22 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Windows</title><link>http://notes.eatonphil.com/windows.html</link><description>&lt;p&gt;It has been six years since I last used Windows for any remotely
+serious software development. I've used Ubuntu, Arch, or FreeBSD
+since. But eventually I spent so much time working around common
+workplace tasks that I decided to put Windows 10 Pro on my work
+laptop.&lt;/p&gt;
+&lt;h3 id="windows-subsystem-for-linux"&gt;Windows Subsystem for Linux&lt;/h3&gt;&lt;p&gt;Introduced in 2016, this technology allows Windows to run unmodified
+Linux binaries. The core feat being &lt;a href="https://blogs.msdn.microsoft.com/wsl/2016/06/08/wsl-system-calls/"&gt;syscall
+translation&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;It works nearly flawlessly. This means I can do all my Go, Node,
+PostgreSQL development on Windows without a virtual machine using
+bash, tmux, git, emacs, etc.&lt;/p&gt;
+&lt;p&gt;I've seen a few minor exceptions over the course of regular software
+development in WSL:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://github.com/Microsoft/WSL/issues/2249"&gt;ss/netstat does not work&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/hashicorp/vagrant/issues/8700"&gt;vagrant does not work&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;More generally, Linux programs are heavily file-oriented. And Windows
+I/O &lt;a href="https://github.com/Microsoft/WSL/issues/873#issuecomment-425272829"&gt;is not designed well for
+that&lt;/a&gt;.
+In the worst cases (installing/adding Node packages) it can take
+minutes to do operations that would take Linux seconds.&lt;/p&gt;
+&lt;h3 id="vagrant"&gt;Vagrant&lt;/h3&gt;&lt;p&gt;Vagrant-Windows interoperability is abysmal.&lt;/p&gt;
+&lt;p&gt;As noted above, you cannot manage Hyper-V from vagrant within WSL. So
+you're stuck using Powershell. Even then, managing synced files from
+vagrant is a nightmare. The default sync method requires you to sign
+in using your &lt;strong&gt;Windows Live&lt;/strong&gt; username and password on every
+reboot. But Node package installation attempts some file operations
+that are not supported over the default synced, network filesystem.&lt;/p&gt;
+&lt;p&gt;When I switched to rsync vagrant wouldn't reliable sync when the
+virtual machine went down and came back up.&lt;/p&gt;
+&lt;p&gt;After hours of trying to get some files synced with vagrant I gave up.&lt;/p&gt;
+&lt;h3 id="hyper-v"&gt;Hyper-V&lt;/h3&gt;&lt;p&gt;Hyper-V's GUI is much more complex/feature-complete than VirtualBox.
+It even provides a Ubuntu-quick-install that I used to jump right in.
+I don't recommend using this though because it gives you no option but
+an 11GB hard disk. I didn't realize this until I went through an hour
+or two of post-install customization only to run out of space. Too
+lazy to boot into a live CD to grow the root filesystem I reinstalled
+with a more suitable 64GB drive and went through the hour-long
+post-install customization process again.&lt;/p&gt;
+&lt;p&gt;Networking in Hyper-V is more complex/feature-complete than VirtualBox
+as well. To access a Hyper-V machine you must create a new virtual
+network interface manually and associate it. Static IP address appear
+to be controlled at the host networking level (e.g. Control Panel)
+instead of within the Hyper-V interface. This highlights how these
+virtual interfaces are first-class, but overcomplicates the process of
+getting started.&lt;/p&gt;
+&lt;p&gt;Ultimately I gave up on a static IP address and decided to reboot less
+frequently.&lt;/p&gt;
+&lt;p&gt;Performance-wise Hyper-V machines are exactly as expected: excellent.&lt;/p&gt;
+&lt;h3 id="misc"&gt;Misc&lt;/h3&gt;&lt;p&gt;Docker support on Windows needs work. It took me a while to understand
+how Docker interacts with the WSL filesystem and what I needed to do
+to allow Docker to mount. The complexity is similar on macOS when you
+want to mount privileged directories like /var, but the experience is
+worse on Windows.&lt;/p&gt;
+&lt;p&gt;Apparently Windows does have tiling window managers, but I have not
+tried one out yet.&lt;/p&gt;
+&lt;p&gt;Powershell, a language with real types, is pretty compelling. But I
+have not spent enough time with it to be efficient. And since WSL is
+mostly good enough I don't really plan to.&lt;/p&gt;
+&lt;p&gt;Windows doesn't allow you to delete any files that are "in use". This
+is kinda cool except for that the errors you get when trying to delete
+files that are in use are useless. They are even more useless when you
+get the plain "could not delete directory" when you try to delete a
+directory with some file inside it that is in use. I had to start
+deleting files within by hand until I found the one I realized was in
+use.&lt;/p&gt;
+&lt;h3 id="conclusion"&gt;Conclusion&lt;/h3&gt;&lt;p&gt;If you have never run Linux or FreeBSD, don't use this post as an
+excuse not to. You should run Linux or FreeBSD for the experience. But
+if you've reached diminishing returns in your Linux/FreeBSD use,
+Windows as a development environment has come a long way. It may be
+the best platform available for software development, the profession.&lt;/p&gt;
+&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Some notes on my experience having replaced Arch Linux with Windows on my work laptop &lt;a href="https://t.co/8asxZmspwR"&gt;https://t.co/8asxZmspwR&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1086994000182153222?ref_src=twsrc%5Etfw"&gt;January 20, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/windows.html</guid><pubDate>Sun, 20 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Writing a lisp compiler from scratch in JavaScript: 2. user-defined functions and variables</title><link>http://notes.eatonphil.com/compiler-basics-functions.html</link><description>&lt;p class="note"&gt;
   Previously in compiler basics:
   &lt;! forgive me, for I have sinned &gt;
   &lt;br /&gt;
@@ -14179,80 +14533,7 @@ $ echo $?
 &lt;p&gt;And that's all there is to it! Stay tuned for the next post on
 conditionals and tail-call optimization.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Part two on compiler basics using JavaScript: user-defined functions and variables &lt;a href="https://t.co/XOam67HO8h"&gt;https://t.co/XOam67HO8h&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1087103061590446083?ref_src=twsrc%5Etfw"&gt;January 20, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/compiler-basics-functions.html</guid><pubDate>Sun, 20 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Windows</title><link>http://notes.eatonphil.com/windows.html</link><description>&lt;p&gt;It has been six years since I last used Windows for any remotely
-serious software development. I've used Ubuntu, Arch, or FreeBSD
-since. But eventually I spent so much time working around common
-workplace tasks that I decided to put Windows 10 Pro on my work
-laptop.&lt;/p&gt;
-&lt;h3 id="windows-subsystem-for-linux"&gt;Windows Subsystem for Linux&lt;/h3&gt;&lt;p&gt;Introduced in 2016, this technology allows Windows to run unmodified
-Linux binaries. The core feat being &lt;a href="https://blogs.msdn.microsoft.com/wsl/2016/06/08/wsl-system-calls/"&gt;syscall
-translation&lt;/a&gt;.&lt;/p&gt;
-&lt;p&gt;It works nearly flawlessly. This means I can do all my Go, Node,
-PostgreSQL development on Windows without a virtual machine using
-bash, tmux, git, emacs, etc.&lt;/p&gt;
-&lt;p&gt;I've seen a few minor exceptions over the course of regular software
-development in WSL:&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;&lt;a href="https://github.com/Microsoft/WSL/issues/2249"&gt;ss/netstat does not work&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="https://github.com/hashicorp/vagrant/issues/8700"&gt;vagrant does not work&lt;/a&gt;&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;More generally, Linux programs are heavily file-oriented. And Windows
-I/O &lt;a href="https://github.com/Microsoft/WSL/issues/873#issuecomment-425272829"&gt;is not designed well for
-that&lt;/a&gt;.
-In the worst cases (installing/adding Node packages) it can take
-minutes to do operations that would take Linux seconds.&lt;/p&gt;
-&lt;h3 id="vagrant"&gt;Vagrant&lt;/h3&gt;&lt;p&gt;Vagrant-Windows interoperability is abysmal.&lt;/p&gt;
-&lt;p&gt;As noted above, you cannot manage Hyper-V from vagrant within WSL. So
-you're stuck using Powershell. Even then, managing synced files from
-vagrant is a nightmare. The default sync method requires you to sign
-in using your &lt;strong&gt;Windows Live&lt;/strong&gt; username and password on every
-reboot. But Node package installation attempts some file operations
-that are not supported over the default synced, network filesystem.&lt;/p&gt;
-&lt;p&gt;When I switched to rsync vagrant wouldn't reliable sync when the
-virtual machine went down and came back up.&lt;/p&gt;
-&lt;p&gt;After hours of trying to get some files synced with vagrant I gave up.&lt;/p&gt;
-&lt;h3 id="hyper-v"&gt;Hyper-V&lt;/h3&gt;&lt;p&gt;Hyper-V's GUI is much more complex/feature-complete than VirtualBox.
-It even provides a Ubuntu-quick-install that I used to jump right in.
-I don't recommend using this though because it gives you no option but
-an 11GB hard disk. I didn't realize this until I went through an hour
-or two of post-install customization only to run out of space. Too
-lazy to boot into a live CD to grow the root filesystem I reinstalled
-with a more suitable 64GB drive and went through the hour-long
-post-install customization process again.&lt;/p&gt;
-&lt;p&gt;Networking in Hyper-V is more complex/feature-complete than VirtualBox
-as well. To access a Hyper-V machine you must create a new virtual
-network interface manually and associate it. Static IP address appear
-to be controlled at the host networking level (e.g. Control Panel)
-instead of within the Hyper-V interface. This highlights how these
-virtual interfaces are first-class, but overcomplicates the process of
-getting started.&lt;/p&gt;
-&lt;p&gt;Ultimately I gave up on a static IP address and decided to reboot less
-frequently.&lt;/p&gt;
-&lt;p&gt;Performance-wise Hyper-V machines are exactly as expected: excellent.&lt;/p&gt;
-&lt;h3 id="misc"&gt;Misc&lt;/h3&gt;&lt;p&gt;Docker support on Windows needs work. It took me a while to understand
-how Docker interacts with the WSL filesystem and what I needed to do
-to allow Docker to mount. The complexity is similar on macOS when you
-want to mount privileged directories like /var, but the experience is
-worse on Windows.&lt;/p&gt;
-&lt;p&gt;Apparently Windows does have tiling window managers, but I have not
-tried one out yet.&lt;/p&gt;
-&lt;p&gt;Powershell, a language with real types, is pretty compelling. But I
-have not spent enough time with it to be efficient. And since WSL is
-mostly good enough I don't really plan to.&lt;/p&gt;
-&lt;p&gt;Windows doesn't allow you to delete any files that are "in use". This
-is kinda cool except for that the errors you get when trying to delete
-files that are in use are useless. They are even more useless when you
-get the plain "could not delete directory" when you try to delete a
-directory with some file inside it that is in use. I had to start
-deleting files within by hand until I found the one I realized was in
-use.&lt;/p&gt;
-&lt;h3 id="conclusion"&gt;Conclusion&lt;/h3&gt;&lt;p&gt;If you have never run Linux or FreeBSD, don't use this post as an
-excuse not to. You should run Linux or FreeBSD for the experience. But
-if you've reached diminishing returns in your Linux/FreeBSD use,
-Windows as a development environment has come a long way. It may be
-the best platform available for software development, the profession.&lt;/p&gt;
-&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Some notes on my experience having replaced Arch Linux with Windows on my work laptop &lt;a href="https://t.co/8asxZmspwR"&gt;https://t.co/8asxZmspwR&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1086994000182153222?ref_src=twsrc%5Etfw"&gt;January 20, 2019&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/windows.html</guid><pubDate>Sun, 20 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Make small changes and solve the problems you have</title><link>http://notes.eatonphil.com/make-small-changes-and-solve-the-problems-you-have.html</link><description>&lt;p&gt;Two frustrating things that can happen in an organization are 1) big
+</description><guid isPermaLink="false">http://notes.eatonphil.com/compiler-basics-functions.html</guid><pubDate>Sun, 20 Jan 2019 00:00:00 +0000</pubDate></item><item><title>Make small changes and solve the problems you have</title><link>http://notes.eatonphil.com/make-small-changes-and-solve-the-problems-you-have.html</link><description>&lt;p&gt;Two frustrating things that can happen in an organization are 1) big
 changes and 2) changes that aren’t clearly associated with a known
 problem. It’s even worse in that order.&lt;/p&gt;
 &lt;p&gt;These situations tend to happen when a problem remain unaddressed for
