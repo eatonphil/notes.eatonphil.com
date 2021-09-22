@@ -11,8 +11,8 @@ But what else is out there? What if I want to embed JavaScript in a C
 program, or a Go program, or a Rust program, or a Java program(, and so
 on)? It turns out there are a ton of high-quality implementations out there.
 
-This post describes a number of them and their implementation choices
-in detail. I'm not going to cover V8, JavaScriptCore, or SpiderMonkey
+This post describes a number of them and their implementation
+choices. I'm not going to cover V8, JavaScriptCore, or SpiderMonkey
 because they are massive and hide multiple various interpreters and
 compilers inside. Plus, you already know about them.
 
@@ -67,6 +67,13 @@ own commercial, production applications.
   * Parser: QuickJS's presumably
   * First release: [2021](https://mp2.dk/techblog/chowjs/)
   * Notes: Code is not available so exact analysis on these points is not possible at the moment.
+* [Artifex's mujs](https://github.com/ccxvii/mujs)
+  * Support: ES5, probably
+  * Implementation language: C
+  * Runtime: [Bytecode stack-oriented VM](https://github.com/ccxvii/mujs/blob/master/jsrun.c)
+  * Parser: [Hand-written](https://github.com/ccxvii/mujs/blob/master/jsparse.c)
+  * First release: [2017?](https://github.com/ccxvii/mujs/releases/tag/1.0.0)
+  * Notes: Originally part of MuPDF viewer, but now broken out. Thanks to [@rwoodsmalljs](https://twitter.com/rwoodsmall) for mentioning!
 
 #### Embedded Systems
 
@@ -150,7 +157,7 @@ features.
   * Parser: [Hand-written](https://github.com/jerryscript-project/jerryscript/blob/master/jerry-core/parser/js/js-parser.c)
   * First release: [2016?](https://github.com/jerryscript-project/jerryscript/releases/tag/v1.0)
 * [Serenity's LibJS](https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS)
-  * Support: [Maybe most of it? Unclear](https://github.com/linusg/libjs-test262)
+  * Support: [Progressing toward compliance](https://libjs.dev/test262/)
   * Implementation language: C++
   * Runtime: [Bytecode VM](https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS/Bytecode)
   * Parser: [Hand-written](https://github.com/SerenityOS/serenity/blob/master/Userland/Libraries/LibJS/Parser.cpp)
@@ -235,6 +242,12 @@ AssemblyScript's case, not JavaScript.
 
 ### Notable Abandoned
 
+* [DMDScript](https://github.com/DigitalMars/DMDScript)
+  * Support: Unclear
+  * Implementation language: D
+  * Runtime: [Bytecode VM](https://github.com/DigitalMars/DMDScript/blob/master/engine/source/dmdscript/opcodes.d#L15)
+  * Parser: [Hand-written](https://github.com/DigitalMars/DMDScript/blob/master/engine/source/dmdscript/parse.d)
+  * Notes: It's possible this is commercially maintained by DigitalMars but I'm not sure. There are also references in this repo to another C++ implementation of DMDScript that may be commercial. Thanks to [@moon_chilled](https://twitter.com/moon_chilled) for mentioning!
 * [twostroke](https://github.com/haileys/twostroke)
   * Support: Unclear
   * Implementation language: Ruby

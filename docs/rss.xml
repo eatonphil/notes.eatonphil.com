@@ -1,13 +1,13 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 22 Sep 2021 10:35:56 +0000</lastBuildDate><item><title>Enumerating and analyzing 40+ non-V8 JavaScript implementations</title><link>http://notes.eatonphil.com/javascript-implementations.html</link><description>&lt;p&gt;V8 is, I'm sure, the most used implementation of JavaScript
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 22 Sep 2021 10:52:23 +0000</lastBuildDate><item><title>Enumerating and analyzing 40+ non-V8 JavaScript implementations</title><link>http://notes.eatonphil.com/javascript-implementations.html</link><description>&lt;p&gt;V8 is, I'm sure, the most used implementation of JavaScript
 today. Used in Chrome, (and by extension) Microsoft Edge, Node.js,
 etc. Safari's JavaScriptCore and Firefox's SpiderMonkey are also
 contenders for extremely mainstream implementations.&lt;/p&gt;
 &lt;p&gt;But what else is out there? What if I want to embed JavaScript in a C
 program, or a Go program, or a Rust program, or a Java program(, and so
 on)? It turns out there are a ton of high-quality implementations out there.&lt;/p&gt;
-&lt;p&gt;This post describes a number of them and their implementation choices
-in detail. I'm not going to cover V8, JavaScriptCore, or SpiderMonkey
+&lt;p&gt;This post describes a number of them and their implementation
+choices. I'm not going to cover V8, JavaScriptCore, or SpiderMonkey
 because they are massive and hide multiple various interpreters and
 compilers inside. Plus, you already know about them.&lt;/p&gt;
 &lt;p class="note"&gt;
@@ -62,6 +62,15 @@ own commercial, production applications.&lt;/p&gt;
 &lt;li&gt;Parser: QuickJS's presumably&lt;/li&gt;
 &lt;li&gt;First release: &lt;a href="https://mp2.dk/techblog/chowjs/"&gt;2021&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Notes: Code is not available so exact analysis on these points is not possible at the moment.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/ccxvii/mujs"&gt;Artifex's mujs&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: ES5, probably&lt;/li&gt;
+&lt;li&gt;Implementation language: C&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/ccxvii/mujs/blob/master/jsrun.c"&gt;Bytecode stack-oriented VM&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/ccxvii/mujs/blob/master/jsparse.c"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/ccxvii/mujs/releases/tag/1.0.0"&gt;2017?&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Notes: Originally part of MuPDF viewer, but now broken out. Thanks to &lt;a href="https://twitter.com/rwoodsmall"&gt;@rwoodsmalljs&lt;/a&gt; for mentioning!&lt;/li&gt;
 &lt;/ul&gt;
 &lt;/li&gt;
 &lt;/ul&gt;
@@ -162,7 +171,7 @@ features.&lt;/p&gt;
 &lt;/ul&gt;
 &lt;/li&gt;
 &lt;li&gt;&lt;a href="https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS"&gt;Serenity's LibJS&lt;/a&gt;&lt;ul&gt;
-&lt;li&gt;Support: &lt;a href="https://github.com/linusg/libjs-test262"&gt;Maybe most of it? Unclear&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Support: &lt;a href="https://libjs.dev/test262/"&gt;Progressing toward compliance&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Implementation language: C++&lt;/li&gt;
 &lt;li&gt;Runtime: &lt;a href="https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS/Bytecode"&gt;Bytecode VM&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Parser: &lt;a href="https://github.com/SerenityOS/serenity/blob/master/Userland/Libraries/LibJS/Parser.cpp"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
@@ -267,6 +276,14 @@ AssemblyScript's case, not JavaScript.&lt;/p&gt;
 &lt;p class="note"&gt;
   Thanks to &lt;a href="https://twitter.com/smarr"&gt;@smarr&lt;/a&gt; for contributing eJS, Higgs, and b9!
 &lt;/p&gt;&lt;h3 id="notable-abandoned"&gt;Notable Abandoned&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://github.com/DigitalMars/DMDScript"&gt;DMDScript&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: Unclear&lt;/li&gt;
+&lt;li&gt;Implementation language: D&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/DigitalMars/DMDScript/blob/master/engine/source/dmdscript/opcodes.d#L15"&gt;Bytecode VM&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/DigitalMars/DMDScript/blob/master/engine/source/dmdscript/parse.d"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Notes: It's possible this is commercially maintained by DigitalMars but I'm not sure. There are also references in this repo to another C++ implementation of DMDScript that may be commercial. Thanks to &lt;a href="https://twitter.com/moon_chilled"&gt;@moon_chilled&lt;/a&gt; for mentioning!&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
 &lt;li&gt;&lt;a href="https://github.com/haileys/twostroke"&gt;twostroke&lt;/a&gt;&lt;ul&gt;
 &lt;li&gt;Support: Unclear&lt;/li&gt;
 &lt;li&gt;Implementation language: Ruby&lt;/li&gt;
