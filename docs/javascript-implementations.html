@@ -35,7 +35,7 @@
           <h2>September 21, 2021</h2>
           <h1>Enumerating and analyzing 40+ non-V8 JavaScript implementations</h1>
           <div class="row" style="padding-bottom: 5px">
-            <div class="tags"><a href="/tags/javascript.html" class="tag">javascript</a><a href="/tags/nodejs.html" class="tag">nodejs</a><a href="/tags/compilers.html" class="tag">compilers</a><a href="/tags/interpreters.html" class="tag">interpreters</a></div>
+            <div class="tags"><a href="/tags/javascript.html" class="tag">javascript</a><a href="/tags/nodejs.html" class="tag">nodejs</a><a href="/tags/compiler.html" class="tag">compiler</a><a href="/tags/interpreter.html" class="tag">interpreter</a></div>
           </div>
 	</div>
       </div>
@@ -57,7 +57,7 @@ compilers inside. Plus, you already know about them.</p>
 <p class="note">
   I'm going to miss some implementations and get some details
   wrong. Please <a href="https://twitter.com/phil_eaton">Tweet</a> or
-  <a href="mailto:phil@eatonphil.com">email</a> with your corrections! I'd be
+  <a href="mailto:phil@eatonphil.com">email</a> me with your corrections! I'd be
   particularly interested to hear about pure-research; and commercial,
   closed-source implementations of JavaScript.
 </p><h3 id="corporate-backed">Corporate-backed</h3><p>These are implementations that would make sense to look into for your
@@ -65,7 +65,6 @@ own commercial, production applications.</p>
 <h4 id="on-the-jvm">On the JVM</h4><ul>
 <li><a href="https://github.com/oracle/graaljs">Oracle's GraalJS</a>: compiles JavaScript to JVM bytecode or GraalVM<ul>
 <li>Support: Full compatibility with latest ECMAScript specification</li>
-<li>Corporate backer: Oracle</li>
 <li>Implementation language: Java</li>
 <li>Runtime: <a href="https://www.graalvm.org/">GraalVM</a> or <a href="https://www.graalvm.org/reference-manual/js/RunOnJDK/">stock JDK</a></li>
 <li>Parser: <a href="https://github.com/oracle/graaljs/blob/master/graal-js/src/com.oracle.js.parser/src/com/oracle/js/parser/Parser.java">Hand-written</a></li>
@@ -84,7 +83,6 @@ own commercial, production applications.</p>
 </li>
 <li><a href="https://github.com/openjdk/nashorn">Oracle's Nashorn</a>: compiles JavaScript to JVM bytecode<ul>
 <li>Support: ES5</li>
-<li>Corporate backer: Oracle</li>
 <li>Implementation language: Java</li>
 <li>Runtime: compiles to <a href="https://github.com/openjdk/nashorn/tree/main/src/org.openjdk.nashorn/share/classes/org/openjdk/nashorn/internal/codegen">JVM bytecode</a></li>
 <li>Parser: <a href="https://github.com/openjdk/nashorn/blob/main/src/org.openjdk.nashorn/share/classes/org/openjdk/nashorn/internal/parser/Parser.java">Hand-written</a></li>
@@ -94,14 +92,6 @@ own commercial, production applications.</p>
 </li>
 </ul>
 <h4 id="embeddable">Embeddable</h4><ul>
-<li><a href="https://github.com/bellard/quickjs">Fabrice Bellard's QuickJS</a><ul>
-<li>Support: ES2020</li>
-<li>Implementation language: C</li>
-<li>Runtime: <a href="https://raw.githubusercontent.com/bellard/quickjs/master/quickjs.c">Bytecode VM</a> (this is a single large file)</li>
-<li>Parser: <a href="https://raw.githubusercontent.com/bellard/quickjs/master/quickjs.c">Hand-written</a> (this is a single large file)</li>
-<li>First release: <a href="https://github.com/bellard/quickjs/commit/91459fb6723e29e923380cec0023af93819ae69d#diff-ead07c84baac57a9542f388a07a2a5209456ce790b04251bc9bd7d179ea85cb1R84">2019</a></li>
-</ul>
-</li>
 <li><a href="https://github.com/nginx/njs">Nginx's njs</a><ul>
 <li>Support: ES5</li>
 <li>Implementation language: C</li>
@@ -109,16 +99,8 @@ own commercial, production applications.</p>
 <li>Parser: <a href="https://github.com/nginx/njs/blob/master/src/njs_parser.c">Hand-written</a></li>
 </ul>
 </li>
-<li><a href="https://github.com/svaarala/duktape">DuktapeJS</a><ul>
-<li>Support: ES5, some parts of ES6/ES7</li>
-<li>Implementation language: C</li>
-<li>Runtime: <a href="https://github.com/svaarala/duktape/blob/master/src-input/duk_js_executor.c">Bytecode VM</a></li>
-<li>Parser: <a href="https://github.com/svaarala/duktape/blob/master/src-input/duk_js_compiler.c">Hand-written</a>, notably with no AST. It just directly compiles to its own bytecode.</li>
-<li>First release: <a href="https://duktape.org/download.html">2013</a></li>
-</ul>
-</li>
 <li><a href="https://mp2.dk/techblog/chowjs/">ChowJS</a>: proprietary AOT compiler based on QuickJS for game developers<ul>
-<li>Support: everything QuickJS does presumably</li>
+<li>Support: everything QuickJS does presumably (see further down for QuickJS)</li>
 <li>Implementation language: C presumably</li>
 <li>Runtime: QuickJS's bytecode interpreter but also an AOT compiler</li>
 <li>Parser: QuickJS's presumably</li>
@@ -172,12 +154,29 @@ own commercial, production applications.</p>
 </ul>
 </li>
 </ul>
-<h3 id="mature,-community-driven">Mature, community-driven</h3><p>Although these are all at least somewhat mature, some are also
-experimental and don't yet support various specifications.</p>
-<p>If you are a looking to get involved in language development, these
-implementations can be a great place to start since they typically
-need work in documentation, testing, and language features.</p>
+<h3 id="mature,-community-driven">Mature, community-driven</h3><p>Implementations toward the top are more reliable and
+proven. Implementations toward the bottom less so.</p>
+<p>If you are a looking to get involved in language development, the
+implementation further down on the list can be a great place to start
+since they typically need work in documentation, testing, and language
+features.</p>
 <ul>
+<li><a href="https://github.com/bellard/quickjs">Fabrice Bellard's QuickJS</a><ul>
+<li>Support: ES2020</li>
+<li>Implementation language: C</li>
+<li>Runtime: <a href="https://raw.githubusercontent.com/bellard/quickjs/master/quickjs.c">Bytecode VM</a> (this is a single large file)</li>
+<li>Parser: <a href="https://raw.githubusercontent.com/bellard/quickjs/master/quickjs.c">Hand-written</a> (this is a single large file)</li>
+<li>First release: <a href="https://github.com/bellard/quickjs/commit/91459fb6723e29e923380cec0023af93819ae69d#diff-ead07c84baac57a9542f388a07a2a5209456ce790b04251bc9bd7d179ea85cb1R84">2019</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/svaarala/duktape">DuktapeJS</a><ul>
+<li>Support: ES5, some parts of ES6/ES7</li>
+<li>Implementation language: C</li>
+<li>Runtime: <a href="https://github.com/svaarala/duktape/blob/master/src-input/duk_js_executor.c">Bytecode VM</a></li>
+<li>Parser: <a href="https://github.com/svaarala/duktape/blob/master/src-input/duk_js_compiler.c">Hand-written</a>, notably with no AST. It just directly compiles to its own bytecode.</li>
+<li>First release: <a href="https://duktape.org/download.html">2013</a></li>
+</ul>
+</li>
 <li><a href="https://github.com/engine262/engine262">engine262</a><ul>
 <li>Support: 100% spec compliance</li>
 <li>Implementation language: JavaScript</li>
@@ -191,6 +190,14 @@ need work in documentation, testing, and language features.</p>
 <li>Runtime: <a href="https://github.com/jerryscript-project/jerryscript/blob/master/jerry-core/vm/vm.c">Bytecode VM</a></li>
 <li>Parser: <a href="https://github.com/jerryscript-project/jerryscript/blob/master/jerry-core/parser/js/js-parser.c">Hand-written</a></li>
 <li>First release: <a href="https://github.com/jerryscript-project/jerryscript/releases/tag/v1.0">2016?</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS">Serenity's LibJS</a><ul>
+<li>Support: <a href="https://github.com/linusg/libjs-test262">Maybe most of it? Unclear</a></li>
+<li>Implementation language: C++</li>
+<li>Runtime: <a href="https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS/Bytecode">Bytecode VM</a></li>
+<li>Parser: <a href="https://github.com/SerenityOS/serenity/blob/master/Userland/Libraries/LibJS/Parser.cpp">Hand-written</a></li>
+<li>Notes: Might also work outside of Serenity but documentation on building/running it on Linux is hard to find.</li>
 </ul>
 </li>
 <li><a href="https://github.com/dop251/goja">goja</a>: JavaScript interpreter for Go<ul>
@@ -224,14 +231,6 @@ need work in documentation, testing, and language features.</p>
 <li>Runtime: <a href="https://github.com/nilproject/NiL.JS/blob/develop/NiL.JS/Expressions/Assignment.cs">AST interpreter</a></li>
 <li>Parser: <a href="https://github.com/nilproject/NiL.JS/blob/develop/NiL.JS/Core/Parser.cs">Hand-written</a></li>
 <li>First release: <a href="https://github.com/nilproject/NiL.JS/graphs/contributors">2014?</a></li>
-</ul>
-</li>
-<li><a href="https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS">Serenity's LibJS</a><ul>
-<li>Support: <a href="https://github.com/linusg/libjs-test262">Maybe most of it? Unclear</a></li>
-<li>Implementation language: C++</li>
-<li>Runtime: <a href="https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS/Bytecode">Bytecode VM</a></li>
-<li>Parser: <a href="https://github.com/SerenityOS/serenity/blob/master/Userland/Libraries/LibJS/Parser.cpp">Hand-written</a></li>
-<li>Notes: Doesn't seem to be available for other operating systems. But that would be neat!</li>
 </ul>
 </li>
 <li><a href="https://github.com/NeilFraser/JS-Interpreter">Neil Fraser's JS-Interpreter</a><ul>
@@ -294,9 +293,10 @@ AssemblyScript's case, not JavaScript.</p>
 <li>See <a href="https://github.com/agoric-labs/jessica">https://github.com/agoric-labs/jessica</a> for more info.</li>
 </ul>
 </li>
+<li><a href="https://github.com/b9org/b9">https://github.com/b9org/b9</a></li>
 </ul>
 <p class="note">
-  Thanks to <a href="https://twitter.com/smarr">@smarr</a> for contributing eJS and Higgs!
+  Thanks to <a href="https://twitter.com/smarr">@smarr</a> for contributing eJS, Higgs, and b9!
 </p><h3 id="notable-abandoned">Notable Abandoned</h3><ul>
 <li><a href="https://github.com/haileys/twostroke">twostroke</a><ul>
 <li>Support: Unclear</li>

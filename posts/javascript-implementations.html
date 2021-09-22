@@ -1,6 +1,6 @@
 # Enumerating and analyzing 40+ non-V8 JavaScript implementations
 ## September 21, 2021
-###### javascript,nodejs,compilers,interpreters
+###### javascript,nodejs,compiler,interpreter
 
 V8 is, I'm sure, the most used implementation of JavaScript
 today. Used in Chrome, (and by extension) Microsoft Edge, Node.js,
@@ -19,7 +19,7 @@ compilers inside. Plus, you already know about them.
 <p class="note">
   I'm going to miss some implementations and get some details
   wrong. Please <a href="https://twitter.com/phil_eaton">Tweet</a> or
-  <a href="mailto:phil@eatonphil.com">email</a> with your corrections! I'd be
+  <a href="mailto:phil@eatonphil.com">email</a> me with your corrections! I'd be
   particularly interested to hear about pure-research; and commercial,
   closed-source implementations of JavaScript.
 </p>
@@ -33,7 +33,6 @@ own commercial, production applications.
 
 * [Oracle's GraalJS](https://github.com/oracle/graaljs): compiles JavaScript to JVM bytecode or GraalVM
   * Support: Full compatibility with latest ECMAScript specification
-  * Corporate backer: Oracle
   * Implementation language: Java
   * Runtime: [GraalVM](https://www.graalvm.org/) or [stock JDK](https://www.graalvm.org/reference-manual/js/RunOnJDK/)
   * Parser: [Hand-written](https://github.com/oracle/graaljs/blob/master/graal-js/src/com.oracle.js.parser/src/com/oracle/js/parser/Parser.java)
@@ -48,7 +47,6 @@ own commercial, production applications.
   * Notes: Replaced by Nashorn as the default JavaScript engine on the JVM, but remains actively developed.
 * [Oracle's Nashorn](https://github.com/openjdk/nashorn): compiles JavaScript to JVM bytecode
   * Support: ES5
-  * Corporate backer: Oracle
   * Implementation language: Java
   * Runtime: compiles to [JVM bytecode](https://github.com/openjdk/nashorn/tree/main/src/org.openjdk.nashorn/share/classes/org/openjdk/nashorn/internal/codegen)
   * Parser: [Hand-written](https://github.com/openjdk/nashorn/blob/main/src/org.openjdk.nashorn/share/classes/org/openjdk/nashorn/internal/parser/Parser.java)
@@ -57,25 +55,13 @@ own commercial, production applications.
 
 #### Embeddable
 
-* [Fabrice Bellard's QuickJS](https://github.com/bellard/quickjs)
-  * Support: ES2020
-  * Implementation language: C
-  * Runtime: [Bytecode VM](https://raw.githubusercontent.com/bellard/quickjs/master/quickjs.c) (this is a single large file)
-  * Parser: [Hand-written](https://raw.githubusercontent.com/bellard/quickjs/master/quickjs.c) (this is a single large file)
-  * First release: [2019](https://github.com/bellard/quickjs/commit/91459fb6723e29e923380cec0023af93819ae69d#diff-ead07c84baac57a9542f388a07a2a5209456ce790b04251bc9bd7d179ea85cb1R84)
 * [Nginx's njs](https://github.com/nginx/njs)
   * Support: ES5
   * Implementation language: C
   * Runtime: [Bytecode VM](https://github.com/nginx/njs/blob/master/src/njs_vmcode.c)
   * Parser: [Hand-written](https://github.com/nginx/njs/blob/master/src/njs_parser.c)
-* [DuktapeJS](https://github.com/svaarala/duktape)
-  * Support: ES5, some parts of ES6/ES7
-  * Implementation language: C
-  * Runtime: [Bytecode VM](https://github.com/svaarala/duktape/blob/master/src-input/duk_js_executor.c)
-  * Parser: [Hand-written](https://github.com/svaarala/duktape/blob/master/src-input/duk_js_compiler.c), notably with no AST. It just directly compiles to its own bytecode.
-  * First release: [2013](https://duktape.org/download.html)
 * [ChowJS](https://mp2.dk/techblog/chowjs/): proprietary AOT compiler based on QuickJS for game developers
-  * Support: everything QuickJS does presumably
+  * Support: everything QuickJS does presumably (see further down for QuickJS)
   * Implementation language: C presumably
   * Runtime: QuickJS's bytecode interpreter but also an AOT compiler
   * Parser: QuickJS's presumably
@@ -121,13 +107,26 @@ own commercial, production applications.
 
 ### Mature, community-driven
 
-Although these are all at least somewhat mature, some are also
-experimental and don't yet support various specifications.
+Implementations toward the top are more reliable and
+proven. Implementations toward the bottom less so.
 
-If you are a looking to get involved in language development, these
-implementations can be a great place to start since they typically
-need work in documentation, testing, and language features.
+If you are a looking to get involved in language development, the
+implementation further down on the list can be a great place to start
+since they typically need work in documentation, testing, and language
+features.
 
+* [Fabrice Bellard's QuickJS](https://github.com/bellard/quickjs)
+  * Support: ES2020
+  * Implementation language: C
+  * Runtime: [Bytecode VM](https://raw.githubusercontent.com/bellard/quickjs/master/quickjs.c) (this is a single large file)
+  * Parser: [Hand-written](https://raw.githubusercontent.com/bellard/quickjs/master/quickjs.c) (this is a single large file)
+  * First release: [2019](https://github.com/bellard/quickjs/commit/91459fb6723e29e923380cec0023af93819ae69d#diff-ead07c84baac57a9542f388a07a2a5209456ce790b04251bc9bd7d179ea85cb1R84)
+* [DuktapeJS](https://github.com/svaarala/duktape)
+  * Support: ES5, some parts of ES6/ES7
+  * Implementation language: C
+  * Runtime: [Bytecode VM](https://github.com/svaarala/duktape/blob/master/src-input/duk_js_executor.c)
+  * Parser: [Hand-written](https://github.com/svaarala/duktape/blob/master/src-input/duk_js_compiler.c), notably with no AST. It just directly compiles to its own bytecode.
+  * First release: [2013](https://duktape.org/download.html)
 * [engine262](https://github.com/engine262/engine262)
   * Support: 100% spec compliance
   * Implementation language: JavaScript
@@ -139,6 +138,12 @@ need work in documentation, testing, and language features.
   * Runtime: [Bytecode VM](https://github.com/jerryscript-project/jerryscript/blob/master/jerry-core/vm/vm.c)
   * Parser: [Hand-written](https://github.com/jerryscript-project/jerryscript/blob/master/jerry-core/parser/js/js-parser.c)
   * First release: [2016?](https://github.com/jerryscript-project/jerryscript/releases/tag/v1.0)
+* [Serenity's LibJS](https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS)
+  * Support: [Maybe most of it? Unclear](https://github.com/linusg/libjs-test262)
+  * Implementation language: C++
+  * Runtime: [Bytecode VM](https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS/Bytecode)
+  * Parser: [Hand-written](https://github.com/SerenityOS/serenity/blob/master/Userland/Libraries/LibJS/Parser.cpp)
+  * Notes: Might also work outside of Serenity but documentation on building/running it on Linux is hard to find.
 * [goja](https://github.com/dop251/goja): JavaScript interpreter for Go
   * Support: ES5
   * Implementation language: Go
@@ -164,12 +169,6 @@ need work in documentation, testing, and language features.
   * Runtime: [AST interpreter](https://github.com/nilproject/NiL.JS/blob/develop/NiL.JS/Expressions/Assignment.cs)
   * Parser: [Hand-written](https://github.com/nilproject/NiL.JS/blob/develop/NiL.JS/Core/Parser.cs)
   * First release: [2014?](https://github.com/nilproject/NiL.JS/graphs/contributors)
-* [Serenity's LibJS](https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS)
-  * Support: [Maybe most of it? Unclear](https://github.com/linusg/libjs-test262)
-  * Implementation language: C++
-  * Runtime: [Bytecode VM](https://github.com/SerenityOS/serenity/tree/master/Userland/Libraries/LibJS/Bytecode)
-  * Parser: [Hand-written](https://github.com/SerenityOS/serenity/blob/master/Userland/Libraries/LibJS/Parser.cpp)
-  * Notes: Doesn't seem to be available for other operating systems. But that would be neat!
 * [Neil Fraser's JS-Interpreter](https://github.com/NeilFraser/JS-Interpreter)
   * Support: ES5
   * Implementation language: JavaScript
@@ -217,9 +216,10 @@ AssemblyScript's case, not JavaScript.
   * Support: some subset of ES2017
   * ???
   * See [https://github.com/agoric-labs/jessica](https://github.com/agoric-labs/jessica) for more info.
+* https://github.com/b9org/b9
 
 <p class="note">
-  Thanks to <a href="https://twitter.com/smarr">@smarr</a> for contributing eJS and Higgs!
+  Thanks to <a href="https://twitter.com/smarr">@smarr</a> for contributing eJS, Higgs, and b9!
 </p>
 
 ### Notable Abandoned
