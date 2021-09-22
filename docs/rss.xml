@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 22 Sep 2021 12:17:04 +0000</lastBuildDate><item><title>Enumerating and analyzing 40+ non-V8 JavaScript implementations</title><link>http://notes.eatonphil.com/javascript-implementations.html</link><description>&lt;p&gt;V8 is, I'm sure, the most used implementation of JavaScript
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 22 Sep 2021 14:45:24 +0000</lastBuildDate><item><title>Enumerating and analyzing 40+ non-V8 JavaScript implementations</title><link>http://notes.eatonphil.com/javascript-implementations.html</link><description>&lt;p&gt;V8 is, I'm sure, the most used implementation of JavaScript
 today. Used in Chrome, (and by extension) Microsoft Edge, Node.js,
 etc. Safari's JavaScriptCore and Firefox's SpiderMonkey are also
 contenders for extremely mainstream implementations.&lt;/p&gt;
@@ -203,6 +203,15 @@ features.&lt;/p&gt;
 &lt;li&gt;First release: &lt;a href="https://github.com/paulbartrum/jurassic/graphs/contributors"&gt;2011?&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
 &lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/sebastienros/jint"&gt;Jint&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: ES5, most of ES6/7/8&lt;/li&gt;
+&lt;li&gt;Implementation language: C#&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/sebastienros/jint/blob/main/Jint/Runtime/Interpreter/Expressions/JintUnaryExpression.cs"&gt;AST interpreter&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/sebastienros/esprima-dotnet/blob/main/src/Esprima/JavascriptParser.cs"&gt;Hand-written via Esprima.NET&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: &lt;a href="https://github.com/sebastienros/jint/graphs/contributors"&gt;2014?&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Notes: Thanks &lt;a href="https://news.ycombinator.com/user?id=fowl2"&gt;fowl2&lt;/a&gt; for mentioning!&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
 &lt;li&gt;&lt;a href="https://github.com/nilproject/NiL.JS"&gt;NiL.JS&lt;/a&gt;&lt;ul&gt;
 &lt;li&gt;Support: ES6&lt;/li&gt;
 &lt;li&gt;Implementation language: C#&lt;/li&gt;
@@ -253,7 +262,7 @@ AssemblyScript's case, not JavaScript.&lt;/p&gt;
 &lt;li&gt;&lt;a href="https://github.com/higgsjs/Higgs"&gt;Higgs&lt;/a&gt;&lt;ul&gt;
 &lt;li&gt;Support: Unclear&lt;/li&gt;
 &lt;li&gt;Implementation language: D&lt;/li&gt;
-&lt;li&gt;Runtime: &lt;a href="https://github.com/higgsjs/Higgs/blob/master/source/runtime/vm.d"&gt;Bytecode VM&lt;/a&gt; and &lt;a href="https://github.com/higgsjs/Higgs/tree/master/source/jit"&gt;JIT compileron x64&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/higgsjs/Higgs/blob/master/source/runtime/vm.d"&gt;Bytecode VM&lt;/a&gt; and &lt;a href="https://github.com/higgsjs/Higgs/tree/master/source/jit"&gt;JIT compiler on x64&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Parser: &lt;a href="https://github.com/higgsjs/Higgs/blob/master/source/parser/parser.d"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
 &lt;/li&gt;
@@ -283,6 +292,13 @@ AssemblyScript's case, not JavaScript.&lt;/p&gt;
 &lt;li&gt;Runtime: &lt;a href="https://github.com/DigitalMars/DMDScript/blob/master/engine/source/dmdscript/opcodes.d#L15"&gt;Bytecode VM&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Parser: &lt;a href="https://github.com/DigitalMars/DMDScript/blob/master/engine/source/dmdscript/parse.d"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Notes: It's possible this is commercially maintained by DigitalMars but I'm not sure. There are also references in this repo to another C++ implementation of DMDScript that may be commercial. Thanks to &lt;a href="https://twitter.com/moon_chilled"&gt;@moon_chilled&lt;/a&gt; for mentioning!&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/toshok/echojs"&gt;EchoJS&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: Unclear&lt;/li&gt;
+&lt;li&gt;Implementation language: JavaScript&lt;/li&gt;
+&lt;li&gt;Runtime: Native through LLVM&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/toshok/esprima/tree/e4445c9cc2530d672c4e9f68f5e2a53673b57af0"&gt;Hand-written via Esprima&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
 &lt;/li&gt;
 &lt;li&gt;&lt;a href="https://github.com/haileys/twostroke"&gt;twostroke&lt;/a&gt;&lt;ul&gt;

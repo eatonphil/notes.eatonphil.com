@@ -181,6 +181,13 @@ features.
   * Runtime: Compiles to [.NET](https://github.com/paulbartrum/jurassic/blob/ee6f4fa17e6205e15412a214b24d7575b0bd461c/Jurassic/Compiler/MethodGenerator/GlobalOrEvalMethodGenerator.cs#L139)
   * Parser: [Hand-written](https://github.com/paulbartrum/jurassic/blob/master/Jurassic/Compiler/Parser/Parser.cs)
   * First release: [2011?](https://github.com/paulbartrum/jurassic/graphs/contributors)
+* [Jint](https://github.com/sebastienros/jint)
+  * Support: ES5, most of ES6/7/8
+  * Implementation language: C#
+  * Runtime: [AST interpreter](https://github.com/sebastienros/jint/blob/main/Jint/Runtime/Interpreter/Expressions/JintUnaryExpression.cs)
+  * Parser: [Hand-written via Esprima.NET](https://github.com/sebastienros/esprima-dotnet/blob/main/src/Esprima/JavascriptParser.cs)
+  * First release: [2014?](https://github.com/sebastienros/jint/graphs/contributors)
+  * Notes: Thanks [fowl2](https://news.ycombinator.com/user?id=fowl2) for mentioning!
 * [NiL.JS](https://github.com/nilproject/NiL.JS)
   * Support: ES6
   * Implementation language: C#
@@ -222,7 +229,7 @@ AssemblyScript's case, not JavaScript.
 * [Higgs](https://github.com/higgsjs/Higgs)
   * Support: Unclear
   * Implementation language: D
-  * Runtime: [Bytecode VM](https://github.com/higgsjs/Higgs/blob/master/source/runtime/vm.d) and [JIT compileron x64](https://github.com/higgsjs/Higgs/tree/master/source/jit)
+  * Runtime: [Bytecode VM](https://github.com/higgsjs/Higgs/blob/master/source/runtime/vm.d) and [JIT compiler on x64](https://github.com/higgsjs/Higgs/tree/master/source/jit)
   * Parser: [Hand-written](https://github.com/higgsjs/Higgs/blob/master/source/parser/parser.d)
 * [eJS](https://github.com/tugawa/ejs-new)
   * Support: Unclear
@@ -249,6 +256,11 @@ AssemblyScript's case, not JavaScript.
   * Runtime: [Bytecode VM](https://github.com/DigitalMars/DMDScript/blob/master/engine/source/dmdscript/opcodes.d#L15)
   * Parser: [Hand-written](https://github.com/DigitalMars/DMDScript/blob/master/engine/source/dmdscript/parse.d)
   * Notes: It's possible this is commercially maintained by DigitalMars but I'm not sure. There are also references in this repo to another C++ implementation of DMDScript that may be commercial. Thanks to [@moon_chilled](https://twitter.com/moon_chilled) for mentioning!
+* [EchoJS](https://github.com/toshok/echojs)
+  * Support: Unclear
+  * Implementation language: JavaScript
+  * Runtime: Native through LLVM
+  * Parser: [Hand-written via Esprima](https://github.com/toshok/esprima/tree/e4445c9cc2530d672c4e9f68f5e2a53673b57af0)
 * [twostroke](https://github.com/haileys/twostroke)
   * Support: Unclear
   * Implementation language: Ruby
