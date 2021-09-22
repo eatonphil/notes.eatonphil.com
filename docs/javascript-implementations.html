@@ -48,8 +48,10 @@ today. Used in Chrome, (and by extension) Microsoft Edge, Node.js,
 etc. Safari's JavaScriptCore and Firefox's SpiderMonkey are also
 contenders for extremely mainstream implementations.</p>
 <p>But what else is out there? What if I want to embed JavaScript in a C
-program, or a Go program, or a Rust program, or a Java program(, and so
-on)? It turns out there are a ton of high-quality implementations out there.</p>
+program, or a Go program, or a Rust program, or a Java program(, and
+so on)? Or what if you want to run JavaScript on a microcontroller? Or
+use it as a base for language research? It turns out there are a ton
+of high-quality implementations out there.</p>
 <p>This post describes a number of them and their implementation
 choices. I'm not going to cover V8, JavaScriptCore, or SpiderMonkey
 because they are massive and hide multiple various interpreters and
@@ -160,6 +162,15 @@ own commercial, production applications.</p>
 <li>Runtime: <a href="https://github.com/facebook/hermes/tree/main/lib/VM">Bytecode VM</a></li>
 <li>Parser: <a href="https://github.com/facebook/hermes/blob/main/lib/Parser/JSParserImpl.cpp">Hand-written</a></li>
 <li>First release: <a href="https://github.com/facebook/hermes/releases/tag/v0.0.1">2019?</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/qt/qtdeclarative/tree/dev/src/qml/jsruntime">Qt's V4</a><ul>
+<li>Support: ES5</li>
+<li>Implementation language: C++</li>
+<li>Runtime: <a href="https://github.com/qt/qtdeclarative/blob/dev/src/qml/jsruntime/qv4vme_moth.cpp">Bytecode VM</a> and JIT compiler</li>
+<li>Parser: <a href="https://github.com/qt/qtdeclarative/blob/dev/src/qml/parser/qqmljs.g">qlalr custom parser generator</a></li>
+<li>First release: 2013</li>
+<li>Notes: Unclear if can be run standalone outside of Qt.</li>
 </ul>
 </li>
 </ul>

@@ -8,8 +8,10 @@ etc. Safari's JavaScriptCore and Firefox's SpiderMonkey are also
 contenders for extremely mainstream implementations.
 
 But what else is out there? What if I want to embed JavaScript in a C
-program, or a Go program, or a Rust program, or a Java program(, and so
-on)? It turns out there are a ton of high-quality implementations out there.
+program, or a Go program, or a Rust program, or a Java program(, and
+so on)? Or what if you want to run JavaScript on a microcontroller? Or
+use it as a base for language research? It turns out there are a ton
+of high-quality implementations out there.
 
 This post describes a number of them and their implementation
 choices. I'm not going to cover V8, JavaScriptCore, or SpiderMonkey
@@ -111,6 +113,13 @@ own commercial, production applications.
   * Runtime: [Bytecode VM](https://github.com/facebook/hermes/tree/main/lib/VM)
   * Parser: [Hand-written](https://github.com/facebook/hermes/blob/main/lib/Parser/JSParserImpl.cpp)
   * First release: [2019?](https://github.com/facebook/hermes/releases/tag/v0.0.1)
+* [Qt's V4](https://github.com/qt/qtdeclarative/tree/dev/src/qml/jsruntime)
+  * Support: ES5
+  * Implementation language: C++
+  * Runtime: [Bytecode VM](https://github.com/qt/qtdeclarative/blob/dev/src/qml/jsruntime/qv4vme_moth.cpp) and JIT compiler
+  * Parser: [qlalr custom parser generator](https://github.com/qt/qtdeclarative/blob/dev/src/qml/parser/qqmljs.g)
+  * First release: 2013
+  * Notes: Unclear if can be run standalone outside of Qt.
 
 I don't know whether to put Microsoft's ChakraCore into this list or
 the next. So I'll put it here but note that as of this year 2021, they

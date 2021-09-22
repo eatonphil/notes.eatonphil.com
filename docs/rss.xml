@@ -1,11 +1,13 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 22 Sep 2021 14:45:24 +0000</lastBuildDate><item><title>Enumerating and analyzing 40+ non-V8 JavaScript implementations</title><link>http://notes.eatonphil.com/javascript-implementations.html</link><description>&lt;p&gt;V8 is, I'm sure, the most used implementation of JavaScript
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 22 Sep 2021 21:46:53 +0000</lastBuildDate><item><title>Enumerating and analyzing 40+ non-V8 JavaScript implementations</title><link>http://notes.eatonphil.com/javascript-implementations.html</link><description>&lt;p&gt;V8 is, I'm sure, the most used implementation of JavaScript
 today. Used in Chrome, (and by extension) Microsoft Edge, Node.js,
 etc. Safari's JavaScriptCore and Firefox's SpiderMonkey are also
 contenders for extremely mainstream implementations.&lt;/p&gt;
 &lt;p&gt;But what else is out there? What if I want to embed JavaScript in a C
-program, or a Go program, or a Rust program, or a Java program(, and so
-on)? It turns out there are a ton of high-quality implementations out there.&lt;/p&gt;
+program, or a Go program, or a Rust program, or a Java program(, and
+so on)? Or what if you want to run JavaScript on a microcontroller? Or
+use it as a base for language research? It turns out there are a ton
+of high-quality implementations out there.&lt;/p&gt;
 &lt;p&gt;This post describes a number of them and their implementation
 choices. I'm not going to cover V8, JavaScriptCore, or SpiderMonkey
 because they are massive and hide multiple various interpreters and
@@ -116,6 +118,15 @@ own commercial, production applications.&lt;/p&gt;
 &lt;li&gt;Runtime: &lt;a href="https://github.com/facebook/hermes/tree/main/lib/VM"&gt;Bytecode VM&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Parser: &lt;a href="https://github.com/facebook/hermes/blob/main/lib/Parser/JSParserImpl.cpp"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;First release: &lt;a href="https://github.com/facebook/hermes/releases/tag/v0.0.1"&gt;2019?&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/qt/qtdeclarative/tree/dev/src/qml/jsruntime"&gt;Qt's V4&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: ES5&lt;/li&gt;
+&lt;li&gt;Implementation language: C++&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/qt/qtdeclarative/blob/dev/src/qml/jsruntime/qv4vme_moth.cpp"&gt;Bytecode VM&lt;/a&gt; and JIT compiler&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/qt/qtdeclarative/blob/dev/src/qml/parser/qqmljs.g"&gt;qlalr custom parser generator&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: 2013&lt;/li&gt;
+&lt;li&gt;Notes: Unclear if can be run standalone outside of Qt.&lt;/li&gt;
 &lt;/ul&gt;
 &lt;/li&gt;
 &lt;/ul&gt;
