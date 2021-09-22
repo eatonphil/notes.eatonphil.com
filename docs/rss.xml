@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 22 Sep 2021 10:52:23 +0000</lastBuildDate><item><title>Enumerating and analyzing 40+ non-V8 JavaScript implementations</title><link>http://notes.eatonphil.com/javascript-implementations.html</link><description>&lt;p&gt;V8 is, I'm sure, the most used implementation of JavaScript
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 22 Sep 2021 12:17:04 +0000</lastBuildDate><item><title>Enumerating and analyzing 40+ non-V8 JavaScript implementations</title><link>http://notes.eatonphil.com/javascript-implementations.html</link><description>&lt;p&gt;V8 is, I'm sure, the most used implementation of JavaScript
 today. Used in Chrome, (and by extension) Microsoft Edge, Node.js,
 etc. Safari's JavaScriptCore and Firefox's SpiderMonkey are also
 contenders for extremely mainstream implementations.&lt;/p&gt;
@@ -272,6 +272,7 @@ AssemblyScript's case, not JavaScript.&lt;/p&gt;
 &lt;/ul&gt;
 &lt;/li&gt;
 &lt;li&gt;&lt;a href="https://github.com/b9org/b9"&gt;https://github.com/b9org/b9&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.defensivejs.com/"&gt;https://www.defensivejs.com/&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p class="note"&gt;
   Thanks to &lt;a href="https://twitter.com/smarr"&gt;@smarr&lt;/a&gt; for contributing eJS, Higgs, and b9!
@@ -319,6 +320,7 @@ AssemblyScript's case, not JavaScript.&lt;/p&gt;
 &lt;li&gt;Parser: &lt;a href="https://github.com/polydojo/jispy/blob/master/jispy.py#L311"&gt;Unclear&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
 &lt;/li&gt;
+&lt;li&gt;&lt;a href="https://metacpan.org/pod/JE#Simple-Use"&gt;JE: Pure-Perl JavaScript Engine&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h3 id="notable-toy-implementations"&gt;Notable toy implementations&lt;/h3&gt;&lt;p&gt;Great for inspiriration if you've never implemented a language before.&lt;/p&gt;
 &lt;ul&gt;
