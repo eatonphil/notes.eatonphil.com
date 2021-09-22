@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 22 Sep 2021 02:03:47 +0000</lastBuildDate><item><title>Enumerating and analyzing 40+ non-V8 JavaScript implementations</title><link>http://notes.eatonphil.com/javascript-implementations.html</link><description>&lt;p&gt;V8 is, I'm sure, the most used implementation of JavaScript
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 22 Sep 2021 10:35:56 +0000</lastBuildDate><item><title>Enumerating and analyzing 40+ non-V8 JavaScript implementations</title><link>http://notes.eatonphil.com/javascript-implementations.html</link><description>&lt;p&gt;V8 is, I'm sure, the most used implementation of JavaScript
 today. Used in Chrome, (and by extension) Microsoft Edge, Node.js,
 etc. Safari's JavaScriptCore and Firefox's SpiderMonkey are also
 contenders for extremely mainstream implementations.&lt;/p&gt;
@@ -107,6 +107,19 @@ own commercial, production applications.&lt;/p&gt;
 &lt;li&gt;Runtime: &lt;a href="https://github.com/facebook/hermes/tree/main/lib/VM"&gt;Bytecode VM&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Parser: &lt;a href="https://github.com/facebook/hermes/blob/main/lib/Parser/JSParserImpl.cpp"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;First release: &lt;a href="https://github.com/facebook/hermes/releases/tag/v0.0.1"&gt;2019?&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;I don't know whether to put Microsoft's ChakraCore into this list or
+the next. So I'll put it here but note that as of this year 2021, they
+are transitioning it to become a community-driven project.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://github.com/chakra-core/ChakraCore"&gt;Microsoft's ChakraCore&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: ES6, probably more&lt;/li&gt;
+&lt;li&gt;Implementation language: C++&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/chakra-core/ChakraCore/tree/master/lib/Backend"&gt;Bytecode VM and JIT on x86/ARM&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/chakra-core/ChakraCore/blob/master/lib/Parser/Parse.cpp"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;First release: 2015?&lt;/li&gt;
 &lt;/ul&gt;
 &lt;/li&gt;
 &lt;/ul&gt;
