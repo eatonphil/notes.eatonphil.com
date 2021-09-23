@@ -49,9 +49,9 @@ etc. Safari's JavaScriptCore and Firefox's SpiderMonkey are also
 contenders for extremely mainstream implementations.</p>
 <p>But what else is out there? What if I want to embed JavaScript in a C
 program, or a Go program, or a Rust program, or a Java program(, and
-so on)? Or what if you want to run JavaScript on a microcontroller? Or
-use it as a base for language research? It turns out there are a ton
-of high-quality implementations out there.</p>
+so on)? Or what if I want to run JavaScript on a microcontroller? Or
+use it as a base for language research? It turns out there are many
+high-quality implementations out there.</p>
 <p>This post describes a number of them and their implementation
 choices. I'm not going to cover V8, JavaScriptCore, or SpiderMonkey
 because they are massive and hide multiple various interpreters and
@@ -395,16 +395,13 @@ AssemblyScript's case, not JavaScript.</p>
 </ul>
 <h3 id="notable-toy-implementations">Notable toy implementations</h3><p>Great for inspiriration if you've never implemented a language before.</p>
 <ul>
-<li><a href="https://github.com/thomasebsmith/armadillo">https://github.com/thomasebsmith/armadillo</a></li>
-<li><a href="https://github.com/DelSkayn/toyjs">https://github.com/DelSkayn/toyjs</a></li>
-<li><a href="https://github.com/yisar/joke">https://github.com/yisar/joke</a></li>
-<li><a href="https://github.com/yanmingsohu/Polydeuces">https://github.com/yanmingsohu/Polydeuces</a></li>
-<li><a href="https://github.com/danfragoso/sausage">https://github.com/danfragoso/sausage</a></li>
-<li><a href="https://github.com/CrimsonAS/v2">https://github.com/CrimsonAS/v2</a></li>
-<li><a href="https://github.com/githubyang/SparrowJS">https://github.com/githubyang/SparrowJS</a></li>
-<li><a href="https://github.com/danfragoso/sausage">https://github.com/danfragoso/sausage</a></li>
-<li><a href="https://github.com/gojisvm/gojis">https://github.com/gojisvm/gojis</a></li>
-<li><a href="https://github.com/eatonphil/jsc">https://github.com/eatonphil/jsc</a></li>
+<li><a href="https://github.com/timruffles/js-to-c">js-to-c</a>: A JavaScript to C compiler, written in C</li>
+<li><a href="https://github.com/mras0/mjs]">mjs</a>: AST interpreter for not just ES5 or even ES3 but also ES1</li>
+<li><a href="https://github.com/gojisvm/gojis">gojis</a>: AST interpreter in Go</li>
+<li><a href="https://github.com/DelSkayn/toyjs">tojs</a>: Bytecode VM in Rust</li>
+<li><a href="https://github.com/CrimsonAS/v2">v2</a>: Bytecode VM in Go</li>
+<li><a href="https://github.com/githubyang/SparrowJS">SparrowJS</a>: AST interpreter in C++</li>
+<li><a href="https://github.com/eatonphil/jsc">jsc</a>: My own experiment compiling JavaScript to C++/libV8</li>
 </ul>
 <p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">New post is up! Enumerating and analyzing 40+ non-V8 JavaScript implementations; of course with links to source code and parser &amp; runtime/backend decisions.<br><br>I hope you enjoy learning about JavaScript engines as much as I did. 😁<a href="https://t.co/dEX06WU38f">https://t.co/dEX06WU38f</a> <a href="https://t.co/AoYScphG6m">pic.twitter.com/AoYScphG6m</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1440436962305789952?ref_src=twsrc%5Etfw">September 21, 2021</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
 
