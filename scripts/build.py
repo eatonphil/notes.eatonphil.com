@@ -188,6 +188,7 @@ def main():
     all_tags = {}
     post_data = []
     for post in get_posts():
+        print('Processing ' + post)
         out_file = post[len('posts/'):]
         output, title = get_post_data(post)
         header, date, tags_raw = title[1], title[2], title.get(6, "")
