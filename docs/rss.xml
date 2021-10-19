@@ -1,11 +1,11 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 19 Oct 2021 13:23:09 +0000</lastBuildDate><item><title>[External] Experimenting with column- and row-oriented datastructures</title><link>http://notes.eatonphil.com/experimenting-with-column-and-row-oriented-datastructures.html</link><description>&lt;head&gt;
-    &lt;meta http-equiv="refresh" content="0;URL='https://datastation.multiprocess.io/blog/2021-10-18-experimenting-with-column-and-row-oriented-datastructures.html'" /&gt;
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 19 Oct 2021 13:39:51 +0000</lastBuildDate><item><title>[External] Experimenting with column- and row-oriented datastructures</title><link>http://notes.eatonphil.com/experimenting-with-column-and-row-oriented-datastructures.html</link><description>&lt;head&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2021-10-18-experimenting-with-column-and-row-oriented-datastructures.html'" /&gt;
 &lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
 &lt;a href="https://datastation.multiprocess.io/blog/2021-10-18-experimenting-with-column-and-row-oriented-datastructures.html"&gt;here&lt;/a&gt;
 if you are not redirected.&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/experimenting-with-column-and-row-oriented-datastructures.html</guid><pubDate>Mon, 18 Oct 2021 00:00:00 +0000</pubDate></item><item><title>[External] Notes on running Electron</title><link>http://notes.eatonphil.com/notes-on-running-electron.html</link><description>&lt;head&gt;
-    &lt;meta http-equiv="refresh" content="0;URL='https://datastation.multiprocess.io/blog/2021-10-13-notes-on-running-electron.html'" /&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2021-10-13-notes-on-running-electron.html'" /&gt;
 &lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
 &lt;a href="https://datastation.multiprocess.io/blog/2021-10-13-notes-on-running-electron.html"&gt;here&lt;/a&gt;
 if you are not redirected.&lt;/p&gt;
@@ -1520,17 +1520,17 @@ Hello world!%
 &lt;h3 id="next-up"&gt;Next up&lt;/h3&gt;&lt;p&gt;I'm porting this example to Kawa to see how it fares. Blog post to come.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;In a ridiculous attempt to prove an internet wrong about the practicality of Lisp (Common Lisp specifically), I tried to get a simple (but realistic) web app running. After four days and a patch to ABCL I got something working.&lt;a href="https://t.co/5UUWNR8Wnn"&gt;https://t.co/5UUWNR8Wnn&lt;/a&gt; &lt;a href="https://t.co/cZsx32IlKD"&gt;pic.twitter.com/cZsx32IlKD&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1423345414279942150?ref_src=twsrc%5Etfw"&gt;August 5, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/practical-common-lisp-on-the-jvm.html</guid><pubDate>Thu, 05 Aug 2021 00:00:00 +0000</pubDate></item><item><title>[External] Writing an efficient object previewer for JavaScript</title><link>http://notes.eatonphil.com/writing-an-efficient-javascript-object-previewer.html</link><description>&lt;head&gt;
-    &lt;meta http-equiv="refresh" content="0;URL='https://datastation.multiprocess.io/blog/2021-07-15-writing-an-efficient-javascript-object-previewer.html'" /&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2021-07-15-writing-an-efficient-javascript-object-previewer.html'" /&gt;
 &lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
 &lt;a href="https://datastation.multiprocess.io/blog/2021-07-15-writing-an-efficient-javascript-object-previewer.html"&gt;here&lt;/a&gt;
 if you are not redirected.&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/writing-an-efficient-javascript-object-previewer.html</guid><pubDate>Thu, 15 Jul 2021 00:00:00 +0000</pubDate></item><item><title>[External] React without webpack: fast path to a working app from scratch</title><link>http://notes.eatonphil.com/react-without-webpack.html</link><description>&lt;head&gt;
-    &lt;meta http-equiv="refresh" content="0;URL='https://datastation.multiprocess.io/blog/2021-07-08-react-without-webpack.html'" /&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2021-07-08-react-without-webpack.html'" /&gt;
 &lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
 &lt;a href="https://datastation.multiprocess.io/blog/2021-07-08-react-without-webpack.html"&gt;here&lt;/a&gt;
 if you are not redirected.&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/react-without-webpack.html</guid><pubDate>Thu, 08 Jul 2021 00:00:00 +0000</pubDate></item><item><title>[External] Controlled HTML select element in React has weird default UX</title><link>http://notes.eatonphil.com/controlled-select-element-in-react-has-weird-ux.html</link><description>&lt;head&gt;
-    &lt;meta http-equiv="refresh" content="0;URL='https://datastation.multiprocess.io/blog/2021-06-25-select-in-react-broken-by-default.html'" /&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2021-06-25-select-in-react-broken-by-default.html'" /&gt;
 &lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
 &lt;a href="https://datastation.multiprocess.io/blog/2021-06-25-select-in-react-broken-by-default.html"&gt;here&lt;/a&gt;
 if you are not redirected.&lt;/p&gt;
@@ -1557,7 +1557,7 @@ freely available chance to give reassurance to your best people.&lt;/p&gt;
 succeeding.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Wrote a post for all the people managers, directors, VPs out there: you need to regularly share success stories with your whole organization. Everyone wants to be part of an organization that is doing good work.&lt;a href="https://t.co/XgaY5Ri1tA"&gt;https://t.co/XgaY5Ri1tA&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1407451413156929537?ref_src=twsrc%5Etfw"&gt;June 22, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/leaders-share-company-success-stories.html</guid><pubDate>Tue, 22 Jun 2021 00:00:00 +0000</pubDate></item><item><title>[External] Languages you can run in the browser, part 1: Python, JavaScript, SQLite</title><link>http://notes.eatonphil.com/languages-you-can-run-in-the-browser.html</link><description>&lt;head&gt;
-    &lt;meta http-equiv="refresh" content="0;URL='https://datastation.multiprocess.io/blog/2021-06-16-languages-you-can-run-in-the-browser.html'" /&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2021-06-16-languages-you-can-run-in-the-browser.html'" /&gt;
 &lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
 &lt;a href="https://datastation.multiprocess.io/blog/2021-06-16-languages-you-can-run-in-the-browser.html"&gt;here&lt;/a&gt;
 if you are not redirected.&lt;/p&gt;
@@ -16803,7 +16803,12 @@ was making poor use of Racket.&lt;/p&gt;
 developed. SBCL, with it's great performance and native-thread
 support, is a promising candidate for backend web development.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;I wrote a post on putting together a Common Lisp project. It&amp;#39;s easy! I also included some of my favorite CL books and a digression on Scheme. &lt;a href="https://t.co/2LEDoFnAjk"&gt;https://t.co/2LEDoFnAjk&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/commonlisp?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#commonlisp&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/lisp?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#lisp&lt;/a&gt; &lt;a href="https://twitter.com/hashtag/scheme?src=hash&amp;amp;ref_src=twsrc%5Etfw"&gt;#scheme&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/971398435856371712?ref_src=twsrc%5Etfw"&gt;March 7, 2018&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/starting-a-minimal-common-lisp-project.html</guid><pubDate>Mon, 05 Mar 2018 00:00:00 +0000</pubDate></item><item><title>First few hurdles writing a Scheme interpreter</title><link>http://notes.eatonphil.com/first-few-hurdles-writing-a-scheme-interpreter.html</link><description>&lt;p&gt;I started working on &lt;a href="https://github.com/eatonphil/bsdscheme"&gt;BSDScheme&lt;/a&gt; last October, inspired to get back
+</description><guid isPermaLink="false">http://notes.eatonphil.com/starting-a-minimal-common-lisp-project.html</guid><pubDate>Mon, 05 Mar 2018 00:00:00 +0000</pubDate></item><item><title>[External] Interview with the D Language Blog: BSDScheme</title><link>http://notes.eatonphil.com/project-highlight-bsdscheme.html</link><description>&lt;head&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://dlang.org/blog/2018/01/20/project-highlight-bsdscheme/'" /&gt;
+&lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
+&lt;a href="https://dlang.org/blog/2018/01/20/project-highlight-bsdscheme/"&gt;here&lt;/a&gt;
+if you are not redirected.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/project-highlight-bsdscheme.html</guid><pubDate>Sat, 20 Jan 2018 00:00:00 +0000</pubDate></item><item><title>First few hurdles writing a Scheme interpreter</title><link>http://notes.eatonphil.com/first-few-hurdles-writing-a-scheme-interpreter.html</link><description>&lt;p&gt;I started working on &lt;a href="https://github.com/eatonphil/bsdscheme"&gt;BSDScheme&lt;/a&gt; last October, inspired to get back
 into language implementation after my coworker built &lt;a href="https://github.com/briansteffens/bshift"&gt;bshift&lt;/a&gt;, a
 compiler for a C-like language. BSDScheme is an interpreter for a
 (currently small subset of) Scheme written in D. It implements a few
