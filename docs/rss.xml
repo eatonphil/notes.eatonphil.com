@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 24 Oct 2021 18:10:28 +0000</lastBuildDate><item><title>Strings, arrays, recursion, and parsing JSON: Exploring PL/pgSQL</title><link>http://notes.eatonphil.com/exploring-plpgsql.html</link><description>&lt;p&gt;PostgreSQL comes with a builtin imperative programming language called
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 24 Oct 2021 18:20:18 +0000</lastBuildDate><item><title>Strings, arrays, recursion, and parsing JSON: Exploring PL/pgSQL</title><link>http://notes.eatonphil.com/exploring-plpgsql.html</link><description>&lt;p&gt;PostgreSQL comes with a builtin imperative programming language called
 PL/pgSQL. I used to think this language was scary because it has a bit
 more adornment than your usual language does. But looking deeper, it's
 actually reasonably pleasant to program in.&lt;/p&gt;
@@ -74,7 +74,7 @@ $ chmod +x ./test.sh
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Easy!&lt;/p&gt;
 &lt;h3 id="numbers-and-recursion"&gt;Numbers and recursion&lt;/h3&gt;&lt;p&gt;Ok now that we've got the basics of function definition down and a way
-to test the code, let's write a fibonnaci program.&lt;/p&gt;
+to test the code, let's write a fibonacci program.&lt;/p&gt;
 &lt;pre&gt;&lt;code&gt;$ cat ./fib.sql
 CREATE OR REPLACE FUNCTION fib(i int) RETURNS int AS $$
 BEGIN
@@ -360,6 +360,7 @@ CONTEXT:  PL/pgSQL function json_get(json_key_value[],text) line 9 at RAISE
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Huzzah! Now hopefully PL/pgSQL is a little less scary to you, whether
 or not you decide to use it.&lt;/p&gt;
+&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;For everyone dying to write imperative code in PostgreSQL, I wrote a post about PL/pgSQL 👽 It starts with implementing simple string and array functions, to recursive Fibonacci, to a small JSON parsing library. A nice little language with a great stdlib!&lt;a href="https://t.co/m4Tff99N6R"&gt;https://t.co/m4Tff99N6R&lt;/a&gt; &lt;a href="https://t.co/2ZMJn2foNa"&gt;pic.twitter.com/2ZMJn2foNa&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1452339113131139072?ref_src=twsrc%5Etfw"&gt;October 24, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/exploring-plpgsql.html</guid><pubDate>Sun, 24 Oct 2021 00:00:00 +0000</pubDate></item><item><title>[External] Experimenting with column- and row-oriented datastructures</title><link>http://notes.eatonphil.com/experimenting-with-column-and-row-oriented-datastructures.html</link><description>&lt;head&gt;
     &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2021-10-18-experimenting-with-column-and-row-oriented-datastructures.html'" /&gt;
 &lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
