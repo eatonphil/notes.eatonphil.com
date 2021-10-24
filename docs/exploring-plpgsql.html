@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Strings, arrays, recursion, and parsing JSON: Exploring PL/pgSQL | notes.eatonphil.com</title>
+    <meta name="description" content="Strings, arrays, recursion, and parsing JSON: Exploring PL/pgSQL" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <div class="row">
+	    <a href="/" class="sm-link">
+              Home
+            </a>
+	    <a href="/rss.xml" class="sm-link">
+              RSS
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+
+          <h2>October 24, 2021</h2>
+          <h1>Strings, arrays, recursion, and parsing JSON: Exploring PL/pgSQL</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/postgres.html" class="tag">postgres</a><a href="/tags/recursion.html" class="tag">recursion</a><a href="/tags/parsing.html" class="tag">parsing</a><a href="/tags/json.html" class="tag">json</a></div>
+          </div>
+	</div>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="col-6">
+        <p>PostgreSQL comes with a builtin imperative programming language called
+PL/pgSQL. I used to think this language was scary because it has a bit
+more adornment than your usual language does. But looking deeper, it's
+actually reasonably pleasant to program in.</p>
+<p>In this post we'll get familiar with it by working with strings,
+arrays and recursive functions. We'll top it all off by building a
+parser for a subset of JSON (no nested objects, no arrays, no unicode,
+no decimals).</p>
+<p>The goal here is not production-quality code (an amazing JSON library
+is already built into PostgreSQL) but simply to get more familiar with
+the PL/pgSQL language.</p>
+<p>All code for this post is available on <a href="https://github.com/eatonphil/exploring-plpgsql">Github</a>.</p>
+<h3 id="creating-functions">Creating functions</h3><p>Functions are declared like tables. Here's a very simple one that
+returns the length of a string:</p>
+<pre><code class="hljs sql">CREATE OR REPLACE FUNCTION slength(s text) RETURNS int AS $$
+BEGIN
+  RETURN length(s);
+END;
+$$ LANGUAGE plpgsql;
+</code></pre>
+<p>It's not a very useful function because <code>length</code> already exists but
+the point is to see a basic custom function.</p>
+<p>All statements in PL/pgSQL must end in a statement. Arguments do not
+have to be named. If they are not named they get default names of <code>$1</code>
+to <code>$N</code>.</p>
+<h4 id="named/unnamed-arguments">Named/unnamed arguments</h4><p>Here's how the function could be written without named arguments:</p>
+<pre><code class="hljs sql">CREATE OR REPLACE FUNCTION slength(text) RETURNS int AS $$
+BEGIN
+  RETURN length($1);
+END;
+$$ LANGUAGE plpgsql;
+</code></pre>
+<h4 id="out-declarations">Out declarations</h4><p>PL/pgSQL also allows you to declare which variables will be returned
+in the function argument list. They call it OUT parameters but as far
+as I can tell it is not like OUT parameters in C# where you are
+modifying the value of a variable in an external scope.</p>
+<pre><code class="hljs sql">CREATE OR REPLACE FUNCTION slength(s text, OUT i int) RETURNS int AS $$
+BEGIN
+  i = length(s);
+END;
+$$ LANGUAGE plpgsql;
+</code></pre>
+<p>This is still equivalent to the first function and is basically a shortcut for:</p>
+<pre><code class="hljs sql">CREATE OR REPLACE FUNCTION slength(s text) RETURNS int AS $$
+DECLARE
+  i int;
+BEGIN
+  i = length(s);
+  RETURN i;
+END;
+$$ LANGUAGE plpgsql;
+</code></pre>
+<p>Whether you declare OUT or not you still must include <code>RETURNS &lt;type&gt;</code>
+in the function signature otherwise even if you call <code>RETURN</code> in the
+body, the result will just be ignored.</p>
+<p>Don't worry about case sensitivity too much. It's really only
+important, as in typical SQL, for mixed-case table and column
+names. But we won't be dealing with that situation in this article
+focused on programming PL/pgSQL.</p>
+<h4 id="testing-it-out">Testing it out</h4><p>Once the function is created, you can call it like <code>SELECT
+slength('foo');</code>. So here's a helper script to load a SQL file and run
+a command:</p>
+<pre><code class="hljs bash">$ cat ./test.sh
+sudo -u postgres psql -c &quot;$(printf &quot;%s;\n%s&quot; &quot;$(cat $1)&quot; &quot;$2&quot;)&quot;
+$ chmod +x ./test.sh
+</code></pre>
+<p>After storing the above <code>slength</code> code in <code>slength.sql</code> we can run a test:</p>
+<pre><code class="hljs sql">$ ./test.sh ./slength.sql &quot;SELECT slength(&#39;foo&#39;)&quot;
+ slength
+---------
+       3
+(1 row)
+</code></pre>
+<p>Easy!</p>
+<h3 id="numbers-and-recursion">Numbers and recursion</h3><p>Ok now that we've got the basics of function definition down and a way
+to test the code, let's write a fibonnaci program.</p>
+<pre><code>$ cat ./fib.sql
+CREATE OR REPLACE FUNCTION fib(i int) RETURNS int AS $$
+BEGIN
+  IF i = 0 OR i = 1 THEN
+    RETURN i;
+  END IF;
+
+  RETURN fib(i - 1) + fib(i - 2);
+END;
+$$ LANGUAGE plpgsql;
+</code></pre>
+<p>Everything in the if test is normal SQL WHERE clause syntax. This
+makes it very easy for folks familiar with SQL to pick up conditionals
+in PL/pgSQL.</p>
+<p>And there's no special syntax to allow function recursion. Nice!</p>
+<p>Run and test this function:</p>
+<pre><code>$ ./test.sh ./fib.sql "SELECT fib(10)"
+ fib
+-----
+  55
+(1 row)
+</code></pre>
+<p>Getting the hang of it?</p>
+<h3 id="strings-and-arrays">Strings and arrays</h3><p>You may have noticed that <code>length</code> used in <code>slength</code> is a builtin
+PostgreSQL function for dealing with strings. All builtin functions in
+PostgreSQL can be used in PL/pgSQL.</p>
+<p>In order to get familiar with using arrays in PL/pgSQL let's write a
+<code>string_to_array</code> function.</p>
+<pre><code class="hljs sql">$ cat ./string_to_array.sql
+CREATE OR REPLACE FUNCTION string_to_array(s text) RETURNS char[] AS $$
+DECLARE
+  a char[];
+BEGIN
+  WHILE COALESCE(array_length(a, 1), 0) &lt; length(s) LOOP
+    a[COALESCE(array_length(a, 1), 0) + 1] = substr(s, COALESCE(array_length(a, 1), 0) + 1, 1);
+  END LOOP;
+  RETURN a;
+END;
+$$ LANGUAGE plpgsql;
+</code></pre>
+<p>This is one way to do it by modify array values directly by index. We
+need to coalesce because calling <code>array_length</code> on an empty array
+returns <code>NULL</code>.</p>
+<p>Another way to do this is by calling the builtin function <code>array_append</code>.</p>
+<pre><code class="hljs sql">CREATE OR REPLACE FUNCTION string_to_array(s text) RETURNS char[] AS $$
+DECLARE
+  a char[];
+BEGIN
+  WHILE COALESCE(array_length(a, 1), 0) &lt; length(s) LOOP
+    a = array_append(a, substr(s, COALESCE(array_length(a, 1), 0) + 1, 1)::char);
+  END LOOP;
+  RETURN a;
+END;
+$$ LANGUAGE plpgsql;
+</code></pre>
+<p>We can test and run both:</p>
+<pre><code class="hljs bash">$ ./test.sh ./string_to_array.sql &quot;SELECT string_to_array(&#39;foo&#39;)&quot;
+ string_to_array
+-----------------
+ {f,o,o}
+(1 row)
+$ ./test.sh ./string_to_array2.sql &quot;SELECT string_to_array(&#39;foo&#39;)&quot;
+ string_to_array
+-----------------
+ {f,o,o}
+(1 row)
+</code></pre>
+<p>Of course the builtin alternative might be <code>SELECT
+regexp_split_to_array('foo')</code> but we need the practice.</p>
+<h3 id="custom-compound-types">Custom compound types</h3><p>If we're going to lex and parse JSON, we're going to want to return an
+array of tokens from the lexer. A token will need to contain the type
+(e.g. number, string, syntax) and the string value of the token
+(e.g. <code>1</code>, <code>{</code>, <code>my great key</code>).</p>
+<p>PostgreSQL allows us to create compound types that we can then use as
+the base of an array:</p>
+<pre><code>DROP TYPE IF EXISTS json_token CASCADE;
+CREATE TYPE json_token AS (
+  kind text,
+  value text
+);
+</code></pre>
+<p>We need to add <code>CASCADE</code> here because functions will have this type in
+their signature and it otherwise makes PostgreSQL unhappy to delete
+the type used in a function before deleting the function.</p>
+<p>We can create literals of this type like <code>SELECT ('number',
+'12')::json_token)</code>.</p>
+<p>Now we're ready to build out the lexer.</p>
+<h3 id="lexing">Lexing</h3><p>The lexers job is to clump together groups of characters into tokens.</p>
+<p>I'm going to describe this function in literate code.</p>
+<pre><code class="hljs sql">CREATE OR REPLACE FUNCTION json_lex(j text, OUT ts json_token[]) RETURNS json_token[] AS $$
+</code></pre>
+<p>This function takes a string in and returns an array of json tokens.</p>
+<pre><code class="hljs sql">DECLARE 
+  i int = 1; -- Index in loop
+  c text; -- Current character in loop
+  token text; -- Current accumulated characters
+</code></pre>
+<p>We need to declare all variables up front.</p>
+<pre><code class="hljs sql">BEGIN
+  WHILE i &lt; length(j) + 1 LOOP
+    c = substr(j, i, 1);
+    token = &#39;&#39;;
+</code></pre>
+<p>The main loop just looks at all characters.</p>
+<pre><code class="hljs sql">    -- Handle syntax characters
+    IF c = &#39;{&#39; OR c = &#39;}&#39; OR c = &#39;,&#39; OR c = &#39;:&#39; THEN
+      ts = array_append(ts, (&#39;syntax&#39;, c)::json_token);
+      i = i + 1;
+      CONTINUE;
+    END IF;
+</code></pre>
+<p>First we look if the character is a syntax character. If it is we
+append it to the array of tokens, increment the index, and go back to
+the start of the main loop.</p>
+<pre><code class="hljs sql">    -- Handle whitespace
+    IF regexp_replace(c, &#39;^\s+&#39;, &#39;&#39;) = &#39;&#39; THEN
+      i = i + 1;
+      CONTINUE;
+    END IF;
+</code></pre>
+<p>Then we check for whitespace characters. If replacing all whitespace
+characters returns an empty string then we know it's whitespace. We
+could also have done something like <code>IF c = ' ' OR c = '\n'
+... THEN</code> instead.</p>
+<p>Same as before though if we find whitespace characters we move on
+(don't accumulate them) and restart the main loop.</p>
+<pre><code class="hljs sql">    -- Handle strings
+    IF c = &#39;&quot;&#39; THEN
+      i = i + 1;
+      c = substr(j, i, 1);
+      WHILE c &lt;&gt; &#39;&quot;&#39; LOOP
+    token = token || c;
+    i = i + 1;
+    c = substr(j, i, 1);
+      END LOOP;
+
+      i = i + 1;
+      ts = array_append(ts, (&#39;string&#39;, token)::json_token);
+      CONTINUE;
+    END IF;
+</code></pre>
+<p>Next we loop through any strings we find and accumulate them as tokens
+before restarting the main loop.</p>
+<pre><code class="hljs sql">    -- Handle numbers
+    WHILE c ~ &#39;^[0-9]+$&#39; LOOP
+      token = token || c;
+      i = i + 1;
+      c = substr(j, i, 1);
+    END LOOP;
+    IF length(token) &gt; 0 THEN
+      ts = array_append(ts, (&#39;number&#39;, token)::json_token);
+      CONTINUE;
+    END IF;
+</code></pre>
+<p>Then we look for integers.</p>
+<pre><code class="hljs sql">    RAISE EXCEPTION &#39;Unknown character: %, at index: %; already found: %.&#39;, c, i, ts;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+</code></pre>
+<p>Lastly if none of those lexing handlers match, we give up! Then the
+loop is done and the function is too.</p>
+<p>There's no <code>RETURN</code> statement because we already declared an <code>OUT</code>
+variable.</p>
+<p>If we test and run this now:</p>
+<pre><code class="hljs bash">./test.sh ./json.sql &quot;SELECT json_lex(&#39;{\&quot;flubberty\&quot;: 12, \&quot;nice\&quot;: \&quot;a\&quot;}&#39;)&quot;
+                                                                json_lex
+----------------------------------------------------------------------------------------------------------------------------------------
+ {&quot;(syntax,{)&quot;,&quot;(string,flubberty)&quot;,&quot;(syntax,:)&quot;,&quot;(number,12)&quot;,&quot;(syntax,\&quot;,\&quot;)&quot;,&quot;(string,nice)&quot;,&quot;(syntax,:)&quot;,&quot;(string,a)&quot;,&quot;(syntax,})&quot;}
+(1 row)
+</code></pre>
+<p>It's messy but it worked! Now on to parsing.</p>
+<h3 id="parsing">Parsing</h3><p>Our parser will only accept JSON objects. JSON objects will be defined
+as an array of key-value pairs. Custom types make this nice again.</p>
+<pre><code class="hljs sql">DROP TYPE IF EXISTS json_key_value CASCADE;
+CREATE TYPE json_key_value AS (
+  k text,
+  v text
+);
+</code></pre>
+<p>One thing PostgreSQL does not make nice is sum types or parametric
+types. But even if the value here is stored as text it can be easily
+cast to a number by the user. And again, we're not going to support
+nested objects/arrays. But using <code>hstore</code> for key-values might be the
+better alternative if we wanted to build a real JSON parser.</p>
+<pre><code class="hljs sql">CREATE OR REPLACE FUNCTION json_parse(ts json_token[], i int) RETURNS json_key_value[] AS $$
+DECLARE
+  t json_token; -- Current token in tokens loop
+  kvs json_key_value[];
+  k text;
+BEGIN
+  t = ts[i];
+
+  IF t.kind &lt;&gt; &#39;syntax&#39; OR t.value &lt;&gt; &#39;{&#39; THEN
+    RAISE EXCEPTION &#39;Invalid JSON, must be an object, got: %.&#39;, t;
+  END IF;
+  i = i + 1;
+  t = ts[i];
+</code></pre>
+<p>First up in the parser is variable declarations and validating that
+this list of tokens represents a JSON object.</p>
+<pre><code class="hljs sql">WHILE t.kind &lt;&gt; &#39;syntax&#39; OR t.value &lt;&gt; &#39;}&#39; LOOP
+    IF array_length(kvs, 1) &gt; 0 THEN
+      IF t.kind &lt;&gt; &#39;syntax&#39; OR t.value &lt;&gt; &#39;,&#39; THEN
+        RAISE EXCEPTION &#39;JSON key-value pair must be followed by a comma or closing brace, got: %.&#39;, t;
+      END IF;
+
+      i = i + 1;
+      t = ts[i];
+    END IF;
+</code></pre>
+<p>Then we loop to find each key-value pair. If one has already been
+found, we need to find a comma before the next pair.</p>
+<pre><code class="hljs sql">    IF t.kind &lt;&gt; &#39;string&#39; THEN
+      RAISE EXCEPTION &#39;JSON object must start with string key, got: %.&#39;, t;
+    END IF;
+    k = t.value;
+
+    i = i + 1;
+    t = ts[i];
+    IF t.kind &lt;&gt; &#39;syntax&#39; OR t.value &lt;&gt; &#39;:&#39; THEN
+      RAISE EXCEPTION &#39;JSON object must start with string key followed by colon, got: %.&#39;, t;
+    END IF;
+
+    i = i + 1;
+    t = ts[i];
+    IF t.kind = &#39;number&#39; OR t.kind = &#39;string&#39; THEN
+      kvs = array_append(kvs, (k, t)::json_key_value);
+      i = i + 1;
+      t = ts[i];
+      CONTINUE;
+    END IF;
+
+    RAISE EXCEPTION &#39;Invalid key-value pair syntax, got: %.&#39;, t;
+  END LOOP;
+
+  RETURN kvs;
+END;
+$$ LANGUAGE plpgsql;
+</code></pre>
+<p>Then we just look for the key, colon, value syntax and fail if we
+don't see it. And that's it! Very simple when not dealing with arrays
+and nested objects.</p>
+<h3 id="helpers">Helpers</h3><p>Lastly it would just be nice to have a single function that calls lex and parse:</p>
+<pre><code class="hljs sql">CREATE OR REPLACE FUNCTION json_from_string(s text) RETURNS json_key_value[] AS $$
+BEGIN
+  RETURN json_parse(json_lex(s), 1);
+END;
+$$ LANGUAGE plpgsql;
+</code></pre>
+<p>And another function to look up a value in a parsed object by key:</p>
+<pre><code class="hljs sql">CREATE OR REPLACE FUNCTION json_get(kvs json_key_value[], key text) RETURNS text AS $$
+DECLARE
+  kv json_key_value;
+BEGIN
+  FOREACH kv IN ARRAY kvs LOOP
+    IF kv.k = key THEN RETURN (kv.v::json_token).value; END IF;
+  END LOOP;
+
+  RAISE EXCEPTION &#39;Key not found.&#39;;
+END;
+$$ LANGUAGE plpgsql;
+</code></pre>
+<p>And we're all set!</p>
+<h3 id="testing">Testing</h3><p>Let's try some bad syntax (missing a comma between pairs):</p>
+<pre><code class="hljs bash">./test.sh ./json.sql &quot;SELECT json_get(json_from_string(&#39;{\&quot;flubberty\&quot;: 12 \&quot;nice\&quot;: \&quot;a\&quot;}&#39;), &#39;ipo&#39;)&quot;
+ERROR:  JSON key-value pair must be followed by a comma or closing brace, got: (string,nice).
+CONTEXT:  PL/pgSQL function json_parse(json_token[],integer) line 18 at RAISE
+PL/pgSQL function json_from_string(text) line 3 at RETURN
+</code></pre>
+<p>Sweet, it fails correctly.</p>
+<p>Now correct syntax but missing key:</p>
+<pre><code class="hljs bash">./test.sh ./json.sql &quot;SELECT json_get(json_from_string(&#39;{\&quot;flubberty\&quot;: 12, \&quot;nice\&quot;: \&quot;a\&quot;}&#39;), &#39;ipo&#39;)&quot;
+ERROR:  Key not found.
+CONTEXT:  PL/pgSQL function json_get(json_key_value[],text) line 9 at RAISE
+</code></pre>
+<p>And finally, correct syntax and existing key:</p>
+<pre><code class="hljs bash">./test.sh ./json.sql &quot;SELECT json_get(json_from_string(&#39;{\&quot;flubberty\&quot;: 12, \&quot;nice\&quot;: \&quot;a\&quot;}&#39;), &#39;flubberty&#39;)&quot;
+ json_get
+----------
+ 12
+(1 row)
+</code></pre>
+<p>Huzzah! Now hopefully PL/pgSQL is a little less scary to you, whether
+or not you decide to use it.</p>
+
+	<div class="feedback">
+	  <h4>Feedback</h4>
+	  As always,
+	  please <a href="mailto:phil@eatonphil.com">email</a>
+	  or <a href="https://twitter.com/phil_eaton">tweet me</a>
+	  with questions, corrections, or ideas!
+	</div>
+      </div>
+    </div>
+
+    <footer>
+      <div class="container">
+	<div>
+	  <div class="row">
+	    <a href="/" class="sm-link">
+              Home
+            </a>
+	    <a href="/rss.xml" class="sm-link">
+              RSS
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+	</div>
+      </div>
+    </footer>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

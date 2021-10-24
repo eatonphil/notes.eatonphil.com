@@ -1,0 +1,504 @@
+# Strings, arrays, recursion, and parsing JSON: Exploring PL/pgSQL
+## October 24, 2021
+###### postgres,recursion,parsing,json
+
+PostgreSQL comes with a builtin imperative programming language called
+PL/pgSQL. I used to think this language was scary because it has a bit
+more adornment than your usual language does. But looking deeper, it's
+actually reasonably pleasant to program in.
+
+In this post we'll get familiar with it by working with strings,
+arrays and recursive functions. We'll top it all off by building a
+parser for a subset of JSON (no nested objects, no arrays, no unicode,
+no decimals).
+
+The goal here is not production-quality code (an amazing JSON library
+is already built into PostgreSQL) but simply to get more familiar with
+the PL/pgSQL language.
+
+All code for this post is available on [Github](https://github.com/eatonphil/exploring-plpgsql).
+
+### Creating functions
+
+Functions are declared like tables. Here's a very simple one that
+returns the length of a string:
+
+```sql
+CREATE OR REPLACE FUNCTION slength(s text) RETURNS int AS $$
+BEGIN
+  RETURN length(s);
+END;
+$$ LANGUAGE plpgsql;
+```
+
+It's not a very useful function because `length` already exists but
+the point is to see a basic custom function.
+
+All statements in PL/pgSQL must end in a statement. Arguments do not
+have to be named. If they are not named they get default names of `$1`
+to `$N`.
+
+#### Named/unnamed arguments
+
+Here's how the function could be written without named arguments:
+
+```sql
+CREATE OR REPLACE FUNCTION slength(text) RETURNS int AS $$
+BEGIN
+  RETURN length($1);
+END;
+$$ LANGUAGE plpgsql;
+```
+
+#### Out declarations
+
+PL/pgSQL also allows you to declare which variables will be returned
+in the function argument list. They call it OUT parameters but as far
+as I can tell it is not like OUT parameters in C# where you are
+modifying the value of a variable in an external scope.
+
+```sql
+CREATE OR REPLACE FUNCTION slength(s text, OUT i int) RETURNS int AS $$
+BEGIN
+  i = length(s);
+END;
+$$ LANGUAGE plpgsql;
+```
+
+This is still equivalent to the first function and is basically a shortcut for:
+
+```sql
+CREATE OR REPLACE FUNCTION slength(s text) RETURNS int AS $$
+DECLARE
+  i int;
+BEGIN
+  i = length(s);
+  RETURN i;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+Whether you declare OUT or not you still must include `RETURNS <type>`
+in the function signature otherwise even if you call `RETURN` in the
+body, the result will just be ignored.
+
+Don't worry about case sensitivity too much. It's really only
+important, as in typical SQL, for mixed-case table and column
+names. But we won't be dealing with that situation in this article
+focused on programming PL/pgSQL.
+
+#### Testing it out
+
+Once the function is created, you can call it like `SELECT
+slength('foo');`. So here's a helper script to load a SQL file and run
+a command:
+
+```bash
+$ cat ./test.sh
+sudo -u postgres psql -c "$(printf "%s;\n%s" "$(cat $1)" "$2")"
+$ chmod +x ./test.sh
+```
+
+After storing the above `slength` code in `slength.sql` we can run a test:
+
+```sql
+$ ./test.sh ./slength.sql "SELECT slength('foo')"
+ slength
+---------
+       3
+(1 row)
+```
+
+Easy!
+
+### Numbers and recursion
+
+Ok now that we've got the basics of function definition down and a way
+to test the code, let's write a fibonnaci program.
+
+```
+$ cat ./fib.sql
+CREATE OR REPLACE FUNCTION fib(i int) RETURNS int AS $$
+BEGIN
+  IF i = 0 OR i = 1 THEN
+    RETURN i;
+  END IF;
+
+  RETURN fib(i - 1) + fib(i - 2);
+END;
+$$ LANGUAGE plpgsql;
+```
+
+Everything in the if test is normal SQL WHERE clause syntax. This
+makes it very easy for folks familiar with SQL to pick up conditionals
+in PL/pgSQL.
+
+And there's no special syntax to allow function recursion. Nice!
+
+Run and test this function:
+
+```
+$ ./test.sh ./fib.sql "SELECT fib(10)"
+ fib
+-----
+  55
+(1 row)
+```
+
+Getting the hang of it?
+
+### Strings and arrays
+
+You may have noticed that `length` used in `slength` is a builtin
+PostgreSQL function for dealing with strings. All builtin functions in
+PostgreSQL can be used in PL/pgSQL.
+
+In order to get familiar with using arrays in PL/pgSQL let's write a
+`string_to_array` function.
+
+```sql
+$ cat ./string_to_array.sql
+CREATE OR REPLACE FUNCTION string_to_array(s text) RETURNS char[] AS $$
+DECLARE
+  a char[];
+BEGIN
+  WHILE COALESCE(array_length(a, 1), 0) < length(s) LOOP
+    a[COALESCE(array_length(a, 1), 0) + 1] = substr(s, COALESCE(array_length(a, 1), 0) + 1, 1);
+  END LOOP;
+  RETURN a;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+This is one way to do it by modify array values directly by index. We
+need to coalesce because calling `array_length` on an empty array
+returns `NULL`.
+
+Another way to do this is by calling the builtin function `array_append`.
+
+```sql
+CREATE OR REPLACE FUNCTION string_to_array(s text) RETURNS char[] AS $$
+DECLARE
+  a char[];
+BEGIN
+  WHILE COALESCE(array_length(a, 1), 0) < length(s) LOOP
+    a = array_append(a, substr(s, COALESCE(array_length(a, 1), 0) + 1, 1)::char);
+  END LOOP;
+  RETURN a;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+We can test and run both:
+
+```bash
+$ ./test.sh ./string_to_array.sql "SELECT string_to_array('foo')"
+ string_to_array
+-----------------
+ {f,o,o}
+(1 row)
+$ ./test.sh ./string_to_array2.sql "SELECT string_to_array('foo')"
+ string_to_array
+-----------------
+ {f,o,o}
+(1 row)
+```
+
+Of course the builtin alternative might be `SELECT
+regexp_split_to_array('foo')` but we need the practice.
+
+### Custom compound types
+
+If we're going to lex and parse JSON, we're going to want to return an
+array of tokens from the lexer. A token will need to contain the type
+(e.g. number, string, syntax) and the string value of the token
+(e.g. `1`, `{`, `my great key`).
+
+PostgreSQL allows us to create compound types that we can then use as
+the base of an array:
+
+```
+DROP TYPE IF EXISTS json_token CASCADE;
+CREATE TYPE json_token AS (
+  kind text,
+  value text
+);
+```
+
+We need to add `CASCADE` here because functions will have this type in
+their signature and it otherwise makes PostgreSQL unhappy to delete
+the type used in a function before deleting the function.
+
+We can create literals of this type like `SELECT ('number',
+'12')::json_token)`.
+
+Now we're ready to build out the lexer.
+
+### Lexing
+
+The lexers job is to clump together groups of characters into tokens.
+
+I'm going to describe this function in literate code.
+
+```sql
+CREATE OR REPLACE FUNCTION json_lex(j text, OUT ts json_token[]) RETURNS json_token[] AS $$
+```
+
+This function takes a string in and returns an array of json tokens.
+
+```sql
+DECLARE 
+  i int = 1; -- Index in loop
+  c text; -- Current character in loop
+  token text; -- Current accumulated characters
+```
+
+We need to declare all variables up front.
+
+```sql
+BEGIN
+  WHILE i < length(j) + 1 LOOP
+    c = substr(j, i, 1);
+    token = '';
+```
+
+The main loop just looks at all characters.
+
+```sql
+    -- Handle syntax characters
+    IF c = '{' OR c = '}' OR c = ',' OR c = ':' THEN
+      ts = array_append(ts, ('syntax', c)::json_token);
+      i = i + 1;
+      CONTINUE;
+    END IF;
+```
+
+First we look if the character is a syntax character. If it is we
+append it to the array of tokens, increment the index, and go back to
+the start of the main loop.
+
+```sql
+    -- Handle whitespace
+    IF regexp_replace(c, '^\s+', '') = '' THEN
+      i = i + 1;
+      CONTINUE;
+    END IF;
+```
+
+Then we check for whitespace characters. If replacing all whitespace
+characters returns an empty string then we know it's whitespace. We
+could also have done something like `IF c = ' ' OR c = '\n'
+... THEN` instead.
+
+Same as before though if we find whitespace characters we move on
+(don't accumulate them) and restart the main loop.
+
+```sql
+    -- Handle strings
+    IF c = '"' THEN
+      i = i + 1;
+      c = substr(j, i, 1);
+      WHILE c <> '"' LOOP
+	token = token || c;
+	i = i + 1;
+	c = substr(j, i, 1);
+      END LOOP;
+
+      i = i + 1;
+      ts = array_append(ts, ('string', token)::json_token);
+      CONTINUE;
+    END IF;
+```
+
+Next we loop through any strings we find and accumulate them as tokens
+before restarting the main loop.
+
+```sql
+    -- Handle numbers
+    WHILE c ~ '^[0-9]+$' LOOP
+      token = token || c;
+      i = i + 1;
+      c = substr(j, i, 1);
+    END LOOP;
+    IF length(token) > 0 THEN
+      ts = array_append(ts, ('number', token)::json_token);
+      CONTINUE;
+    END IF;
+```
+
+Then we look for integers.
+
+```sql
+    RAISE EXCEPTION 'Unknown character: %, at index: %; already found: %.', c, i, ts;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+Lastly if none of those lexing handlers match, we give up! Then the
+loop is done and the function is too.
+
+There's no `RETURN` statement because we already declared an `OUT`
+variable.
+
+If we test and run this now:
+
+```bash
+./test.sh ./json.sql "SELECT json_lex('{\"flubberty\": 12, \"nice\": \"a\"}')"
+                                                                json_lex
+----------------------------------------------------------------------------------------------------------------------------------------
+ {"(syntax,{)","(string,flubberty)","(syntax,:)","(number,12)","(syntax,\",\")","(string,nice)","(syntax,:)","(string,a)","(syntax,})"}
+(1 row)
+```
+
+It's messy but it worked! Now on to parsing.
+
+### Parsing
+
+Our parser will only accept JSON objects. JSON objects will be defined
+as an array of key-value pairs. Custom types make this nice again.
+
+```sql
+DROP TYPE IF EXISTS json_key_value CASCADE;
+CREATE TYPE json_key_value AS (
+  k text,
+  v text
+);
+```
+
+One thing PostgreSQL does not make nice is sum types or parametric
+types. But even if the value here is stored as text it can be easily
+cast to a number by the user. And again, we're not going to support
+nested objects/arrays. But using `hstore` for key-values might be the
+better alternative if we wanted to build a real JSON parser.
+
+```sql
+CREATE OR REPLACE FUNCTION json_parse(ts json_token[], i int) RETURNS json_key_value[] AS $$
+DECLARE
+  t json_token; -- Current token in tokens loop
+  kvs json_key_value[];
+  k text;
+BEGIN
+  t = ts[i];
+
+  IF t.kind <> 'syntax' OR t.value <> '{' THEN
+    RAISE EXCEPTION 'Invalid JSON, must be an object, got: %.', t;
+  END IF;
+  i = i + 1;
+  t = ts[i];
+```
+
+First up in the parser is variable declarations and validating that
+this list of tokens represents a JSON object.
+
+```sql
+WHILE t.kind <> 'syntax' OR t.value <> '}' LOOP
+    IF array_length(kvs, 1) > 0 THEN
+      IF t.kind <> 'syntax' OR t.value <> ',' THEN
+        RAISE EXCEPTION 'JSON key-value pair must be followed by a comma or closing brace, got: %.', t;
+      END IF;
+
+      i = i + 1;
+      t = ts[i];
+    END IF;
+```
+
+Then we loop to find each key-value pair. If one has already been
+found, we need to find a comma before the next pair.
+
+```sql
+    IF t.kind <> 'string' THEN
+      RAISE EXCEPTION 'JSON object must start with string key, got: %.', t;
+    END IF;
+    k = t.value;
+
+    i = i + 1;
+    t = ts[i];
+    IF t.kind <> 'syntax' OR t.value <> ':' THEN
+      RAISE EXCEPTION 'JSON object must start with string key followed by colon, got: %.', t;
+    END IF;
+
+    i = i + 1;
+    t = ts[i];
+    IF t.kind = 'number' OR t.kind = 'string' THEN
+      kvs = array_append(kvs, (k, t)::json_key_value);
+      i = i + 1;
+      t = ts[i];
+      CONTINUE;
+    END IF;
+
+    RAISE EXCEPTION 'Invalid key-value pair syntax, got: %.', t;
+  END LOOP;
+  
+  RETURN kvs;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+Then we just look for the key, colon, value syntax and fail if we
+don't see it. And that's it! Very simple when not dealing with arrays
+and nested objects.
+
+### Helpers
+
+Lastly it would just be nice to have a single function that calls lex and parse:
+
+```sql
+CREATE OR REPLACE FUNCTION json_from_string(s text) RETURNS json_key_value[] AS $$
+BEGIN
+  RETURN json_parse(json_lex(s), 1);
+END;
+$$ LANGUAGE plpgsql;
+```
+
+And another function to look up a value in a parsed object by key:
+
+```sql
+CREATE OR REPLACE FUNCTION json_get(kvs json_key_value[], key text) RETURNS text AS $$
+DECLARE
+  kv json_key_value;
+BEGIN
+  FOREACH kv IN ARRAY kvs LOOP
+    IF kv.k = key THEN RETURN (kv.v::json_token).value; END IF;
+  END LOOP;
+
+  RAISE EXCEPTION 'Key not found.';
+END;
+$$ LANGUAGE plpgsql;
+```
+
+And we're all set!
+
+### Testing
+
+Let's try some bad syntax (missing a comma between pairs):
+
+```bash
+./test.sh ./json.sql "SELECT json_get(json_from_string('{\"flubberty\": 12 \"nice\": \"a\"}'), 'ipo')"
+ERROR:  JSON key-value pair must be followed by a comma or closing brace, got: (string,nice).
+CONTEXT:  PL/pgSQL function json_parse(json_token[],integer) line 18 at RAISE
+PL/pgSQL function json_from_string(text) line 3 at RETURN
+```
+
+Sweet, it fails correctly.
+
+Now correct syntax but missing key:
+
+```bash
+./test.sh ./json.sql "SELECT json_get(json_from_string('{\"flubberty\": 12, \"nice\": \"a\"}'), 'ipo')"
+ERROR:  Key not found.
+CONTEXT:  PL/pgSQL function json_get(json_key_value[],text) line 9 at RAISE
+```
+
+And finally, correct syntax and existing key:
+
+```bash
+./test.sh ./json.sql "SELECT json_get(json_from_string('{\"flubberty\": 12, \"nice\": \"a\"}'), 'flubberty')"
+ json_get
+----------
+ 12
+(1 row)
+```
+
+Huzzah! Now hopefully PL/pgSQL is a little less scary to you, whether
+or not you decide to use it.
