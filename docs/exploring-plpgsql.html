@@ -250,9 +250,9 @@ could also have done something like <code>IF c = ' ' OR c = '\n'
       i = i + 1;
       c = substr(j, i, 1);
       WHILE c &lt;&gt; &#39;&quot;&#39; LOOP
-    token = token || c;
-    i = i + 1;
-    c = substr(j, i, 1);
+        token = token || c;
+        i = i + 1;
+        c = substr(j, i, 1);
       END LOOP;
 
       i = i + 1;

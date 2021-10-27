@@ -299,9 +299,9 @@ Same as before though if we find whitespace characters we move on
       i = i + 1;
       c = substr(j, i, 1);
       WHILE c <> '"' LOOP
-	token = token || c;
-	i = i + 1;
-	c = substr(j, i, 1);
+        token = token || c;
+        i = i + 1;
+        c = substr(j, i, 1);
       END LOOP;
 
       i = i + 1;
