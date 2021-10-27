@@ -392,7 +392,7 @@ First up in the parser is variable declarations and validating that
 this list of tokens represents a JSON object.
 
 ```sql
-WHILE t.kind <> 'syntax' OR t.value <> '}' LOOP
+  WHILE t.kind <> 'syntax' OR t.value <> '}' LOOP
     IF array_length(kvs, 1) > 0 THEN
       IF t.kind <> 'syntax' OR t.value <> ',' THEN
         RAISE EXCEPTION 'JSON key-value pair must be followed by a comma or closing brace, got: %.', t;

@@ -320,7 +320,7 @@ BEGIN
 </code></pre>
 <p>First up in the parser is variable declarations and validating that
 this list of tokens represents a JSON object.</p>
-<pre><code class="hljs sql">WHILE t.kind &lt;&gt; &#39;syntax&#39; OR t.value &lt;&gt; &#39;}&#39; LOOP
+<pre><code class="hljs sql">  WHILE t.kind &lt;&gt; &#39;syntax&#39; OR t.value &lt;&gt; &#39;}&#39; LOOP
     IF array_length(kvs, 1) &gt; 0 THEN
       IF t.kind &lt;&gt; &#39;syntax&#39; OR t.value &lt;&gt; &#39;,&#39; THEN
         RAISE EXCEPTION &#39;JSON key-value pair must be followed by a comma or closing brace, got: %.&#39;, t;

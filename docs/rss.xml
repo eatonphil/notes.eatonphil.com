@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 27 Oct 2021 19:58:10 +0000</lastBuildDate><item><title>Strings, arrays, recursion, and parsing JSON: Exploring PL/pgSQL</title><link>http://notes.eatonphil.com/exploring-plpgsql.html</link><description>&lt;p&gt;PostgreSQL comes with a builtin imperative programming language called
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 27 Oct 2021 20:03:48 +0000</lastBuildDate><item><title>Strings, arrays, recursion, and parsing JSON: Exploring PL/pgSQL</title><link>http://notes.eatonphil.com/exploring-plpgsql.html</link><description>&lt;p&gt;PostgreSQL comes with a builtin imperative programming language called
 PL/pgSQL. I used to think this language was scary because it has a bit
 more adornment than your usual language does. But looking deeper, it's
 actually reasonably pleasant to program in.&lt;/p&gt;
@@ -276,7 +276,7 @@ BEGIN
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;First up in the parser is variable declarations and validating that
 this list of tokens represents a JSON object.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs sql"&gt;WHILE t.kind &amp;lt;&amp;gt; &amp;#39;syntax&amp;#39; OR t.value &amp;lt;&amp;gt; &amp;#39;}&amp;#39; LOOP
+&lt;pre&gt;&lt;code class="hljs sql"&gt;  WHILE t.kind &amp;lt;&amp;gt; &amp;#39;syntax&amp;#39; OR t.value &amp;lt;&amp;gt; &amp;#39;}&amp;#39; LOOP
     IF array_length(kvs, 1) &amp;gt; 0 THEN
       IF t.kind &amp;lt;&amp;gt; &amp;#39;syntax&amp;#39; OR t.value &amp;lt;&amp;gt; &amp;#39;,&amp;#39; THEN
         RAISE EXCEPTION &amp;#39;JSON key-value pair must be followed by a comma or closing brace, got: %.&amp;#39;, t;
