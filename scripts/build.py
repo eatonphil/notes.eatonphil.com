@@ -28,12 +28,13 @@ HOME_PAGE = """
 <div class="fp-section fp-section--about">
   <h2 class="fp-h2"></h2>
   <p>
-    Hello! I'm Phil, a developer and manager in Queens, NY. I'm
-    building <a
-    href="https://datastation.multiprocess.io">DataStation</a>,
-    an open-source data IDE for developers. Check out the <a
-    href="https://app.datastation.multiprocess.io">in-browser
-    demo</a>.
+    Hello! I'm Phil, currently doing contract software development
+    based in Queens, NY. I'm building <a
+    href="https://datastation.multiprocess.io">DataStation</a>, an
+    open-source data IDE to help you create dashboards and exports on
+    data from every database, API, and file without cumbersome ETL processes.
+    <a href="me@eatonphil.com">Email me</a> if you're up for talking
+    about your data ecosystem.
   </p>
   <p>
     Some of my most viewed posts are on building <a
