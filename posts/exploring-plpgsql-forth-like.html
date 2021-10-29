@@ -1,5 +1,5 @@
 # Exploring PL/pgSQL part two: implementing a Forth-like interpreter
-## October 30, 2021
+## October 29, 2021
 ###### postgres,plpgsql,forth,interpreters
 
 In my [last post](https://notes.eatonphil.com/exploring-plpgsql.html)
@@ -161,7 +161,7 @@ Produces `1`.
 
 ### Implementation
 
-Joining the 'EXIT' condition in the interpeter loop we get:
+Joining the `EXIT` condition in the interpeter loop we get:
 
 ```sql
 ...
@@ -446,3 +446,5 @@ EXIT')"
 ```
 
 Happy PL/pgSQL- and Forth-ish-ing!
+
+<blockquote class="twitter-tweet"><p lang="en" dir="ltr">Latest post is up! Writing a Forth(-inspired language) implementation from scratch in PL/pgSQL. Because who doesn&#39;t want to be able to run stack machine code from SELECT statements in PostgreSQL?<a href="https://t.co/sbxhuDp1J9">https://t.co/sbxhuDp1J9</a> <a href="https://t.co/9nrHEIhRPa">pic.twitter.com/9nrHEIhRPa</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1453958284109500417?ref_src=twsrc%5Etfw">October 29, 2021</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
