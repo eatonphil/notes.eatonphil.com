@@ -1,0 +1,448 @@
+# Exploring PL/pgSQL part two: implementing a Forth-like interpreter
+## October 30, 2021
+###### postgres,plpgsql,forth,interpreters
+
+In my [last post](https://notes.eatonphil.com/exploring-plpgsql.html)
+I walked through the basics of PL/pgSQL, the embedded procedural
+language inside of PostgreSQL. It covered simple functions, recursions
+and parsing. But there was something very obviously missing from that
+post: a working interpreter.
+
+So in this post we'll walk through building a Forth-like language from
+scratch in PL/pgSQL. We'll be able to write a fibonacci function in
+this Forth-like language and have it be evaluated correctly like so:
+
+```bash
+$ ./test.sh sm.sql "SELECT sm_run('
+DEF fib
+  . DUP 1 > IF
+  1- DUP 1- fib CALL SWAP fib CALL + THEN
+  RET
+
+20 fib CALL
+EXIT')"
+
+...
+
+ sm_run
+--------
+ 6765
+(1 row)
+```
+
+All code is available on [Github](https://github.com/eatonphil/exploring-plpgsql/blob/main/sm.sql).
+
+### Forth
+
+[Forth](https://www.forth.com/resources/forth-programming-language/)
+is a stack-oriented language. Literals are pushed onto the stack.
+Functions and builtins operate on the stack.
+
+For example:
+
+```bash
+$ ./test.sh sm.sql "SELECT sm_run('3 2 + EXIT')"
+```
+
+Will produce `5`. And:
+
+```bash
+$ ./test.sh sm.sql "SELECT sm_run('3 2 + 1 - EXIT')"
+```
+
+Will produce `4`.
+
+Our code will notably not be a real Forth, since there are many
+special features of a real Forth. But it will look like one to a
+novice Forth programmer like myself.
+
+You can read more about Forth basics
+[here](https://skilldrick.github.io/easyforth/). And you can read a
+truly stunning, real Forth implementation in
+[jonesforth.S](https://github.com/nornagon/jonesforth/blob/master/jonesforth.S). Or
+you can pick up [Let Over Lambda](https://letoverlambda.com/) for a
+fantastic book on Common Lisp that culminates in a Forth interpreter.
+
+### Implementation
+
+Since the builtin `array_length($arr, $dim)` returns `NULL` if the
+array is `NULL` and our dimension is always 1, we'll write a helper.
+
+```sql
+DROP FUNCTION IF EXISTS sm_alength;
+CREATE FUNCTION sm_alength(a text[]) RETURNS int AS $$
+BEGIN
+  RETURN COALESCE(array_length(a, 1), 0);
+END;
+$$ LANGUAGE plpgsql;
+```
+
+We'll also need to bring in the `hstore` extension so we can map
+function names to their positions. (We could use an association list
+but those are less programmer-friendly.)
+
+```sql
+CREATE EXTENSION IF NOT EXISTS hstore;
+```
+
+Our interpreter function will take a string to evaluate, splitting the
+string on whitespace into tokens.
+
+```sql
+DROP FUNCTION IF EXISTS sm_run;
+CREATE FUNCTION sm_run(s text) RETURNS TEXT AS $$
+DECLARE
+  tokens text[] = regexp_split_to_array(s, '\s+');
+  stack text[]; -- Data stack
+  defs hstore; -- Map of functions to location
+  tmps text[]; -- Array we can use for temporary variables
+  token text; -- Current token
+  rps text[]; -- Return pointer stack, always ints but easier to store as text
+  pc int = 1; -- Program counter
+BEGIN
+```
+
+We set up a `tmps` array because each builtin may need differing
+number of temporary variables and PL/pgSQL makes ad-hoc variables
+cumbersome (or at least an easier way exists outside my knowledge).
+
+And we store the return pointer stack as a text array so that we can
+use `sm_alength` on it even though values in this array will always be
+integers.
+
+Next we'll start an infinite loop to evaluate the program. The only thing
+that will stop the input is the `EXIT` builtin that will return from
+this function with the top of the stack.
+
+```sql
+  WHILE true LOOP
+    token = tokens[pc];
+    RAISE NOTICE '[Debug] Current token: %. Current stack: %.', token, stack;
+    IF token IS NULL THEN
+      RAISE EXCEPTION 'PC out of bounds.';
+    END IF;
+
+    IF token = 'EXIT' THEN
+      RETURN stack[sm_alength(stack)];
+    END IF;
+
+    ... TODO ...
+
+    stack = array_append(stack, token);
+    pc = pc + 1;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+If no other condition is met (the token is not a builtin), we push it
+onto the data stack and increment the program counter.
+
+### Conditionals
+
+The `IF` builtin pops the top of the stack. If it is true evaluation
+continues. If it is false evaluation skips ahead until after a `THEN`
+builtin.
+
+For example:
+
+```bash
+$ ./test.sh sm.sql "SELECT sm_run('1 1 1 = IF 2 THEN EXIT')"
+```
+
+Produces `2`. But
+
+```bash
+$ ./test.sh sm.sql "SELECT sm_run('1 1 0 = IF 2 THEN EXIT')"
+```
+
+Produces `1`.
+
+
+### Implementation
+
+Joining the 'EXIT' condition in the interpeter loop we get:
+
+```sql
+...
+
+  WHILE true LOOP
+
+    ...
+
+    IF token = 'IF' THEN
+      -- Grab last item from stack
+      tmps[1] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      IF NOT tmps[1]::boolean THEN
+        WHILE tokens[pc] <> 'THEN' LOOP
+	  pc = pc + 1;
+	END LOOP;
+	pc = pc + 1; -- Skip past THEN
+      ELSE
+        pc = pc + 1;
+      END IF;
+      CONTINUE;
+    END IF;
+
+    IF token = 'THEN' THEN
+      -- Just skip past it
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = 'EXIT' THEN
+      RETURN stack[sm_alength(stack)];
+    END IF;
+
+    ...
+```
+
+### Other builtins
+
+The `DUP` builtin makes a copy of the top of the stack. The `SWAP`
+builtin swaps the order of the top two items on the stack. And the
+`1-` builtin subtracts 1 from the top of the stack.
+
+```sql
+    ...
+
+    IF token = 'DUP' THEN
+      -- Grab item
+      tmps[1] = stack[sm_alength(stack)];
+      -- Add it to the stack
+      stack = array_append(stack, tmps[1]);
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = '1-' THEN
+      -- Grab item
+      tmps[1] = stack[sm_alength(stack)];
+      -- Rewrite top of stack
+      stack[sm_alength(stack)] = tmps[1]::int - 1;
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = 'SWAP' THEN
+      -- Grab two items from stack
+      tmps[1] = stack[sm_alength(stack) - 1];
+      tmps[2] = stack[sm_alength(stack)];
+      -- Swap the two
+      -- Replace last item on stack
+      stack[sm_alength(stack)] = tmps[1];
+      stack[sm_alength(stack) - 1] = tmps[2];
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    ...
+```
+
+It's important that every builtin handle incrementing the program
+counter and skipping to the beginning of the loop. Because some
+builtins increment the program counter under different conditions
+(like `IF` above).
+
+The last few builtins are the simplest: arithmetic operations that
+produce integers or booleans.
+
+```sql
+    ...
+
+    IF token = '=' THEN
+      -- Grab two items from stack
+      tmps[1] = stack[sm_alength(stack) - 1];
+      tmps[2] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      -- Replace last item on stack
+      stack[sm_alength(stack)] = tmps[1]::int = tmps[2]::int;
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = '>' THEN
+      -- Grab two items from stack
+      tmps[1] = stack[sm_alength(stack) - 1];
+      tmps[2] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      -- Replace last item on stack
+      stack[sm_alength(stack)] = tmps[1]::int > tmps[2]::int;
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = '+' THEN
+      -- Grab two items from stack
+      tmps[1] = stack[sm_alength(stack) - 1];
+      tmps[2] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      -- Replace last item on stack
+      stack[sm_alength(stack)] = tmps[1]::int + tmps[2]::int;
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = '-' THEN
+      -- Grab two items from stack
+      tmps[1] = stack[sm_alength(stack) - 1];
+      tmps[2] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      -- Replace last item on stack
+      stack[sm_alength(stack)] = tmps[1]::int - tmps[2]::int;
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = '*' THEN
+      -- Grab two items from stack
+      tmps[1] = stack[sm_alength(stack) - 1];
+      tmps[2] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      -- Replace last item on stack
+      stack[sm_alength(stack)] = tmps[1]::int * tmps[2]::int;
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = '/' THEN
+      -- Grab two items from stack
+      tmps[1] = stack[sm_alength(stack) - 1];
+      tmps[2] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      -- Replace last item on stack
+      stack[sm_alength(stack)] = tmps[1]::int / tmps[2]::int;
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    ...
+```
+
+### Function definitions
+
+Functions here will differ from Forth, borrowing elements of machine
+code. Return pointers will be stored in a dedicated return pointer
+stack. We could store it on the data stack but that would require more
+effort on the part of the programmer to restore the stack. Calling
+`RET` inside a function pops a return pointer off the return pointer
+stack.
+
+Here's a simple function definition: `DEF plus + RET`.
+
+```sql
+    ...
+
+    IF token = 'DEF' THEN
+      tmps[1] = tokens[pc+1]; -- function name
+      tmps[2] = pc + 2; -- starting pc
+      WHILE tokens[pc] <> 'RET' LOOP
+        -- RAISE NOTICE '[Debug] skipping past: %.', tokens[pc];
+        pc = pc + 1;
+      END LOOP;
+
+      IF defs IS NULL THEN
+        defs = hstore(tmps[1], tmps[2]);
+      ELSE
+        defs = defs || hstore(tmps[1], tmps[2]);
+      END IF;
+      pc = pc + 1; -- continue past 'RET'
+      CONTINUE;
+    END IF;
+
+    ...
+```
+
+There doesn't seem to be a way to combine a NULL hstore value and a
+non-NULL hstore value. So that's why we need that special case.
+
+### Return
+
+The `RET` builtin pops a value off the return pointer stack and jumps
+to it.
+
+```sql
+   ...
+
+   IF token = 'RET' THEN
+      -- Grab last return pointer
+      tmps[1] = rps[sm_alength(rps)];
+      -- Drop last return pointer from stack
+      rps = rps[1:sm_alength(rps) - 1];
+      -- Jump to last return pointer
+      pc = tmps[1]::int;
+      CONTINUE;
+    END IF;
+
+    ...
+```
+
+### Function calls
+
+Forming the other half of function calls is the `CALL` builtin. This
+places the program counter (plus one, past the `CALL` token) onto the
+return pointer stack and jumps to the position of the function if it
+exists.
+
+A simple function call for the above `plus` function might be: `2 3
+plus CALL` and would produce `5` on the top of the stack.
+
+```sql
+    ...
+
+    IF token = 'CALL' THEN
+      -- Grab item
+      tmps[1] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      -- Store return pointer
+      rps = array_append(rps, (pc + 1)::text);
+      -- Fail if function not defined
+      IF NOT defs?tmps[1] THEN
+        RAISE EXCEPTION 'No such function, %.', tmps[1];
+      END IF;
+      -- Otherwise jump to function
+      RAISE NOTICE '[Debug] Jumping to: %:%.', tmps[1], defs->tmps[1];
+      pc = defs->tmps[1];
+      CONTINUE;
+    END IF;
+
+    ...
+```
+
+And that's it! All done the basic instructions needed. Store all that code in `sm.sql` and grab the `test.sh` code from the previous post:
+
+```bash
+$ cat ./test.sh
+sudo -u postgres psql -c "$(printf "%s;\n%s" "$(cat $1)" "$2")"
+```
+
+And try out our port of recursive fibonacci:
+
+```bash
+$ ./test.sh sm.sql "SELECT sm_run('
+DEF fib
+  . DUP 1 > IF
+  1- DUP 1- fib CALL SWAP fib CALL + THEN
+  RET
+
+20 fib CALL
+EXIT')"
+
+...
+
+ sm_run
+--------
+ 6765
+(1 row)
+```
+
+Happy PL/pgSQL- and Forth-ish-ing!

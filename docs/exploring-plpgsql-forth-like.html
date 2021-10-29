@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Exploring PL/pgSQL part two: implementing a Forth-like interpreter | notes.eatonphil.com</title>
+    <meta name="description" content="Exploring PL/pgSQL part two: implementing a Forth-like interpreter" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <div class="row">
+	    <a href="/" class="sm-link">
+              Home
+            </a>
+	    <a href="/rss.xml" class="sm-link">
+              RSS
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+
+          <h2>October 30, 2021</h2>
+          <h1>Exploring PL/pgSQL part two: implementing a Forth-like interpreter</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/postgres.html" class="tag">postgres</a><a href="/tags/plpgsql.html" class="tag">plpgsql</a><a href="/tags/forth.html" class="tag">forth</a><a href="/tags/interpreters.html" class="tag">interpreters</a></div>
+          </div>
+	</div>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="col-6">
+        <p>In my <a href="https://notes.eatonphil.com/exploring-plpgsql.html">last post</a>
+I walked through the basics of PL/pgSQL, the embedded procedural
+language inside of PostgreSQL. It covered simple functions, recursions
+and parsing. But there was something very obviously missing from that
+post: a working interpreter.</p>
+<p>So in this post we'll walk through building a Forth-like language from
+scratch in PL/pgSQL. We'll be able to write a fibonacci function in
+this Forth-like language and have it be evaluated correctly like so:</p>
+<pre><code class="hljs bash">$ ./test.sh sm.sql &quot;SELECT sm_run(&#39;
+DEF fib
+  . DUP 1 &gt; IF
+  1- DUP 1- fib CALL SWAP fib CALL + THEN
+  RET
+
+20 fib CALL
+EXIT&#39;)&quot;
+
+...
+
+ sm_run
+--------
+ 6765
+(1 row)
+</code></pre>
+<p>All code is available on <a href="https://github.com/eatonphil/exploring-plpgsql/blob/main/sm.sql">Github</a>.</p>
+<h3 id="forth">Forth</h3><p><a href="https://www.forth.com/resources/forth-programming-language/">Forth</a>
+is a stack-oriented language. Literals are pushed onto the stack.
+Functions and builtins operate on the stack.</p>
+<p>For example:</p>
+<pre><code class="hljs bash">$ ./test.sh sm.sql &quot;SELECT sm_run(&#39;3 2 + EXIT&#39;)&quot;
+</code></pre>
+<p>Will produce <code>5</code>. And:</p>
+<pre><code class="hljs bash">$ ./test.sh sm.sql &quot;SELECT sm_run(&#39;3 2 + 1 - EXIT&#39;)&quot;
+</code></pre>
+<p>Will produce <code>4</code>.</p>
+<p>Our code will notably not be a real Forth, since there are many
+special features of a real Forth. But it will look like one to a
+novice Forth programmer like myself.</p>
+<p>You can read more about Forth basics
+<a href="https://skilldrick.github.io/easyforth/">here</a>. And you can read a
+truly stunning, real Forth implementation in
+<a href="https://github.com/nornagon/jonesforth/blob/master/jonesforth.S">jonesforth.S</a>. Or
+you can pick up <a href="https://letoverlambda.com/">Let Over Lambda</a> for a
+fantastic book on Common Lisp that culminates in a Forth interpreter.</p>
+<h3 id="implementation">Implementation</h3><p>Since the builtin <code>array_length($arr, $dim)</code> returns <code>NULL</code> if the
+array is <code>NULL</code> and our dimension is always 1, we'll write a helper.</p>
+<pre><code class="hljs sql">DROP FUNCTION IF EXISTS sm_alength;
+CREATE FUNCTION sm_alength(a text[]) RETURNS int AS $$
+BEGIN
+  RETURN COALESCE(array_length(a, 1), 0);
+END;
+$$ LANGUAGE plpgsql;
+</code></pre>
+<p>We'll also need to bring in the <code>hstore</code> extension so we can map
+function names to their positions. (We could use an association list
+but those are less programmer-friendly.)</p>
+<pre><code class="hljs sql">CREATE EXTENSION IF NOT EXISTS hstore;
+</code></pre>
+<p>Our interpreter function will take a string to evaluate, splitting the
+string on whitespace into tokens.</p>
+<pre><code class="hljs sql">DROP FUNCTION IF EXISTS sm_run;
+CREATE FUNCTION sm_run(s text) RETURNS TEXT AS $$
+DECLARE
+  tokens text[] = regexp_split_to_array(s, &#39;\s+&#39;);
+  stack text[]; -- Data stack
+  defs hstore; -- Map of functions to location
+  tmps text[]; -- Array we can use for temporary variables
+  token text; -- Current token
+  rps text[]; -- Return pointer stack, always ints but easier to store as text
+  pc int = 1; -- Program counter
+BEGIN
+</code></pre>
+<p>We set up a <code>tmps</code> array because each builtin may need differing
+number of temporary variables and PL/pgSQL makes ad-hoc variables
+cumbersome (or at least an easier way exists outside my knowledge).</p>
+<p>And we store the return pointer stack as a text array so that we can
+use <code>sm_alength</code> on it even though values in this array will always be
+integers.</p>
+<p>Next we'll start an infinite loop to evaluate the program. The only thing
+that will stop the input is the <code>EXIT</code> builtin that will return from
+this function with the top of the stack.</p>
+<pre><code class="hljs sql">  WHILE true LOOP
+    token = tokens[pc];
+    RAISE NOTICE &#39;[Debug] Current token: %. Current stack: %.&#39;, token, stack;
+    IF token IS NULL THEN
+      RAISE EXCEPTION &#39;PC out of bounds.&#39;;
+    END IF;
+
+    IF token = &#39;EXIT&#39; THEN
+      RETURN stack[sm_alength(stack)];
+    END IF;
+
+    ... TODO ...
+
+    stack = array_append(stack, token);
+    pc = pc + 1;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+</code></pre>
+<p>If no other condition is met (the token is not a builtin), we push it
+onto the data stack and increment the program counter.</p>
+<h3 id="conditionals">Conditionals</h3><p>The <code>IF</code> builtin pops the top of the stack. If it is true evaluation
+continues. If it is false evaluation skips ahead until after a <code>THEN</code>
+builtin.</p>
+<p>For example:</p>
+<pre><code class="hljs bash">$ ./test.sh sm.sql &quot;SELECT sm_run(&#39;1 1 1 = IF 2 THEN EXIT&#39;)&quot;
+</code></pre>
+<p>Produces <code>2</code>. But</p>
+<pre><code class="hljs bash">$ ./test.sh sm.sql &quot;SELECT sm_run(&#39;1 1 0 = IF 2 THEN EXIT&#39;)&quot;
+</code></pre>
+<p>Produces <code>1</code>.</p>
+<h3 id="implementation">Implementation</h3><p>Joining the 'EXIT' condition in the interpeter loop we get:</p>
+<pre><code class="hljs sql">...
+
+  WHILE true LOOP
+
+    ...
+
+    IF token = &#39;IF&#39; THEN
+      -- Grab last item from stack
+      tmps[1] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      IF NOT tmps[1]::boolean THEN
+        WHILE tokens[pc] &lt;&gt; &#39;THEN&#39; LOOP
+      pc = pc + 1;
+    END LOOP;
+    pc = pc + 1; -- Skip past THEN
+      ELSE
+        pc = pc + 1;
+      END IF;
+      CONTINUE;
+    END IF;
+
+    IF token = &#39;THEN&#39; THEN
+      -- Just skip past it
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = &#39;EXIT&#39; THEN
+      RETURN stack[sm_alength(stack)];
+    END IF;
+
+    ...
+</code></pre>
+<h3 id="other-builtins">Other builtins</h3><p>The <code>DUP</code> builtin makes a copy of the top of the stack. The <code>SWAP</code>
+builtin swaps the order of the top two items on the stack. And the
+<code>1-</code> builtin subtracts 1 from the top of the stack.</p>
+<pre><code class="hljs sql">    ...
+
+    IF token = &#39;DUP&#39; THEN
+      -- Grab item
+      tmps[1] = stack[sm_alength(stack)];
+      -- Add it to the stack
+      stack = array_append(stack, tmps[1]);
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = &#39;1-&#39; THEN
+      -- Grab item
+      tmps[1] = stack[sm_alength(stack)];
+      -- Rewrite top of stack
+      stack[sm_alength(stack)] = tmps[1]::int - 1;
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = &#39;SWAP&#39; THEN
+      -- Grab two items from stack
+      tmps[1] = stack[sm_alength(stack) - 1];
+      tmps[2] = stack[sm_alength(stack)];
+      -- Swap the two
+      -- Replace last item on stack
+      stack[sm_alength(stack)] = tmps[1];
+      stack[sm_alength(stack) - 1] = tmps[2];
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    ...
+</code></pre>
+<p>It's important that every builtin handle incrementing the program
+counter and skipping to the beginning of the loop. Because some
+builtins increment the program counter under different conditions
+(like <code>IF</code> above).</p>
+<p>The last few builtins are the simplest: arithmetic operations that
+produce integers or booleans.</p>
+<pre><code class="hljs sql">    ...
+
+    IF token = &#39;=&#39; THEN
+      -- Grab two items from stack
+      tmps[1] = stack[sm_alength(stack) - 1];
+      tmps[2] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      -- Replace last item on stack
+      stack[sm_alength(stack)] = tmps[1]::int = tmps[2]::int;
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = &#39;&gt;&#39; THEN
+      -- Grab two items from stack
+      tmps[1] = stack[sm_alength(stack) - 1];
+      tmps[2] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      -- Replace last item on stack
+      stack[sm_alength(stack)] = tmps[1]::int &gt; tmps[2]::int;
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = &#39;+&#39; THEN
+      -- Grab two items from stack
+      tmps[1] = stack[sm_alength(stack) - 1];
+      tmps[2] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      -- Replace last item on stack
+      stack[sm_alength(stack)] = tmps[1]::int + tmps[2]::int;
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = &#39;-&#39; THEN
+      -- Grab two items from stack
+      tmps[1] = stack[sm_alength(stack) - 1];
+      tmps[2] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      -- Replace last item on stack
+      stack[sm_alength(stack)] = tmps[1]::int - tmps[2]::int;
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = &#39;*&#39; THEN
+      -- Grab two items from stack
+      tmps[1] = stack[sm_alength(stack) - 1];
+      tmps[2] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      -- Replace last item on stack
+      stack[sm_alength(stack)] = tmps[1]::int * tmps[2]::int;
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    IF token = &#39;/&#39; THEN
+      -- Grab two items from stack
+      tmps[1] = stack[sm_alength(stack) - 1];
+      tmps[2] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      -- Replace last item on stack
+      stack[sm_alength(stack)] = tmps[1]::int / tmps[2]::int;
+      pc = pc + 1;
+      CONTINUE;
+    END IF;
+
+    ...
+</code></pre>
+<h3 id="function-definitions">Function definitions</h3><p>Functions here will differ from Forth, borrowing elements of machine
+code. Return pointers will be stored in a dedicated return pointer
+stack. We could store it on the data stack but that would require more
+effort on the part of the programmer to restore the stack. Calling
+<code>RET</code> inside a function pops a return pointer off the return pointer
+stack.</p>
+<p>Here's a simple function definition: <code>DEF plus + RET</code>.</p>
+<pre><code class="hljs sql">    ...
+
+    IF token = &#39;DEF&#39; THEN
+      tmps[1] = tokens[pc+1]; -- function name
+      tmps[2] = pc + 2; -- starting pc
+      WHILE tokens[pc] &lt;&gt; &#39;RET&#39; LOOP
+        -- RAISE NOTICE &#39;[Debug] skipping past: %.&#39;, tokens[pc];
+        pc = pc + 1;
+      END LOOP;
+
+      IF defs IS NULL THEN
+        defs = hstore(tmps[1], tmps[2]);
+      ELSE
+        defs = defs || hstore(tmps[1], tmps[2]);
+      END IF;
+      pc = pc + 1; -- continue past &#39;RET&#39;
+      CONTINUE;
+    END IF;
+
+    ...
+</code></pre>
+<p>There doesn't seem to be a way to combine a NULL hstore value and a
+non-NULL hstore value. So that's why we need that special case.</p>
+<h3 id="return">Return</h3><p>The <code>RET</code> builtin pops a value off the return pointer stack and jumps
+to it.</p>
+<pre><code class="hljs sql">   ...
+
+   IF token = &#39;RET&#39; THEN
+      -- Grab last return pointer
+      tmps[1] = rps[sm_alength(rps)];
+      -- Drop last return pointer from stack
+      rps = rps[1:sm_alength(rps) - 1];
+      -- Jump to last return pointer
+      pc = tmps[1]::int;
+      CONTINUE;
+    END IF;
+
+    ...
+</code></pre>
+<h3 id="function-calls">Function calls</h3><p>Forming the other half of function calls is the <code>CALL</code> builtin. This
+places the program counter (plus one, past the <code>CALL</code> token) onto the
+return pointer stack and jumps to the position of the function if it
+exists.</p>
+<p>A simple function call for the above <code>plus</code> function might be: <code>2 3
+plus CALL</code> and would produce <code>5</code> on the top of the stack.</p>
+<pre><code class="hljs sql">    ...
+
+    IF token = &#39;CALL&#39; THEN
+      -- Grab item
+      tmps[1] = stack[sm_alength(stack)];
+      -- Remove one item from stack
+      stack = stack[1:sm_alength(stack) - 1];
+      -- Store return pointer
+      rps = array_append(rps, (pc + 1)::text);
+      -- Fail if function not defined
+      IF NOT defs?tmps[1] THEN
+        RAISE EXCEPTION &#39;No such function, %.&#39;, tmps[1];
+      END IF;
+      -- Otherwise jump to function
+      RAISE NOTICE &#39;[Debug] Jumping to: %:%.&#39;, tmps[1], defs-&gt;tmps[1];
+      pc = defs-&gt;tmps[1];
+      CONTINUE;
+    END IF;
+
+    ...
+</code></pre>
+<p>And that's it! All done the basic instructions needed. Store all that code in <code>sm.sql</code> and grab the <code>test.sh</code> code from the previous post:</p>
+<pre><code class="hljs bash">$ cat ./test.sh
+sudo -u postgres psql -c &quot;$(printf &quot;%s;\n%s&quot; &quot;$(cat $1)&quot; &quot;$2&quot;)&quot;
+</code></pre>
+<p>And try out our port of recursive fibonacci:</p>
+<pre><code class="hljs bash">$ ./test.sh sm.sql &quot;SELECT sm_run(&#39;
+DEF fib
+  . DUP 1 &gt; IF
+  1- DUP 1- fib CALL SWAP fib CALL + THEN
+  RET
+
+20 fib CALL
+EXIT&#39;)&quot;
+
+...
+
+ sm_run
+--------
+ 6765
+(1 row)
+</code></pre>
+<p>Happy PL/pgSQL- and Forth-ish-ing!</p>
+
+	<div class="feedback">
+	  <h4>Feedback</h4>
+	  As always,
+	  please <a href="mailto:phil@eatonphil.com">email</a>
+	  or <a href="https://twitter.com/phil_eaton">tweet me</a>
+	  with questions, corrections, or ideas!
+	</div>
+      </div>
+    </div>
+
+    <footer>
+      <div class="container">
+	<div>
+	  <div class="row">
+	    <a href="/" class="sm-link">
+              Home
+            </a>
+	    <a href="/rss.xml" class="sm-link">
+              RSS
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+	</div>
+      </div>
+    </footer>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>
