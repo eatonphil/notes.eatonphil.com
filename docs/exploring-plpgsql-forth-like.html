@@ -53,7 +53,7 @@ scratch in PL/pgSQL. We'll be able to write a fibonacci function in
 this Forth-like language and have it be evaluated correctly like so:</p>
 <pre><code class="hljs bash">$ ./test.sh sm.sql &quot;SELECT sm_run(&#39;
 DEF fib
-  . DUP 1 &gt; IF
+  DUP 1 &gt; IF
   1- DUP 1- fib CALL SWAP fib CALL + THEN
   RET
 
@@ -389,7 +389,7 @@ sudo -u postgres psql -c &quot;$(printf &quot;%s;\n%s&quot; &quot;$(cat $1)&quot
 <p>And try out our port of recursive fibonacci:</p>
 <pre><code class="hljs bash">$ ./test.sh sm.sql &quot;SELECT sm_run(&#39;
 DEF fib
-  . DUP 1 &gt; IF
+  DUP 1 &gt; IF
   1- DUP 1- fib CALL SWAP fib CALL + THEN
   RET
 

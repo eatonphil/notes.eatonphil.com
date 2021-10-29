@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Fri, 29 Oct 2021 05:34:30 +0000</lastBuildDate><item><title>Exploring PL/pgSQL part two: implementing a Forth-like interpreter</title><link>http://notes.eatonphil.com/exploring-plpgsql-forth-like.html</link><description>&lt;p&gt;In my &lt;a href="https://notes.eatonphil.com/exploring-plpgsql.html"&gt;last post&lt;/a&gt;
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Fri, 29 Oct 2021 05:43:12 +0000</lastBuildDate><item><title>Exploring PL/pgSQL part two: implementing a Forth-like interpreter</title><link>http://notes.eatonphil.com/exploring-plpgsql-forth-like.html</link><description>&lt;p&gt;In my &lt;a href="https://notes.eatonphil.com/exploring-plpgsql.html"&gt;last post&lt;/a&gt;
 I walked through the basics of PL/pgSQL, the embedded procedural
 language inside of PostgreSQL. It covered simple functions, recursions
 and parsing. But there was something very obviously missing from that
@@ -9,7 +9,7 @@ scratch in PL/pgSQL. We'll be able to write a fibonacci function in
 this Forth-like language and have it be evaluated correctly like so:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ ./test.sh sm.sql &amp;quot;SELECT sm_run(&amp;#39;
 DEF fib
-  . DUP 1 &amp;gt; IF
+  DUP 1 &amp;gt; IF
   1- DUP 1- fib CALL SWAP fib CALL + THEN
   RET
 
@@ -345,7 +345,7 @@ sudo -u postgres psql -c &amp;quot;$(printf &amp;quot;%s;\n%s&amp;quot; &amp;quo
 &lt;p&gt;And try out our port of recursive fibonacci:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ ./test.sh sm.sql &amp;quot;SELECT sm_run(&amp;#39;
 DEF fib
-  . DUP 1 &amp;gt; IF
+  DUP 1 &amp;gt; IF
   1- DUP 1- fib CALL SWAP fib CALL + THEN
   RET
 

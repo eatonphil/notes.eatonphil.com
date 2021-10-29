@@ -15,7 +15,7 @@ this Forth-like language and have it be evaluated correctly like so:
 ```bash
 $ ./test.sh sm.sql "SELECT sm_run('
 DEF fib
-  . DUP 1 > IF
+  DUP 1 > IF
   1- DUP 1- fib CALL SWAP fib CALL + THEN
   RET
 
@@ -430,7 +430,7 @@ And try out our port of recursive fibonacci:
 ```bash
 $ ./test.sh sm.sql "SELECT sm_run('
 DEF fib
-  . DUP 1 > IF
+  DUP 1 > IF
   1- DUP 1- fib CALL SWAP fib CALL + THEN
   RET
 
