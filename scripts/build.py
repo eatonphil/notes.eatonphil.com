@@ -41,17 +41,9 @@ HOME_PAGE = """
   </p>
   <p>
     Some of my most viewed posts on this site are about building <a
-    href="/tags/interpreter.html">interpreters</a>, <a
     href="/tags/compiler.html">compilers</a>, <a
-    href="/tags/database.html">databases</a>, <a
-    href="/tags/web-servers.html">servers</a>, and <a
+    href="/tags/database.html">databases</a>, and <a
     href="/tags/emulator.html">emulators</a> from scratch.
-  </p>
-  <p>
-    I run a <a href="https://discord.gg/xGPcYTMNwW">Discord community
-    for developers</a> working on or interested in challenging
-    programming projects like compilers, databases, emulators,
-    etc. Come to share and learn from other folks!
   </p>
   <p>
     You can also find me on <a
