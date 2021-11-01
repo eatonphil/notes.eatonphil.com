@@ -62,7 +62,7 @@ HOME_PAGE = """
     href="https://www.goodreads.com/user/show/50930981-phil-eaton">Goodreads</a>.
   </p>
   <p>
-    I love <a href="mailto:me@eatonphil.com">hearing from you</a>.
+    I love <a href="mailto:me@eatonphil.com">hearing from you</a>!
   </p>
 </div>
 <div class="fp-section fp-section--notes">
