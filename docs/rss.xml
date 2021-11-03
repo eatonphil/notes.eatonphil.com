@@ -1,10 +1,14 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 01 Nov 2021 14:29:34 +0000</lastBuildDate><item><title>[External] Building a fast SCSS-like rule expander for CSS using fuzzy parsing</title><link>http://notes.eatonphil.com/building-a-nested-css-rule-expander.html</link><description>&lt;head&gt;
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 03 Nov 2021 14:19:08 +0000</lastBuildDate><item><title>[External] Building a fast SCSS-like rule expander for CSS using fuzzy parsing</title><link>http://notes.eatonphil.com/building-a-nested-css-rule-expander.html</link><description>&lt;head&gt;
     &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2021-10-31-building-a-nested-css-rule-expander.html'" /&gt;
 &lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
 &lt;a href="https://datastation.multiprocess.io/blog/2021-10-31-building-a-nested-css-rule-expander.html"&gt;here&lt;/a&gt;
 if you are not redirected.&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/building-a-nested-css-rule-expander.html</guid><pubDate>Sun, 31 Oct 2021 00:00:00 +0000</pubDate></item><item><title>Exploring PL/pgSQL part two: implementing a Forth-like interpreter</title><link>http://notes.eatonphil.com/exploring-plpgsql-forth-like.html</link><description>&lt;p&gt;In my &lt;a href="https://notes.eatonphil.com/exploring-plpgsql.html"&gt;last post&lt;/a&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/building-a-nested-css-rule-expander.html</guid><pubDate>Sun, 31 Oct 2021 00:00:00 +0000</pubDate></item><item><title>Exploring PL/pgSQL part two: implementing a Forth-like interpreter</title><link>http://notes.eatonphil.com/exploring-plpgsql-forth-like.html</link><description>&lt;p class="note"&gt;
+  Previously in exploring PL/pgSQL:
+  &lt;br /&gt;
+  &lt;a href="exploring-plpgsql.html"&gt;Strings, arrays, recursion and parsing JSON&lt;/a&gt;
+&lt;/p&gt;&lt;p&gt;In my &lt;a href="https://notes.eatonphil.com/exploring-plpgsql.html"&gt;last post&lt;/a&gt;
 I walked through the basics of PL/pgSQL, the embedded procedural
 language inside of PostgreSQL. It covered simple functions, recursions
 and parsing. But there was something very obviously missing from that
@@ -366,7 +370,11 @@ EXIT&amp;#39;)&amp;quot;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Happy PL/pgSQL- and Forth-ish-ing!&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Latest post is up! Writing a Forth(-inspired language) implementation from scratch in PL/pgSQL. Because who doesn&amp;#39;t want to be able to run stack machine code from SELECT statements in PostgreSQL?&lt;a href="https://t.co/sbxhuDp1J9"&gt;https://t.co/sbxhuDp1J9&lt;/a&gt; &lt;a href="https://t.co/9nrHEIhRPa"&gt;pic.twitter.com/9nrHEIhRPa&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1453958284109500417?ref_src=twsrc%5Etfw"&gt;October 29, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/exploring-plpgsql-forth-like.html</guid><pubDate>Fri, 29 Oct 2021 00:00:00 +0000</pubDate></item><item><title>Exploring PL/pgSQL: Strings, arrays, recursion, and parsing JSON</title><link>http://notes.eatonphil.com/exploring-plpgsql.html</link><description>&lt;p&gt;PostgreSQL comes with a builtin imperative programming language called
+</description><guid isPermaLink="false">http://notes.eatonphil.com/exploring-plpgsql-forth-like.html</guid><pubDate>Fri, 29 Oct 2021 00:00:00 +0000</pubDate></item><item><title>Exploring PL/pgSQL: Strings, arrays, recursion, and parsing JSON</title><link>http://notes.eatonphil.com/exploring-plpgsql.html</link><description>&lt;p class="note"&gt;
+  Next in exploring PL/pgSQL:
+  &lt;br /&gt;
+  &lt;a href="exploring-plpgsql-forth-like.html"&gt;Implementing a Forth-like interpreter&lt;/a&gt;
+&lt;/p&gt;&lt;p&gt;PostgreSQL comes with a builtin imperative programming language called
 PL/pgSQL. I used to think this language was scary because it has a bit
 more adornment than your usual language does. But looking deeper, it's
 actually reasonably pleasant to program in.&lt;/p&gt;
