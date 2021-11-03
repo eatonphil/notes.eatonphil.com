@@ -191,6 +191,7 @@ aside p {
 .tag {
     display: inline-block;
     margin-right: 10px;
+    margin-bottom: 5px;
     padding: 3px 5px;
     background: #efefef;
     color: #777;

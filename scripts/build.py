@@ -57,75 +57,19 @@ HOME_PAGE = """
     I love <a href="mailto:me@eatonphil.com">hearing from you</a>!
   </p>
 </div>
+<div class="fp-section fp-section--tags">
+  <h2 class="fp-h2">Frequent Topics</h2>
+  <div class="tags">
+    {tags}
+  </div>
+  <p>
+    <a href="/tags/">View all</a>
+  </p>
+</div>
 <div class="fp-section fp-section--notes">
   <h2 class="fp-h2">Archive</h2>
   {notes}
 </div>
-<!--
-<div class="fp-section fp-section--projects">
-  <h2 class="fp-h2">Fun</h2>
-  <a href="http://ponyo.org" class="fp-project">
-    <div>Ponyo</div>
-    <p>High-level library and toolkit for programming Standard ML.</p>
-  </a>
-  <a href="https://github.com/eatonphil/bsdscheme" class="fp-project">
-    <div>BSDScheme</div>
-    <p>A Scheme interpreter and compiler targeting R7RS written in D.</p>
-  </a>
-  <a href="https://github.com/eatonphil/jsc" class="fp-project">
-    <div>Jsc</div>
-    <p>A JavaScript to C++ compiler (using V8) written in TypeScript.</p>
-  </a>
-  <a href="https://github.com/eatonphil/ulisp" class="fp-project">
-    <div>ulisp</div>
-    <p>An educational compiler from Lisp to LLVM and x86 assembly, written in JavaScript.</p>
-  </a>
-  <a href="https://github.com/eatonphil/uweb" class="fp-project">
-    <div>uweb</div>
-    <p>An educational web server written in JavaScript.</p>
-  </a>
-  <a href="https://github.com/eatonphil/x86e" class="fp-project">
-    <div>x86e</div>
-    <p>An x86 emulator and graphical debugger in JavaScript.</p>
-  </a>
-  <a href="https://github.com/eatonphil/gosql" class="fp-project">
-    <div>gosql</div>
-    <p>A PostgreSQL implementation in Go.</p>
-  </a>
-  <a href="https://github.com/eatonphil/dbcore" class="fp-project">
-    <div>dbcore</div>
-    <p>A code generation tool and API specification powered by your database.</p>
-  </a>
-  <a href="https://github.com/eatonphil/go-amd64-emulator" class="fp-project">
-    <div>go-amd64-emulator</div>
-    <p>A userland linux/amd64 emulator and terminal debugger in Go.</p>
-  </a>
-</div>
-<div class="fp-section fp-section--talks">
-  <h2 class="fp-h2">Talks</h2>
-  <div class="fp-project">
-    <a href="https://www.meetup.com/TypeScriptNYC/events/260291994/">Interpreting TypeScript</a>
-    <div>
-      <a href="https://docs.google.com/presentation/d/e/2PACX-1vQOSorW7HGPvt1qURVK4d82bTxUVzlDUyCtFtbSgvA8CXhg2yw2FLpBD9cCBNvplSUmj-KezR1X1DBt/pub">Slides</a>
-    </div>
-    <p>April 17, 2019</p>
-  </div>
-  <div class="fp-project">
-    <a href="https://www.meetup.com/nodejs/events/258732362/">AOT-compilation of Javascript with V8</a>
-    <div>
-      <a href="https://docs.google.com/presentation/d/e/2PACX-1vQRIjLOcxdbZEDWI8LH2iPtzo4YVTueg1JTlFgJRRjcRDKMOYZ_XS1C-Q9DLpER3AoivyHFzzWT8HQK/pub">Slides</a>
-    </div>
-    <p>February 20, 2019</p>
-  </div>
-  <div class="fp-project">
-    <a href="https://www.meetup.com/JS-NYC/events/mwwrjqyxqbqb/">Compiler basics: Lisp to Assembly</a>
-    <div>
-      <a href="https://docs.google.com/presentation/d/e/2PACX-1vQE2HWfQwFzmFkvfGssqp-93dN5no0ozzNwqO6nNF7-yUm_Kv_TOhbBqoIhy1y8imUj6AwPmF1UZaqG/pub">Slides</a>
-    </div>
-    <p>December 20, 2018</p>
-  </div>
-</div>
--->
 <style>.feedback{{display:none;}}</style>
 """
 TEMPLATE = open('template.html').read()
@@ -177,7 +121,7 @@ def get_html_tags(all_tags):
         if not tag:
             continue
         #if i < 3:
-        tags += '<a href="/tags/{}.html" class="tag">{}</a>'.format(tag.replace(' ', '-'), tag)
+        tags += '<a href="/tags/{}.html" class="tag">{}</a>'.format(tag.replace(' ', '-').replace('/', '-'), tag)
         #else:
         #    tags += '<span style="display: none;">{}</span>'.format(tag)
     if tags:
@@ -189,6 +133,7 @@ def get_html_tags(all_tags):
 def main():
     all_tags = {}
     post_data = []
+    tags_with_counts = {}
     for post in get_posts():
         print('Processing ' + post)
         out_file = post[len('posts/'):]
@@ -202,6 +147,9 @@ def main():
         for tag in tags:
             if tag not in all_tags:
                 all_tags[tag] = []
+            if tag not in tags_with_counts:
+                tags_with_counts[tag] = 0
+            tags_with_counts[tag] += 1
 
             all_tags[tag].append((out_file, title[1], title[2]))
 
@@ -219,8 +167,15 @@ def main():
             notes.append('<h3>{}</h3>'.format(year))
         note = POST_SUMMARY.format(*args[:2], args[5], *args[2:3])
         notes.append(note)
+
+    homepage_tags_data = sorted(tags_with_counts.items(), key=lambda x: x[1], reverse=True)
+    homepage_tags = []
+    for tag, count in homepage_tags_data[:20]:
+        homepage_tags.append(f'<a href="/tags/{tag.replace(" ", "-").replace("/", "-")}.html" class="tag">{tag} ({count})</a>')
+    
     home_page = HOME_PAGE.format(
-        notes="\n".join(notes))
+        notes="\n".join(notes),
+        tags="\n".join(homepage_tags))
     with open('docs/index.html', 'w') as f:
         meta = '<meta name="google-site-verification" content="s-Odt0Dj7WZzEk6hLV28wLyR5LeGQFoopUV3IDNO6bM" />\n    '
         f.write(TEMPLATE.format(post=home_page, title="", tag=TAG, subtitle="", tags="", meta=meta))
@@ -266,9 +221,19 @@ Sitemap: https://notes.eatonphil.com/sitemap.xml""")
 
     if not os.path.exists('docs/tags'):
         os.makedirs('docs/tags')
+    # Write tag index
+    tag_index_data = sorted(tags_with_counts.items(), key=lambda x: x[1], reverse=True)
+    tag_index = []
+    for tag, count in tag_index_data:
+        tag_index.append(f'<a href="/tags/{tag.replace(" ", "-").replace("/", "-")}.html" class="tag {"tag--common" if i < 20 else ""}">{tag} ({count})</a>')
+    with open('docs/tags/index.html', 'w') as f:
+        index_page = f'<div class="tags">{"".join(tag_index)}</div>'
+        f.write(TEMPLATE.format(post=index_page, title="All Topics", tag="All Topics", subtitle="", tags="", meta=""))
+
+    # Write each individual tag page
     for tag in all_tags:
         posts = all_tags[tag]
-        with open('docs/tags/%s.html' % tag.replace(' ', '-'), 'w') as f:
+        with open('docs/tags/%s.html' % tag.replace(' ', '-').replace('/', '-'), 'w') as f:
             posts.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
             posts.reverse()
             tag_page = TAG_PAGE.format(tag)
