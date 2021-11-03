@@ -170,7 +170,7 @@ def main():
 
     homepage_tags_data = sorted(tags_with_counts.items(), key=lambda x: x[1], reverse=True)
     homepage_tags = []
-    for tag, count in homepage_tags_data[:20]:
+    for tag, count in [t for t in homepage_tags_data if t[0] != 'external'][:20]:
         homepage_tags.append(f'<a href="/tags/{tag.replace(" ", "-").replace("/", "-")}.html" class="tag">{tag} ({count})</a>')
     
     home_page = HOME_PAGE.format(
