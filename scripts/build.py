@@ -70,7 +70,6 @@ HOME_PAGE = """
   <h2 class="fp-h2">Archive</h2>
   {notes}
 </div>
-<style>.feedback{{display:none;}}</style>
 """
 TEMPLATE = open('template.html').read()
 TAG = "Notes on software, organizations, product development, and professional growth"
@@ -153,9 +152,16 @@ def main():
 
             all_tags[tag].append((out_file, title[1], title[2]))
 
-        title = title[1]
+    frequent_tags_data = sorted(tags_with_counts.items(), key=lambda x: x[1], reverse=True)
+    frequent_tags = []
+    for tag, count in [t for t in frequent_tags_data if t[0] != 'external'][:20]:
+        frequent_tags.append(f'<a href="/tags/{tag.replace(" ", "-").replace("/", "-")}.html" class="tag">{tag} ({count})</a>')
+    frequent_tags = "".join(frequent_tags)
+
+    showfeedback = "<style>.feedback{display:initial;}</style>"
+    for (out_file, title, date, _, output, tags_html) in post_data:
         with open('docs/' + out_file, 'w') as f:
-            f.write(TEMPLATE.format(post=output, title=title, subtitle=date, tag=title, tags=tags_html, meta=""))
+            f.write(TEMPLATE.format(post=output+showfeedback, title=title, subtitle=date, tag=title, tags=tags_html, meta="", frequent_tags=frequent_tags))
 
     post_data.sort(key=lambda post: datetime.strptime(post[2], '%B %d, %Y'))
     post_data.reverse()
@@ -167,18 +173,13 @@ def main():
             notes.append('<h3>{}</h3>'.format(year))
         note = POST_SUMMARY.format(*args[:2], args[5], *args[2:3])
         notes.append(note)
-
-    homepage_tags_data = sorted(tags_with_counts.items(), key=lambda x: x[1], reverse=True)
-    homepage_tags = []
-    for tag, count in [t for t in homepage_tags_data if t[0] != 'external'][:20]:
-        homepage_tags.append(f'<a href="/tags/{tag.replace(" ", "-").replace("/", "-")}.html" class="tag">{tag} ({count})</a>')
     
     home_page = HOME_PAGE.format(
         notes="\n".join(notes),
-        tags="\n".join(homepage_tags))
+        tags=frequent_tags)
     with open('docs/index.html', 'w') as f:
         meta = '<meta name="google-site-verification" content="s-Odt0Dj7WZzEk6hLV28wLyR5LeGQFoopUV3IDNO6bM" />\n    '
-        f.write(TEMPLATE.format(post=home_page, title="", tag=TAG, subtitle="", tags="", meta=meta))
+        f.write(TEMPLATE.format(post=home_page, title="", tag=TAG, subtitle="", tags="", meta=meta, frequent_tags=""))
 
     with open('docs/style.css', 'w') as fw:
         with open('style.css') as fr:
@@ -228,7 +229,7 @@ Sitemap: https://notes.eatonphil.com/sitemap.xml""")
         tag_index.append(f'<a href="/tags/{tag.replace(" ", "-").replace("/", "-")}.html" class="tag {"tag--common" if i < 20 else ""}">{tag} ({count})</a>')
     with open('docs/tags/index.html', 'w') as f:
         index_page = f'<div class="tags">{"".join(tag_index)}</div>'
-        f.write(TEMPLATE.format(post=index_page, title="All Topics", tag="All Topics", subtitle="", tags="", meta=""))
+        f.write(TEMPLATE.format(post=index_page, title="All Topics", tag="All Topics", subtitle="", tags="", meta="", frequent_tags=""))
 
     # Write each individual tag page
     for tag in all_tags:
@@ -238,7 +239,7 @@ Sitemap: https://notes.eatonphil.com/sitemap.xml""")
             posts.reverse()
             tag_page = TAG_PAGE.format(tag)
             tag_page += "\n".join([TAG_SUMMARY.format(*args) for args in posts])
-            f.write(TEMPLATE.format(post=tag_page, title="", tag=TAG, subtitle="", tags="", meta=""))
+            f.write(TEMPLATE.format(post=tag_page, title="", tag=TAG, subtitle="", tags="", meta="", frequent_tags=""))
 
 
 if __name__ == '__main__':

@@ -140,14 +140,15 @@ header .container {
 
 .subscribe a {
     font-size: 1rem;
-    border: 1px solid black;
+    border: 3px solid rgb(0, 95, 255);
+    background: rgb(0, 95, 255);
     padding: 5px;
-    color: black;
+    color: white;
 }
 
 .subscribe a:hover {
-    background: black;
-    color: white;
+    background: white;
+    color: black;
 }
 
 aside {
@@ -284,6 +285,10 @@ aside p {
     color: #333;
     margin: 0;
     font-size: .9rem;
+}
+
+.feedback {
+    display: none;
 }
 
 @media (max-width: 650px) {
