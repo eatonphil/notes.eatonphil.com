@@ -29,7 +29,11 @@ HOME_PAGE = """
   <h2 class="fp-h2"></h2>
   <p>
     Hello! I'm Phil, based in Queens, NY. I've been a developer and
-    manager in the past. Today I do contract software development.
+    manager in the past. Today I do contract software
+    development. Some of the most viewed posts on this site are about
+    building <a href="/tags/compiler.html">compilers</a>, <a
+    href="/tags/database.html">databases</a>, and <a
+    href="/tags/emulator.html">emulators</a> from scratch.
   </p>
   <p>
     I'm building <a
@@ -40,13 +44,13 @@ HOME_PAGE = """
     about your data ecosystem.
   </p>
   <p>
-    Some of my most viewed posts on this site are about building <a
-    href="/tags/compiler.html">compilers</a>, <a
-    href="/tags/database.html">databases</a>, and <a
-    href="/tags/emulator.html">emulators</a> from scratch.
+    I also run a <a href="https://discord.gg/xGPcYTMNwW">Discord community
+    for developers</a> working on or interested in challenging
+    programming projects like compilers, databases, emulators,
+    etc. Come to share and learn from other folks!
   </p>
   <p>
-    You can also find me on <a
+    You can find me elsewhere on <a
     href="https://github.com/eatonphil">Github</a>, <a
     href="https://twitter.com/phil_eaton">Twitter</a>, <a
     href="https://www.linkedin.com/in/phil-e-97a490178/">LinkedIn</a>,
@@ -173,7 +177,7 @@ def main():
             notes.append('<h3>{}</h3>'.format(year))
         note = POST_SUMMARY.format(*args[:2], args[5], *args[2:3])
         notes.append(note)
-    
+
     home_page = HOME_PAGE.format(
         notes="\n".join(notes),
         tags=frequent_tags)
