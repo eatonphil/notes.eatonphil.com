@@ -31,9 +31,9 @@ HOME_PAGE = """
     Hello! I'm Phil, based in Queens, NY. I've been a developer and
     manager in the past. Today I do contract software
     development. Some of the most viewed posts on this site are about
-    building <a href="/tags/compiler.html">compilers</a>, <a
-    href="/tags/database.html">databases</a>, and <a
-    href="/tags/emulator.html">emulators</a> from scratch.
+    building <a href="/tags/compilers.html">compilers</a>, <a
+    href="/tags/databases.html">databases</a>, and <a
+    href="/tags/emulators.html">emulators</a> from scratch.
   </p>
   <p>
     I'm building <a
