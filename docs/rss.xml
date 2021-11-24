@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 24 Nov 2021 03:59:47 +0000</lastBuildDate><item><title>Implementing zip archiving in Golang: unzipping</title><link>http://notes.eatonphil.com/implementing-zip-in-go-unzipping.html</link><description>&lt;p&gt;&lt;small&gt;All code for this post is &lt;a href="https://github.com/eatonphil/gozip"&gt;available on Github&lt;/a&gt;.&lt;/small&gt;&lt;/p&gt;
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 24 Nov 2021 13:39:00 +0000</lastBuildDate><item><title>Implementing zip archiving in Golang: unzipping</title><link>http://notes.eatonphil.com/implementing-zip-in-go-unzipping.html</link><description>&lt;p&gt;&lt;small&gt;All code for this post is &lt;a href="https://github.com/eatonphil/gozip"&gt;available on Github&lt;/a&gt;.&lt;/small&gt;&lt;/p&gt;
 &lt;p&gt;Let's take a look at how zip files work. Take a small file for example:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ cat hello.text
 Hello!
@@ -30,10 +30,17 @@ complicated!&lt;/p&gt;
 000000b1
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;We can see both the file name and the file contents in there.&lt;/p&gt;
-&lt;p&gt;Let's take a look at the zip structure defined
+&lt;h3 id="structure"&gt;Structure&lt;/h3&gt;&lt;p&gt;Let's take a look at the zip structure defined
 &lt;a href="https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT"&gt;here&lt;/a&gt;. Based
 on section 4.3.6 it looks like file metadata followed by the file
-contents are stored one after another. The file metadata looks like this:&lt;/p&gt;
+contents are stored one after another with a final bit of "central
+directory" metadata.&lt;/p&gt;
+&lt;div style="text-align:center"&gt;
+  &lt;img src="https://www.codeproject.com/KB/cs/remotezip/diagram1.png" style="height:400px; width: auto" /&gt;
+  &lt;div&gt;
+    &lt;small&gt;&lt;a href="https://www.codeproject.com/Articles/8688/Extracting-files-from-a-remote-ZIP-archive"&gt;Image Credit&lt;/a&gt;&lt;/small&gt;
+  &lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;The local header metadata looks like this:&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;&lt;tr&gt;
 &lt;th&gt;Field&lt;/th&gt;
@@ -361,11 +368,10 @@ $ ./gozip test.zip
 &lt;p&gt;Fab.&lt;/p&gt;
 &lt;h3 id="notes"&gt;Notes&lt;/h3&gt;&lt;p&gt;There are many parts of the standard to deal with (e.g. directories)
 and many common extensions. I'm ignoring them.&lt;/p&gt;
-&lt;p&gt;There's some space left at the end of the file and I don't know why
-it's there because the spec doesn't seem to mention anything about
-footers. But I didn't read it too closely. Understanding those last
-remaining bits are probably necessary if I want to be able to &lt;em&gt;create&lt;/em&gt;
-zip archives.&lt;/p&gt;
+&lt;p&gt;There's some space left at the end of the file which is probably the
+"central directory" metadata but I haven't dug into
+that. Understanding those last remaining bits are probably necessary
+if I want to be able to &lt;em&gt;create&lt;/em&gt; zip archives.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;I wrote a new post on building a zip archive reader in Go!&lt;a href="https://t.co/U0Yg2powlP"&gt;https://t.co/U0Yg2powlP&lt;/a&gt; &lt;a href="https://t.co/ns5dF3mjIx"&gt;pic.twitter.com/ns5dF3mjIx&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1463354752675323904?ref_src=twsrc%5Etfw"&gt;November 24, 2021&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/implementing-zip-in-go-unzipping.html</guid><pubDate>Tue, 23 Nov 2021 00:00:00 +0000</pubDate></item><item><title>Benchmarking esbuild, swc, tsc, and babel for React/JSX projects</title><link>http://notes.eatonphil.com/benchmarking-esbuild-swc-typescript-babel.html</link><description>&lt;head&gt;
     &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2021-11-13-benchmarking-esbuild-swc-typescript-babel.html'" /&gt;
