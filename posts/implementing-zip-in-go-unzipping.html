@@ -1,5 +1,5 @@
 # Implementing zip archiving in Golang: unzipping
-## November 24, 2021
+## November 23, 2021
 ###### golang,zip
 
 <small>All code for this post is <a href="https://github.com/eatonphil/gozip">available on Github</a>.</small>
@@ -75,11 +75,7 @@ Last modified time and date is MSDOS-style date/time format which is
 [pretty
 funky](https://groups.google.com/g/comp.os.msdos.programmer/c/ffAVUFN2NbA).
 
-When there is no compression, we'll use the uncompressed size
-field. When compression is set we'll use the compressed size field.
-
-And the last two length fields describe the number of bytes for the
-last two variable fields.
+Let's translate this roughly to Go with some high level flourishes.
 
 ```go
 package main
@@ -115,16 +111,10 @@ type localFileHeader struct {
 }
 ```
 
-It's not a direct translation. We'll map compression to a Go-style
-"enum", the MSDOS date/time to Go's time, and store the file name,
-extra field directly without the length fields. We'll tack on the
-actual file contents at the end too.
-
 ### main
 
-The main program will read a zip file passed by name in command line
-arguments. Since files are laid out one after another we'll call a
-parse function until we stop seeing files.
+Our entrypoint will read a zip file and keep walking through the file
+until we stop being able to parse zip file entries.
 
 ```go
 func main() {
@@ -151,15 +141,154 @@ func main() {
 		fmt.Println(lfh.lastModified, lfh.fileName, lfh.fileContents)
 	}
 }
+  ```
+
+### Files
+
+For each file we'll fail early if the first four bytes are not the magic zip signature.
+
+```go
+var errNotZip = fmt.Errorf("Not a zip file")
+
+func parseLocalFileHeader(bs []byte, start int) (*localFileHeader, int, error) {
+	signature, i, err := readUint32(bs, start)
+	if signature != 0x04034b50 {
+		return nil, 0, errNotZip
+	}
+	if err != nil {
+		return nil, 0, err
+	}
 ```
 
-### Reading integers, bytes, strings
+The basic pattern is that one of thhese read helpers will take an
+offset and return a Go value and a new offset. The read helper will do
+bounds checking.
 
-In converting an array of bytes into distinct fields we'll need some
-helper functions. Each helper will take an array of bytes and an
-offset. They'll return an integer, string, or bytes and the index in
-the array of bytes after the offset. They'll return an error if we
-ever run past the size of the array of bytes.
+Let's follow the same pattern to the end of the struct:
+
+```
+	version, i, err := readUint16(bs, i)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	bitFlag, i, err := readUint16(bs, i)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	compression := noCompression
+	compressionRaw, i, err := readUint16(bs, i)
+	if err != nil {
+		return nil, 0, err
+	}
+	if compressionRaw == 8 {
+		compression = deflateCompression
+	}
+
+	lmTime, i, err := readUint16(bs, i)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	lmDate, i, err := readUint16(bs, i)
+	if err != nil {
+		return nil, 0, err
+	}
+	lastModified := msdosTimeToGoTime(lmDate, lmTime)
+
+	crc32, i, err := readUint32(bs, i)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	compressedSize, i, err := readUint32(bs, i)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	uncompressedSize, i, err := readUint32(bs, i)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	fileNameLength, i, err := readUint16(bs, i)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	extraFieldLength, i, err := readUint16(bs, i)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	fileName, i, err := readString(bs, i, int(fileNameLength))
+	if err != nil {
+		return nil, 0, err
+	}
+
+	extraField, i, err := readBytes(bs, i, int(extraFieldLength))
+	if err != nil {
+		return nil, 0, err
+	}
+```
+
+Now if the file contents are uncompressed we can just copy bytes after
+the file header. If the file contents are compressed though we'll use
+Go's builtin DEFLATE support to decompress the bytes after the file
+header.
+
+```go
+	var fileContents string
+	if compression == noCompression {
+		fileContents, i, err = readString(bs, i, int(uncompressedSize))
+		if err != nil {
+			return nil, 0, err
+		}
+	} else {
+		end := i + int(compressedSize)
+		if end > len(bs) {
+			return nil, 0, errOverranBuffer
+		}
+		flateReader := flate.NewReader(bytes.NewReader(bs[i:end]))
+
+		defer flateReader.Close()
+		read, err := ioutil.ReadAll(flateReader)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		fileContents = string(read)
+
+		i = end
+	}
+```
+
+And return the filled out representation:
+
+```go
+
+	return &localFileHeader{
+		signature: signature,
+		version: version,
+		bitFlag: bitFlag,
+		compression: compression,
+		lastModified: lastModified,
+		crc32: crc32,
+		compressedSize: compressedSize,
+		uncompressedSize: uncompressedSize,
+		fileName: fileName,
+		extraField: extraField,
+		fileContents: fileContents,
+	}, i, nil
+}
+```
+
+
+### Read helpers
+
+Now we just define those read helpers with bounds checking, using Go's
+builtin libraries for dealing with binary encodings.
 
 ```go
 var errOverranBuffer = fmt.Errorf("Overran buffer")
@@ -183,8 +312,7 @@ func readUint16(bs []byte, offset int) (uint16, int, error) {
 }
 ```
 
-Grabbing bytes and strings is easier. The only extra piece on top of
-slicing is bounds checking.
+And basically only bounds checking for grabbing bytes and strings.
 
 ```go
 func readBytes(bs []byte, offset int, n int) ([]byte, int, error) {
@@ -202,21 +330,61 @@ func readString(bs []byte, offset int, n int) (string, int, error) {
 }
 ```
 
-Now we're ready to actually grab files out of a zip!
+### MSDOS time
 
-### Files
-
-For each file we'll fail early if the first four bytes are not the magic zip signature.
+At the time zip was created, MSDOS time format was popular, I
+guess. But it's not popular today so it took a bit of work to finally
+find [an explanation of the
+format](https://groups.google.com/g/comp.os.msdos.programmer/c/ffAVUFN2NbA)
+with some code (in C).
 
 ```go
-var errNotZip = fmt.Errorf("Not a zip file")
+func msdosTimeToGoTime(d uint16, t uint16) time.Time {
+	seconds := int((t & 0x1F) * 2)
+	minutes := int((t >> 5) & 0x3F)
+	hours := int(t >> 11)
 
-func parseLocalFileHeader(bs []byte, start int) (*localFileHeader, int, error) {
-	signature, i, err := readUint32(bs, start)
-	if signature != 0x04034b50 {
-		return nil, 0, errNotZip
-	}
-	if err != nil {
-		return nil, 0, err
-	}
+	day := int(d & 0x1F)
+	month := time.Month((d >> 5) & 0x0F)
+	year := int((d >> 9) & 0x7F) + 1980
+	return time.Date(year, month, day, hours, minutes, seconds, 0, time.Local)
+}
 ```
+
+### Tout ensemble
+
+Running it we get:
+
+```bash
+$ go build
+$ ./gozip test.zip
+2021-11-23 23:04:20 +0000 UTC hello.text Hello!
+
+```
+
+And that looks good! Now let's try zipping more than one file.
+
+```bash
+$ cat bye.text
+Au revoir!
+$ rm test.zip
+$ zip test.zip *.text
+  adding: bye.text (stored 0%)
+  adding: hello.text (stored 0%)
+$ ./gozip test.zip
+2021-11-24 03:40:00 +0000 UTC bye.text Au revoir!
+
+2021-11-23 23:04:20 +0000 UTC hello.text Hello!
+
+```
+
+### Notes
+
+There are many parts of the standard to deal with (e.g. directories)
+and many common extensions. I'm ignoring them.
+
+There's some space left at the end of the file and I don't know why
+it's there because the spec doesn't seem to mention anything about
+footers. But I didn't read it too closely. Understanding those last
+remaining bits are probably necessary if I want to be able to _create_
+zip archives.

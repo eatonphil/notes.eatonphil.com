@@ -32,7 +32,7 @@
 	    </div>
 	  </div>
 
-          <h2>November 24, 2021</h2>
+          <h2>November 23, 2021</h2>
           <h1>Implementing zip archiving in Golang: unzipping</h1>
           <div class="row" style="padding-bottom: 5px">
             <div class="tags"><a href="/tags/golang.html" class="tag">golang</a><a href="/tags/zip.html" class="tag">zip</a></div>
@@ -146,10 +146,7 @@ compression/decompression.</p>
 <p>Last modified time and date is MSDOS-style date/time format which is
 <a href="https://groups.google.com/g/comp.os.msdos.programmer/c/ffAVUFN2NbA">pretty
 funky</a>.</p>
-<p>When there is no compression, we'll use the uncompressed size
-field. When compression is set we'll use the compressed size field.</p>
-<p>And the last two length fields describe the number of bytes for the
-last two variable fields.</p>
+<p>Let's translate this roughly to Go with some high level flourishes.</p>
 <pre><code class="hljs go">package main
 
 import (
@@ -182,13 +179,8 @@ type localFileHeader struct {
     fileContents string
 }
 </code></pre>
-<p>It's not a direct translation. We'll map compression to a Go-style
-"enum", the MSDOS date/time to Go's time, and store the file name,
-extra field directly without the length fields. We'll tack on the
-actual file contents at the end too.</p>
-<h3 id="main">main</h3><p>The main program will read a zip file passed by name in command line
-arguments. Since files are laid out one after another we'll call a
-parse function until we stop seeing files.</p>
+<h3 id="main">main</h3><p>Our entrypoint will read a zip file and keep walking through the file
+until we stop being able to parse zip file entries.</p>
 <pre><code class="hljs go">func main() {
     f, err := ioutil.ReadFile(os.Args[1])
     if err != nil {
@@ -214,11 +206,134 @@ parse function until we stop seeing files.</p>
     }
 }
 </code></pre>
-<h3 id="reading-integers,-bytes,-strings">Reading integers, bytes, strings</h3><p>In converting an array of bytes into distinct fields we'll need some
-helper functions. Each helper will take an array of bytes and an
-offset. They'll return an integer, string, or bytes and the index in
-the array of bytes after the offset. They'll return an error if we
-ever run past the size of the array of bytes.</p>
+<h3 id="files">Files</h3><p>For each file we'll fail early if the first four bytes are not the magic zip signature.</p>
+<pre><code class="hljs go">var errNotZip = fmt.Errorf(&quot;Not a zip file&quot;)
+
+func parseLocalFileHeader(bs []byte, start int) (*localFileHeader, int, error) {
+    signature, i, err := readUint32(bs, start)
+    if signature != 0x04034b50 {
+        return nil, 0, errNotZip
+    }
+    if err != nil {
+        return nil, 0, err
+    }
+</code></pre>
+<p>The basic pattern is that one of thhese read helpers will take an
+offset and return a Go value and a new offset. The read helper will do
+bounds checking.</p>
+<p>Let's follow the same pattern to the end of the struct:</p>
+<pre><code>    version, i, err := readUint16(bs, i)
+    if err != nil {
+        return nil, 0, err
+    }
+
+    bitFlag, i, err := readUint16(bs, i)
+    if err != nil {
+        return nil, 0, err
+    }
+
+    compression := noCompression
+    compressionRaw, i, err := readUint16(bs, i)
+    if err != nil {
+        return nil, 0, err
+    }
+    if compressionRaw == 8 {
+        compression = deflateCompression
+    }
+
+    lmTime, i, err := readUint16(bs, i)
+    if err != nil {
+        return nil, 0, err
+    }
+
+    lmDate, i, err := readUint16(bs, i)
+    if err != nil {
+        return nil, 0, err
+    }
+    lastModified := msdosTimeToGoTime(lmDate, lmTime)
+
+    crc32, i, err := readUint32(bs, i)
+    if err != nil {
+        return nil, 0, err
+    }
+
+    compressedSize, i, err := readUint32(bs, i)
+    if err != nil {
+        return nil, 0, err
+    }
+
+    uncompressedSize, i, err := readUint32(bs, i)
+    if err != nil {
+        return nil, 0, err
+    }
+
+    fileNameLength, i, err := readUint16(bs, i)
+    if err != nil {
+        return nil, 0, err
+    }
+
+    extraFieldLength, i, err := readUint16(bs, i)
+    if err != nil {
+        return nil, 0, err
+    }
+
+    fileName, i, err := readString(bs, i, int(fileNameLength))
+    if err != nil {
+        return nil, 0, err
+    }
+
+    extraField, i, err := readBytes(bs, i, int(extraFieldLength))
+    if err != nil {
+        return nil, 0, err
+    }
+</code></pre>
+<p>Now if the file contents are uncompressed we can just copy bytes after
+the file header. If the file contents are compressed though we'll use
+Go's builtin DEFLATE support to decompress the bytes after the file
+header.</p>
+<pre><code class="hljs go">    var fileContents string
+    if compression == noCompression {
+        fileContents, i, err = readString(bs, i, int(uncompressedSize))
+        if err != nil {
+            return nil, 0, err
+        }
+    } else {
+        end := i + int(compressedSize)
+        if end &gt; len(bs) {
+            return nil, 0, errOverranBuffer
+        }
+        flateReader := flate.NewReader(bytes.NewReader(bs[i:end]))
+
+        defer flateReader.Close()
+        read, err := ioutil.ReadAll(flateReader)
+        if err != nil {
+            return nil, 0, err
+        }
+
+        fileContents = string(read)
+
+        i = end
+    }
+</code></pre>
+<p>And return the filled out representation:</p>
+<pre><code class="hljs go">
+    return &amp;localFileHeader{
+        signature: signature,
+        version: version,
+        bitFlag: bitFlag,
+        compression: compression,
+        lastModified: lastModified,
+        crc32: crc32,
+        compressedSize: compressedSize,
+        uncompressedSize: uncompressedSize,
+        fileName: fileName,
+        extraField: extraField,
+        fileContents: fileContents,
+    }, i, nil
+}
+</code></pre>
+<h3 id="read-helpers">Read helpers</h3><p>Now we just define those read helpers with bounds checking, using Go's
+builtin libraries for dealing with binary encodings.</p>
 <pre><code class="hljs go">var errOverranBuffer = fmt.Errorf(&quot;Overran buffer&quot;)
 
 func readUint32(bs []byte, offset int) (uint32, int, error) {
@@ -239,8 +354,7 @@ func readUint16(bs []byte, offset int) (uint16, int, error) {
     return binary.LittleEndian.Uint16(bs[offset:end]), end, nil
 }
 </code></pre>
-<p>Grabbing bytes and strings is easier. The only extra piece on top of
-slicing is bounds checking.</p>
+<p>And basically only bounds checking for grabbing bytes and strings.</p>
 <pre><code class="hljs go">func readBytes(bs []byte, offset int, n int) ([]byte, int, error) {
     end := offset + n
     if end &gt; len(bs) {
@@ -255,19 +369,46 @@ func readString(bs []byte, offset int, n int) (string, int, error) {
     return string(read), end, err
 }
 </code></pre>
-<p>Now we're ready to actually grab files out of a zip!</p>
-<h3 id="files">Files</h3><p>For each file we'll fail early if the first four bytes are not the magic zip signature.</p>
-<pre><code class="hljs go">var errNotZip = fmt.Errorf(&quot;Not a zip file&quot;)
+<h3 id="msdos-time">MSDOS time</h3><p>At the time zip was created, MSDOS time format was popular, I
+guess. But it's not popular today so it took a bit of work to finally
+find <a href="https://groups.google.com/g/comp.os.msdos.programmer/c/ffAVUFN2NbA">an explanation of the
+format</a>
+with some code (in C).</p>
+<pre><code class="hljs go">func msdosTimeToGoTime(d uint16, t uint16) time.Time {
+    seconds := int((t &amp; 0x1F) * 2)
+    minutes := int((t &gt;&gt; 5) &amp; 0x3F)
+    hours := int(t &gt;&gt; 11)
 
-func parseLocalFileHeader(bs []byte, start int) (*localFileHeader, int, error) {
-    signature, i, err := readUint32(bs, start)
-    if signature != 0x04034b50 {
-        return nil, 0, errNotZip
-    }
-    if err != nil {
-        return nil, 0, err
-    }
+    day := int(d &amp; 0x1F)
+    month := time.Month((d &gt;&gt; 5) &amp; 0x0F)
+    year := int((d &gt;&gt; 9) &amp; 0x7F) + 1980
+    return time.Date(year, month, day, hours, minutes, seconds, 0, time.Local)
+}
 </code></pre>
+<h3 id="tout-ensemble">Tout ensemble</h3><p>Running it we get:</p>
+<pre><code class="hljs bash">$ go build
+$ ./gozip test.zip
+2021-11-23 23:04:20 +0000 UTC hello.text Hello!
+</code></pre>
+<p>And that looks good! Now let's try zipping more than one file.</p>
+<pre><code class="hljs bash">$ cat bye.text
+Au revoir!
+$ rm test.zip
+$ zip test.zip *.text
+  adding: bye.text (stored 0%)
+  adding: hello.text (stored 0%)
+$ ./gozip test.zip
+2021-11-24 03:40:00 +0000 UTC bye.text Au revoir!
+
+2021-11-23 23:04:20 +0000 UTC hello.text Hello!
+</code></pre>
+<h3 id="notes">Notes</h3><p>There are many parts of the standard to deal with (e.g. directories)
+and many common extensions. I'm ignoring them.</p>
+<p>There's some space left at the end of the file and I don't know why
+it's there because the spec doesn't seem to mention anything about
+footers. But I didn't read it too closely. Understanding those last
+remaining bits are probably necessary if I want to be able to <em>create</em>
+zip archives.</p>
 <style>.feedback{display:initial;}</style>
 	<div class="feedback">
 	  <h4>Feedback</h4>
