@@ -50,7 +50,7 @@ We can see both the file name and the file contents in there.
 Let's take a look at the zip structure defined
 [here](https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT). Based
 on section 4.3.6 it looks like file metadata followed by the file
-contents are stored one after another with a final bit of "central
+contents are stored one after another with a final chunk of "central
 directory" metadata.
 
 <div style="text-align:center">
@@ -172,7 +172,7 @@ func parseLocalFileHeader(bs []byte, start int) (*localFileHeader, int, error) {
 	}
 ```
 
-The basic pattern is that one of thhese read helpers will take an
+The basic pattern is that one of these read helpers will take an
 offset and return a Go value and a new offset. The read helper will do
 bounds checking.
 
