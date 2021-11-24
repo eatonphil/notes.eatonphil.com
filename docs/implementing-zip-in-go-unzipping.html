@@ -227,7 +227,7 @@ func parseLocalFileHeader(bs []byte, start int) (*localFileHeader, int, error) {
 </code></pre>
 <p>The basic pattern is that one of these read helpers will take an
 offset and return a Go value and a new offset. The read helper will do
-bounds checking.</p>
+bounds checking. We'll define the read helpers further down.</p>
 <p>Let's follow the same pattern to the end of the struct:</p>
 <pre><code>    version, i, err := readUint16(bs, i)
     if err != nil {

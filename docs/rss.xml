@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 24 Nov 2021 15:58:53 +0000</lastBuildDate><item><title>Implementing zip archiving in Golang: unzipping</title><link>http://notes.eatonphil.com/implementing-zip-in-go-unzipping.html</link><description>&lt;p&gt;&lt;small&gt;All code for this post is &lt;a href="https://github.com/eatonphil/gozip"&gt;available on Github&lt;/a&gt;.&lt;/small&gt;&lt;/p&gt;
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 24 Nov 2021 18:26:51 +0000</lastBuildDate><item><title>Implementing zip archiving in Golang: unzipping</title><link>http://notes.eatonphil.com/implementing-zip-in-go-unzipping.html</link><description>&lt;p&gt;&lt;small&gt;All code for this post is &lt;a href="https://github.com/eatonphil/gozip"&gt;available on Github&lt;/a&gt;.&lt;/small&gt;&lt;/p&gt;
 &lt;p&gt;Let's take a look at how zip files work. Take a small file for example:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ cat hello.text
 Hello!
@@ -183,7 +183,7 @@ func parseLocalFileHeader(bs []byte, start int) (*localFileHeader, int, error) {
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;The basic pattern is that one of these read helpers will take an
 offset and return a Go value and a new offset. The read helper will do
-bounds checking.&lt;/p&gt;
+bounds checking. We'll define the read helpers further down.&lt;/p&gt;
 &lt;p&gt;Let's follow the same pattern to the end of the struct:&lt;/p&gt;
 &lt;pre&gt;&lt;code&gt;    version, i, err := readUint16(bs, i)
     if err != nil {
