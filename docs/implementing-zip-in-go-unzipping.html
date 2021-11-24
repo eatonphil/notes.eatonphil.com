@@ -390,7 +390,7 @@ with some code (in C).</p>
 $ ./gozip test.zip
 2021-11-23 23:04:20 +0000 UTC hello.text Hello!
 </code></pre>
-<p>And that looks good! Now let's try zipping more than one file.</p>
+<p>That looks good! Now let's try zipping more than one file.</p>
 <pre><code class="hljs bash">$ cat bye.text
 Au revoir!
 $ rm test.zip
@@ -402,6 +402,7 @@ $ ./gozip test.zip
 
 2021-11-23 23:04:20 +0000 UTC hello.text Hello!
 </code></pre>
+<p>Fab.</p>
 <h3 id="notes">Notes</h3><p>There are many parts of the standard to deal with (e.g. directories)
 and many common extensions. I'm ignoring them.</p>
 <p>There's some space left at the end of the file and I don't know why
@@ -409,6 +410,7 @@ it's there because the spec doesn't seem to mention anything about
 footers. But I didn't read it too closely. Understanding those last
 remaining bits are probably necessary if I want to be able to <em>create</em>
 zip archives.</p>
+<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">I wrote a new post on building a zip archive reader in Go!<a href="https://t.co/U0Yg2powlP">https://t.co/U0Yg2powlP</a> <a href="https://t.co/ns5dF3mjIx">pic.twitter.com/ns5dF3mjIx</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1463354752675323904?ref_src=twsrc%5Etfw">November 24, 2021</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
 <style>.feedback{display:initial;}</style>
 	<div class="feedback">
 	  <h4>Feedback</h4>
