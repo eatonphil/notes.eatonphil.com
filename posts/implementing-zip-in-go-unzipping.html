@@ -67,9 +67,9 @@ contents are stored one after another. The file metadata looks like this:
 | extra field                 | variable |
 
 The header signature is a single integer (<code>0x04034b50</code>) in
-a valid zip file. We'll ignore version and general. Compression is
-either <code>0</code> for no compression or <code>8</code> for DEFLATE
-compression/decompression.
+a valid zip file. We'll ignore version, the general purpose flag, and
+the checksum. Compression is either <code>0</code> for no compression
+or <code>8</code> for DEFLATE compression/decompression.
 
 Last modified time and date is MSDOS-style date/time format which is
 [pretty

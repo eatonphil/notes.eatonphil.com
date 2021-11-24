@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 24 Nov 2021 03:52:54 +0000</lastBuildDate><item><title>Implementing zip archiving in Golang: unzipping</title><link>http://notes.eatonphil.com/implementing-zip-in-go-unzipping.html</link><description>&lt;p&gt;&lt;small&gt;All code for this post is &lt;a href="https://github.com/eatonphil/gozip"&gt;available on Github&lt;/a&gt;.&lt;/small&gt;&lt;/p&gt;
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 24 Nov 2021 03:59:47 +0000</lastBuildDate><item><title>Implementing zip archiving in Golang: unzipping</title><link>http://notes.eatonphil.com/implementing-zip-in-go-unzipping.html</link><description>&lt;p&gt;&lt;small&gt;All code for this post is &lt;a href="https://github.com/eatonphil/gozip"&gt;available on Github&lt;/a&gt;.&lt;/small&gt;&lt;/p&gt;
 &lt;p&gt;Let's take a look at how zip files work. Take a small file for example:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ cat hello.text
 Hello!
@@ -96,9 +96,9 @@ contents are stored one after another. The file metadata looks like this:&lt;/p&
 &lt;/tbody&gt;
 &lt;/table&gt;
 &lt;p&gt;The header signature is a single integer (&lt;code&gt;0x04034b50&lt;/code&gt;) in
-a valid zip file. We'll ignore version and general. Compression is
-either &lt;code&gt;0&lt;/code&gt; for no compression or &lt;code&gt;8&lt;/code&gt; for DEFLATE
-compression/decompression.&lt;/p&gt;
+a valid zip file. We'll ignore version, the general purpose flag, and
+the checksum. Compression is either &lt;code&gt;0&lt;/code&gt; for no compression
+or &lt;code&gt;8&lt;/code&gt; for DEFLATE compression/decompression.&lt;/p&gt;
 &lt;p&gt;Last modified time and date is MSDOS-style date/time format which is
 &lt;a href="https://groups.google.com/g/comp.os.msdos.programmer/c/ffAVUFN2NbA"&gt;pretty
 funky&lt;/a&gt;.&lt;/p&gt;
