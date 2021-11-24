@@ -135,7 +135,7 @@ header .container {
 
 .subscribe {
     flex: 1;
-    text-align: right;    
+    text-align: right;
 }
 
 .subscribe a {
@@ -165,7 +165,7 @@ aside p {
 .hljs {
     padding: 2rem;
     max-height: 1000px;
-    border: 1px solid #f0f0f0;
+    border: 1px solid #ddd;
     background: white;
     width: 800px;
     margin-left: -100px;
@@ -289,6 +289,18 @@ aside p {
 
 .feedback {
     display: none;
+}
+
+table {
+    border: 1px solid #ddd;
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+th, td {
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-collapse: collapse;
 }
 
 @media (max-width: 650px) {

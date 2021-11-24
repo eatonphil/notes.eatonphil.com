@@ -1,5 +1,230 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 17 Nov 2021 02:07:57 +0000</lastBuildDate><item><title>Benchmarking esbuild, swc, tsc, and babel for React/JSX projects</title><link>http://notes.eatonphil.com/benchmarking-esbuild-swc-typescript-babel.html</link><description>&lt;head&gt;
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 24 Nov 2021 01:34:47 +0000</lastBuildDate><item><title>Implementing zip archiving in Golang: unzipping</title><link>http://notes.eatonphil.com/implementing-zip-in-go-unzipping.html</link><description>&lt;p&gt;&lt;small&gt;All code for this post is &lt;a href="https://github.com/eatonphil/gozip"&gt;available on Github&lt;/a&gt;.&lt;/small&gt;&lt;/p&gt;
+&lt;p&gt;Let's take a look at how zip files work. Take a small file for example:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ cat hello.text
+Hello!
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Let's zip it up.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ zip test.zip hello.text
+adding: hello.text (stored 0%)
+$ ls -lah test.zip
+-rw-r--r-- 1 phil phil 177 Nov 23 23:04 test.zip
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;So a 6 byte text file becomes a 177 byte zip file. That is pretty
+small! Parsing 177 bytes sounds like it can't possibly be too
+complicated!&lt;/p&gt;
+&lt;p&gt;Let's hexdump the zip file.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ hexdump -C test.zip
+00000000  50 4b 03 04 0a 00 00 00  00 00 8a b8 77 53 9e d8  |PK..........wS..|
+00000010  42 b0 07 00 00 00 07 00  00 00 0a 00 1c 00 68 65  |B.............he|
+00000020  6c 6c 6f 2e 74 65 78 74  55 54 09 00 03 74 73 9d  |llo.textUT...ts.|
+00000030  61 74 73 9d 61 75 78 0b  00 01 04 eb 03 00 00 04  |ats.aux.........|
+00000040  eb 03 00 00 48 65 6c 6c  6f 21 0a 50 4b 01 02 1e  |....Hello!.PK...|
+00000050  03 0a 00 00 00 00 00 8a  b8 77 53 9e d8 42 b0 07  |.........wS..B..|
+00000060  00 00 00 07 00 00 00 0a  00 18 00 00 00 00 00 01  |................|
+00000070  00 00 00 a4 81 00 00 00  00 68 65 6c 6c 6f 2e 74  |.........hello.t|
+00000080  65 78 74 55 54 05 00 03  74 73 9d 61 75 78 0b 00  |extUT...ts.aux..|
+00000090  01 04 eb 03 00 00 04 eb  03 00 00 50 4b 05 06 00  |...........PK...|
+000000a0  00 00 00 01 00 01 00 50  00 00 00 4b 00 00 00 00  |.......P...K....|
+000000b0  00                                                |.|
+000000b1
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We can see both the file name and the file contents in there.&lt;/p&gt;
+&lt;p&gt;Let's take a look at the zip structure defined
+&lt;a href="https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT"&gt;here&lt;/a&gt;. Based
+on section 4.3.6 it looks like file metadata followed by the file
+contents are stored one after another. The file metadata looks like this:&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;
+&lt;th&gt;Field&lt;/th&gt;
+&lt;th&gt;Size&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;local file header signature&lt;/td&gt;
+&lt;td&gt;4 bytes&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;version needed to extract&lt;/td&gt;
+&lt;td&gt;2 bytes&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;general purpose bit flag&lt;/td&gt;
+&lt;td&gt;2 bytes&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;compression method&lt;/td&gt;
+&lt;td&gt;2 bytes&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;last mod file time&lt;/td&gt;
+&lt;td&gt;2 bytes&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;last mod file date&lt;/td&gt;
+&lt;td&gt;2 bytes&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;crc-32&lt;/td&gt;
+&lt;td&gt;4 bytes&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;compressed size&lt;/td&gt;
+&lt;td&gt;4 bytes&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;uncompressed size&lt;/td&gt;
+&lt;td&gt;4 bytes&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;file name length&lt;/td&gt;
+&lt;td&gt;2 bytes&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;extra field length&lt;/td&gt;
+&lt;td&gt;2 bytes&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;file name&lt;/td&gt;
+&lt;td&gt;variable&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;extra field&lt;/td&gt;
+&lt;td&gt;variable&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;The header signature is a single integer (&lt;code&gt;0x04034b50&lt;/code&gt;) in
+a valid zip file. We'll ignore version and general. Compression is
+either &lt;code&gt;0&lt;/code&gt; for no compression or &lt;code&gt;8&lt;/code&gt; for DEFLATE
+compression/decompression.&lt;/p&gt;
+&lt;p&gt;Last modified time and date is MSDOS-style date/time format which is
+&lt;a href="https://groups.google.com/g/comp.os.msdos.programmer/c/ffAVUFN2NbA"&gt;pretty
+funky&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;When there is no compression, we'll use the uncompressed size
+field. When compression is set we'll use the compressed size field.&lt;/p&gt;
+&lt;p&gt;And the last two length fields describe the number of bytes for the
+last two variable fields.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;package main
+
+import (
+    &amp;quot;os&amp;quot;
+    &amp;quot;bytes&amp;quot;
+    &amp;quot;compress/flate&amp;quot;
+    &amp;quot;io/ioutil&amp;quot;
+    &amp;quot;encoding/binary&amp;quot;
+    &amp;quot;time&amp;quot;
+    &amp;quot;fmt&amp;quot;
+)
+
+type compression uint8
+const (
+    noCompression compression = iota
+    deflateCompression
+)
+
+type localFileHeader struct {
+    signature uint32
+    version uint16
+    bitFlag uint16
+    compression compression
+    lastModified time.Time
+    crc32 uint32
+    compressedSize uint32
+    uncompressedSize uint32
+    fileName string
+    extraField []byte
+    fileContents string
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;It's not a direct translation. We'll map compression to a Go-style
+"enum", the MSDOS date/time to Go's time, and store the file name,
+extra field directly without the length fields. We'll tack on the
+actual file contents at the end too.&lt;/p&gt;
+&lt;h3 id="main"&gt;main&lt;/h3&gt;&lt;p&gt;The main program will read a zip file passed by name in command line
+arguments. Since files are laid out one after another we'll call a
+parse function until we stop seeing files.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;func main() {
+    f, err := ioutil.ReadFile(os.Args[1])
+    if err != nil {
+        panic(err)
+    }
+
+    end := 0
+    for end &amp;lt; len(f) {
+        var err error
+        var lfh *localFileHeader
+        var next int
+        lfh, next, err = parseLocalFileHeader(f, end)
+        if err == errNotZip &amp;amp;&amp;amp; end &amp;gt; 0 {
+            break
+        }
+        if err != nil {
+            panic(err)
+        }
+
+        end = next
+
+        fmt.Println(lfh.lastModified, lfh.fileName, lfh.fileContents)
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id="reading-integers,-bytes,-strings"&gt;Reading integers, bytes, strings&lt;/h3&gt;&lt;p&gt;In converting an array of bytes into distinct fields we'll need some
+helper functions. Each helper will take an array of bytes and an
+offset. They'll return an integer, string, or bytes and the index in
+the array of bytes after the offset. They'll return an error if we
+ever run past the size of the array of bytes.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;var errOverranBuffer = fmt.Errorf(&amp;quot;Overran buffer&amp;quot;)
+
+func readUint32(bs []byte, offset int) (uint32, int, error) {
+    end := offset + 4
+    if end &amp;gt; len(bs) {
+        return 0, 0, errOverranBuffer
+    }
+
+    return binary.LittleEndian.Uint32(bs[offset:end]), end, nil
+}
+
+func readUint16(bs []byte, offset int) (uint16, int, error) {
+    end := offset+2
+    if end &amp;gt; len(bs) {
+        return 0, 0, errOverranBuffer
+    }
+
+    return binary.LittleEndian.Uint16(bs[offset:end]), end, nil
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Grabbing bytes and strings is easier. The only extra piece on top of
+slicing is bounds checking.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;func readBytes(bs []byte, offset int, n int) ([]byte, int, error) {
+    end := offset + n
+    if end &amp;gt; len(bs) {
+        return nil, 0, errOverranBuffer
+    }
+
+    return bs[offset:offset+n], end, nil
+}
+
+func readString(bs []byte, offset int, n int) (string, int, error) {
+    read, end, err := readBytes(bs, offset, n)
+    return string(read), end, err
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now we're ready to actually grab files out of a zip!&lt;/p&gt;
+&lt;h3 id="files"&gt;Files&lt;/h3&gt;&lt;p&gt;For each file we'll fail early if the first four bytes are not the magic zip signature.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;var errNotZip = fmt.Errorf(&amp;quot;Not a zip file&amp;quot;)
+
+func parseLocalFileHeader(bs []byte, start int) (*localFileHeader, int, error) {
+    signature, i, err := readUint32(bs, start)
+    if signature != 0x04034b50 {
+        return nil, 0, errNotZip
+    }
+    if err != nil {
+        return nil, 0, err
+    }
+&lt;/code&gt;&lt;/pre&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/implementing-zip-in-go-unzipping.html</guid><pubDate>Wed, 24 Nov 2021 00:00:00 +0000</pubDate></item><item><title>Benchmarking esbuild, swc, tsc, and babel for React/JSX projects</title><link>http://notes.eatonphil.com/benchmarking-esbuild-swc-typescript-babel.html</link><description>&lt;head&gt;
     &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2021-11-13-benchmarking-esbuild-swc-typescript-babel.html'" /&gt;
 &lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
 &lt;a href="https://datastation.multiprocess.io/blog/2021-11-13-benchmarking-esbuild-swc-typescript-babel.html"&gt;here&lt;/a&gt;
