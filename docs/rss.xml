@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 24 Nov 2021 18:26:51 +0000</lastBuildDate><item><title>Implementing zip archiving in Golang: unzipping</title><link>http://notes.eatonphil.com/implementing-zip-in-go-unzipping.html</link><description>&lt;p&gt;&lt;small&gt;All code for this post is &lt;a href="https://github.com/eatonphil/gozip"&gt;available on Github&lt;/a&gt;.&lt;/small&gt;&lt;/p&gt;
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 01 Dec 2021 20:37:07 +0000</lastBuildDate><item><title>Implementing zip archiving in Golang: unzipping</title><link>http://notes.eatonphil.com/implementing-zip-in-go-unzipping.html</link><description>&lt;p&gt;&lt;small&gt;All code for this post is &lt;a href="https://github.com/eatonphil/gozip"&gt;available on Github&lt;/a&gt;.&lt;/small&gt;&lt;/p&gt;
 &lt;p&gt;Let's take a look at how zip files work. Take a small file for example:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ cat hello.text
 Hello!
@@ -1403,6 +1403,13 @@ AssemblyScript's case, not JavaScript.&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;&lt;a href="https://github.com/nickmain/kawa-scheme/tree/master/gnu/ecmascript"&gt;JavaScript in Kawa Scheme&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="https://wingolog.org/archives/2009/02/22/ecmascript-for-guile"&gt;JavaScript in GNU Guile Scheme&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/ReevaJS/reeva"&gt;ReevaJS&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Support: ES5 (with exceptions)&lt;/li&gt;
+&lt;li&gt;Implementation language: Kotlin&lt;/li&gt;
+&lt;li&gt;Runtime: &lt;a href="https://github.com/ReevaJS/reeva/blob/master/src/main/kotlin/com/reevajs/reeva/interpreter/Interpreter.kt"&gt;Stack machine&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Parser: &lt;a href="https://github.com/ReevaJS/reeva/blob/master/src/main/kotlin/com/reevajs/reeva/parsing/Parser.kt"&gt;Hand-written&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h3 id="research-implementations"&gt;Research Implementations&lt;/h3&gt;&lt;ul&gt;
 &lt;li&gt;&lt;a href="https://github.com/higgsjs/Higgs"&gt;Higgs&lt;/a&gt;&lt;ul&gt;
