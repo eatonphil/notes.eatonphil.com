@@ -40,11 +40,10 @@ HOME_PAGE = """
     href="https://datastation.multiprocess.io">DataStation</a>, an
     open-source data IDE to help you create dashboards and exports on
     data from every database, API, and file without cumbersome ETL
-    processes. <a href="mailto:me@eatonphil.com">Email me</a> if you're thinking
-    about your data ecosystem.
+    processes.
   </p>
   <p>
-    I also run a <a href="https://discord.gg/xGPcYTMNwW">Discord community
+    I also run a <a href="https://discord.gg/PmmShtF7WS">Discord community
     for developers</a> working on or interested in challenging
     programming projects like compilers, databases, emulators,
     etc. Come to share and learn from other folks!
