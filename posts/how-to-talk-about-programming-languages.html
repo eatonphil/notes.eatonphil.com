@@ -1,0 +1,51 @@
+# How to talk about programming languages, compilers, interpreters
+## December 20, 2021
+###### compilers,interpreters
+
+### Compilers vs. interpreters
+
+I don't know of a single major interpreter that doesn't compile code
+to bytecode before running it on a virtual machine. CPython, YARV
+Ruby, Node.js/V8, Java, C# all compile to bytecode that runs on a
+virtual machine. Ok I lied, Bash and most shell languages don't have a
+compile step or a virtual machine.
+
+Java, C#, Node.js and some implementations of Python (e.g. PyPy) and
+Ruby additionally can live recompile to native code switching "hot"
+code from running on the virtual machine to running directly on the
+processor.
+
+
+
+As far as I'm concerned basically every interesting interpreter is a
+compiler. Some interpreters run native code.
+
+### Static vs. dynamic
+
+C does some static type checking. But it also implicitly coerces
+non-integer-type values to integers when asked. Python doesn't check
+types statically (hey, MyPy) but will throw an exception when you try
+to operate on incompatible types. JavaScript doesn't check types
+statically (hey, TypeScript) and will implicitly coerce types to
+integers or strings when asked.
+
+A slightly more useful way to talk about type systems is the two-way
+matric of static vs. dynamic and strong vs. weak. C is static
+weak. Python is dynamic strong. JavaScript is dynamic weak. Go is
+static strong.
+
+But this also doesn't help discuss the difference between Haskell or
+Scala's type system and Go or Java's type system.
+
+### Dynamic vs. compiled
+
+
+
+### Parsers
+
+Most major language implementations use [hand-written
+parsers](https://notes.eatonphil.com/parser-generators-vs-handwritten-parsers-survey-2021.html).
+
+### Real language implementations are written in C or C++
+
+Unfortunately this is probably still true.
