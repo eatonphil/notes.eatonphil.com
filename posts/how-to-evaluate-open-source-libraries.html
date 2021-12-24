@@ -1,0 +1,59 @@
+# How to evaluate open source libraries
+## December 22, 2021
+###### open source
+
+tldr:
+
+* Consistent (but not necessarily frequent!) releases
+* Automated testing
+* Decent test coverage
+* Automated builds of release artifact
+* Not a lot of commented out code and tests
+* Developer documentation
+* Number of dependencies
+
+As time goes on I only get pickier about the libraries I bring in or
+if I bring in a library at all. When I'm looking at a library though I
+look at the following categories. Sometimes you do need a library and
+not all of these categories are well met. I don't think of these
+categories as absolutes but about what makes me more or less
+comfortable using a library.
+
+And moreover none of these particularly cost actual money, even
+automated testing. CI services have long offered completely free
+compute for open source libraries.
+
+This isn't a criticism of developers who have open source projects who
+just haven't gotten to this level of maturity or aren't interested in
+doing so. But there may be good reason to prefer some libraries.
+
+Here are my categories in detail.
+
+### Consistent releases
+
+The most important thing to me is that the library has consistent
+releases. This is not the same thing as having frequent
+releases. Every library releases at a different pace. I'm completely
+ok if the last release was a year or two ago if the library has had
+consistent releases every year or two.
+
+But if the releases are erratic and infrequent or just stopped
+happening, I feel uncomfortable picking that library.
+
+### Automated testing
+
+
+
+For example, there's a database driver I'm using that doesn't have
+automated testing in place. That makes me incredibly
+uncomfortable. But it's the only good driver for that database for
+that language so I'm stuck with it for the moment.
+
+### Decent test coverage
+
+Decent to me is at least 50% and ideally 70% line coverage. Anything
+greater than that is impressive but 100% line coverage doesn't have a
+great correlation to working software since you can mock out so much
+to get to 100% test coverage that you aren't testing anything. So I'm
+happy with 70% test coverage as a general indicator and I'd
+also like to see integration or end-to-end tests.
