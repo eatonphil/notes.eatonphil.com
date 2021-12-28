@@ -972,12 +972,12 @@ the <code>else</code> keyword, then the if body (a list of statements), and then
 <h3 id="compiling-to-a-made-up-virtual-machine">Compiling to a made up virtual machine</h3><p>This virtual machine will be entirely stack-based other than the stack
 pointer and program counter.</p>
 <p>The calling convention is that the caller will put arguments on the
-stack followed by the stack pointer, the program counter, and then the
+stack followed by the frame pointer, the program counter, and then the
 number of arguments (for cleanup). Then it will alter the program
-counter and stack pointer. Then the caller will allocate space on the
+counter and frame pointer. Then the caller will allocate space on the
 stack for all arguments and locals within the function.</p>
 <p>For simplicity in addressing modes, the function declaration once
-jumped to will copy the arguments from before the stack pointer to in
+jumped to will copy the arguments from before the frame pointer to in
 front of it (yes I know, I know, this is silly).</p>
 <p>The virtual machine will support add, subtract, less than operations
 as well as jump, jump-if-not-zero, return, and call. It will support a
@@ -989,9 +989,9 @@ use std::collections::HashMap;
 
 #[derive(Debug)]
 enum Instruction {
-    DupPlusSP(i32),
-    MoveMinusSP(usize, i32),
-    MovePlusSP(usize),
+    DupPlusFP(i32),
+    MoveMinusFP(usize, i32),
+    MovePlusFP(usize),
     Store(i32),
     Return,
     JumpIfNotZero(String),
@@ -1067,14 +1067,14 @@ non-function-declaration statements be evaluated.</p>
 <p>Then we'll add another limitation/simplification that local variables
 are only accessible within the current function scope.</p>
 <p>For each parameter, we'll copy the parameter on the stack before the
-stack pointer to a place in front of the stack pointer. This gets
+frame pointer to a place in front of the frame pointer. This gets
 around addressing mode limitations in our virtual machine.</p>
 <pre><code class="hljs rust">    let mut new_locals = HashMap::&lt;String, i32&gt;::new();
 
     let function_index = pgrm.instructions.len() as i32;
     let narguments = fd.parameters.len();
     for (i, param) in fd.parameters.iter().enumerate() {
-        pgrm.instructions.push(Instruction::MoveMinusSP(
+        pgrm.instructions.push(Instruction::MoveMinusFP(
             i,
             narguments as i32 - (i as i32 + 1),
         ));
@@ -1117,7 +1117,7 @@ N.</p>
 <h4 id="local-declarations">Local declarations</h4><p>The expression for the local is compiled and then the local name is
 stored in a locals table mapped to the current number of locals
 (including arguments). This allows the compiler to turn <code>identifier</code>
-token lookups into simply an offset from the stack pointer.</p>
+token lookups into simply an offset from the frame pointer.</p>
 <pre><code class="hljs rust">fn compile_local(
     pgrm: &amp;mut Program,
     raw: &amp;Vec&lt;char&gt;,
@@ -1127,7 +1127,7 @@ token lookups into simply an offset from the stack pointer.</p>
     let index = locals.keys().len();
     locals.insert(local.name.value, index as i32);
     compile_expression(pgrm, raw, locals, local.expression);
-    pgrm.instructions.push(Instruction::MovePlusSP(index));
+    pgrm.instructions.push(Instruction::MovePlusFP(index));
 }
 </code></pre>
 <p>And specifically, the instruction pattern is to evaluate the
@@ -1135,7 +1135,7 @@ expression and then copy it back into a relative position in the
 stack.</p>
 <h4 id="literals">Literals</h4><p>Number literals use the <code>store</code> instruction for pushing a number onto
 the stack. Identifier literals are copied to the top of the stack from
-their position relative to the stack pointer.</p>
+their position relative to the frame pointer.</p>
 <pre><code class="hljs rust">fn compile_literal(
     pgrm: &amp;mut Program,
     _: &amp;Vec&lt;char&gt;,
@@ -1149,7 +1149,7 @@ their position relative to the stack pointer.</p>
         }
         Literal::Identifier(ident) =&gt; {
             pgrm.instructions
-                .push(Instruction::DupPlusSP(locals[&amp;ident.value]));
+                .push(Instruction::DupPlusFP(locals[&amp;ident.value]));
         }
     }
 }
@@ -1262,13 +1262,13 @@ expression and issue a return instruction.</p>
 <p>That's it for the compiler! Now the trickiest part. I lost a few hours
 debugging and iterating on the next bit.</p>
 <h3 id="the-virtual-machine">The virtual machine</h3><p>Ok so the easy part is that there are only two registers, a program
-counter and a stack pointer. There's also a data stack. The stack
+counter and a frame pointer. There's also a data stack. The frame
 pointer points to the location on the data stack where each function
 can start storing its locals.</p>
 <p>Evaluation starts from 0 and goes until the last instruction.</p>
 <pre><code class="hljs rust">pub fn eval(pgrm: Program) {
     let mut pc: i32 = 0;
-    let mut sp: i32 = 0;
+    let mut fp: i32 = 0;
     let mut data: Vec&lt;i32&gt; = vec![];
 
     while pc &lt; pgrm.instructions.len() as i32 {
@@ -1318,12 +1318,12 @@ first.</p>
                 pc = pgrm.syms[label].location;
             }
 </code></pre>
-<h4 id="loading-from-a-variable">Loading from a variable</h4><p>The <code>MovePlusSP</code> instruction copies a value from the stack (offset the
-stack pointer) onto the top of the stack. This is for references to
+<h4 id="loading-from-a-variable">Loading from a variable</h4><p>The <code>MovePlusFP</code> instruction copies a value from the stack (offset the
+frame pointer) onto the top of the stack. This is for references to
 arguments and locals.</p>
-<pre><code class="hljs rust">            Instruction::MovePlusSP(i) =&gt; {
+<pre><code class="hljs rust">            Instruction::MovePlusFP(i) =&gt; {
                 let val = data.pop().unwrap();
-                let index = sp as usize + *i;
+                let index = fp as usize + *i;
                 // Accounts for top-level locals
                 while index &gt;= data.len() {
                     data.push(0);
@@ -1332,20 +1332,20 @@ arguments and locals.</p>
                 pc += 1;
             }
 </code></pre>
-<h4 id="storing-locals">Storing locals</h4><p>The <code>DupPlusSP</code> instruction is used by <code>compile_locals</code> to store a
+<h4 id="storing-locals">Storing locals</h4><p>The <code>DupPlusFP</code> instruction is used by <code>compile_locals</code> to store a
 local once compiled onto the stack in the relative position from the
-stack pointer.</p>
-<pre><code class="hljs rust">            Instruction::DupPlusSP(i) =&gt; {
-                data.push(data[(sp + i) as usize]);
+frame pointer.</p>
+<pre><code class="hljs rust">            Instruction::DupPlusFP(i) =&gt; {
+                data.push(data[(fp + i) as usize]);
                 pc += 1;
             }
 </code></pre>
-<h4 id="duplicating-arguments">Duplicating arguments</h4><p>The <code>MoveMinusSP</code> instruction is, again, a hack to work around limited
+<h4 id="duplicating-arguments">Duplicating arguments</h4><p>The <code>MoveMinusFP</code> instruction is, again, a hack to work around limited
 addressing modes in this minimal virtual machine. It copies
-arguments from behind the stack pointer to in front of the stack
+arguments from behind the frame pointer to in front of the frame
 pointer.</p>
-<pre><code class="hljs rust">            Instruction::MoveMinusSP(local_offset, sp_offset) =&gt; {
-                data[sp as usize + local_offset] = data[(sp - (sp_offset + 4)) as usize];
+<pre><code class="hljs rust">            Instruction::MoveMinusFP(local_offset, fp_offset) =&gt; {
+                data[fp as usize + local_offset] = data[(fp - (fp_offset + 4)) as usize];
                 pc += 1;
             }
 </code></pre>
@@ -1364,16 +1364,16 @@ exists being <code>print</code>).</p>
                     continue;
                 }
 </code></pre>
-<p>Otherwise it pushes the current stack pointer, then the program
+<p>Otherwise it pushes the current frame pointer, then the program
 counter, and finally the number of arguments (not locals) onto the
 stack for preservation. Then it sets up the new program counter and
-stack pointer and creates space for all locals and arguments after the
-new stack pointer.</p>
-<pre><code class="hljs rust">                data.push(sp);
+frame pointer and creates space for all locals and arguments after the
+new frame pointer.</p>
+<pre><code class="hljs rust">                data.push(fp);
                 data.push(pc + 1);
                 data.push(pgrm.syms[label].narguments as i32);
                 pc = pgrm.syms[label].location;
-                sp = data.len() as i32;
+                fp = data.len() as i32;
 
                 // Set up space for all arguments/locals
                 let mut nlocals = pgrm.syms[label].nlocals;
@@ -1385,20 +1385,20 @@ new stack pointer.</p>
 </code></pre>
 <h4 id="return">Return</h4><p>The return instructions pops the return value from the stack. Then it
 pops off all locals and arguments. Then it restores the program
-counter and stack pointer, and pops off the arguments before the stack
+counter and frame pointer, and pops off the arguments before the frame
 pointer. Finally it adds the return value back onto the stack.</p>
 <pre><code class="hljs rust">            Instruction::Return =&gt; {
                 let ret = data.pop().unwrap();
 
                 // Clean up the local stack
-                while sp &lt; data.len() as i32 {
+                while fp &lt; data.len() as i32 {
                     data.pop();
                 }
 
-                // Restore pc and sp
+                // Restore pc and fp
                 let mut narguments = data.pop().unwrap();
                 pc = data.pop().unwrap();
-                sp = data.pop().unwrap();
+                fp = data.pop().unwrap();
 
                 // Clean up arguments
                 while narguments &gt; 0 {
@@ -1412,7 +1412,7 @@ pointer. Finally it adds the return value back onto the stack.</p>
 </code></pre>
 <p>And yes, this implementation would be more efficient if instead of
 literally pushing and popping we just incremented/decremented a
-data-head-pointer.</p>
+stack pointer.</p>
 <p>And that's it! We're completely done a basic parser, compiler, and
 virtual machine for a subet of Lua. Is it janky? Yeah. Is it simple?
 Kind of? Does it work? It seems to!</p>

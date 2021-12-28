@@ -1081,13 +1081,13 @@ This virtual machine will be entirely stack-based other than the stack
 pointer and program counter.
 
 The calling convention is that the caller will put arguments on the
-stack followed by the stack pointer, the program counter, and then the
+stack followed by the frame pointer, the program counter, and then the
 number of arguments (for cleanup). Then it will alter the program
-counter and stack pointer. Then the caller will allocate space on the
+counter and frame pointer. Then the caller will allocate space on the
 stack for all arguments and locals within the function.
 
 For simplicity in addressing modes, the function declaration once
-jumped to will copy the arguments from before the stack pointer to in
+jumped to will copy the arguments from before the frame pointer to in
 front of it (yes I know, I know, this is silly).
 
 The virtual machine will support add, subtract, less than operations
@@ -1103,9 +1103,9 @@ use std::collections::HashMap;
 
 #[derive(Debug)]
 enum Instruction {
-    DupPlusSP(i32),
-    MoveMinusSP(usize, i32),
-    MovePlusSP(usize),
+    DupPlusFP(i32),
+    MoveMinusFP(usize, i32),
+    MovePlusFP(usize),
     Store(i32),
     Return,
     JumpIfNotZero(String),
@@ -1196,7 +1196,7 @@ Then we'll add another limitation/simplification that local variables
 are only accessible within the current function scope.
 
 For each parameter, we'll copy the parameter on the stack before the
-stack pointer to a place in front of the stack pointer. This gets
+frame pointer to a place in front of the frame pointer. This gets
 around addressing mode limitations in our virtual machine.
 
 ```rust
@@ -1205,7 +1205,7 @@ around addressing mode limitations in our virtual machine.
     let function_index = pgrm.instructions.len() as i32;
     let narguments = fd.parameters.len();
     for (i, param) in fd.parameters.iter().enumerate() {
-        pgrm.instructions.push(Instruction::MoveMinusSP(
+        pgrm.instructions.push(Instruction::MoveMinusFP(
             i,
             narguments as i32 - (i as i32 + 1),
         ));
@@ -1261,7 +1261,7 @@ Ok that wasn't so bad. And the rest are simpler.
 The expression for the local is compiled and then the local name is
 stored in a locals table mapped to the current number of locals
 (including arguments). This allows the compiler to turn `identifier`
-token lookups into simply an offset from the stack pointer.
+token lookups into simply an offset from the frame pointer.
 
 ```rust
 fn compile_local(
@@ -1273,7 +1273,7 @@ fn compile_local(
     let index = locals.keys().len();
     locals.insert(local.name.value, index as i32);
     compile_expression(pgrm, raw, locals, local.expression);
-    pgrm.instructions.push(Instruction::MovePlusSP(index));
+    pgrm.instructions.push(Instruction::MovePlusFP(index));
 }
 ```
 
@@ -1285,7 +1285,7 @@ stack.
 
 Number literals use the `store` instruction for pushing a number onto
 the stack. Identifier literals are copied to the top of the stack from
-their position relative to the stack pointer.
+their position relative to the frame pointer.
 
 ```rust
 fn compile_literal(
@@ -1301,7 +1301,7 @@ fn compile_literal(
         }
         Literal::Identifier(ident) => {
             pgrm.instructions
-                .push(Instruction::DupPlusSP(locals[&ident.value]));
+                .push(Instruction::DupPlusFP(locals[&ident.value]));
         }
     }
 }
@@ -1451,7 +1451,7 @@ debugging and iterating on the next bit.
 ### The virtual machine
 
 Ok so the easy part is that there are only two registers, a program
-counter and a stack pointer. There's also a data stack. The stack
+counter and a frame pointer. There's also a data stack. The frame
 pointer points to the location on the data stack where each function
 can start storing its locals.
 
@@ -1460,7 +1460,7 @@ Evaluation starts from 0 and goes until the last instruction.
 ```rust
 pub fn eval(pgrm: Program) {
     let mut pc: i32 = 0;
-    let mut sp: i32 = 0;
+    let mut fp: i32 = 0;
     let mut data: Vec<i32> = vec![];
 
     while pc < pgrm.instructions.len() as i32 {
@@ -1528,14 +1528,14 @@ first.
 
 #### Loading from a variable
 
-The `MovePlusSP` instruction copies a value from the stack (offset the
-stack pointer) onto the top of the stack. This is for references to
+The `MovePlusFP` instruction copies a value from the stack (offset the
+frame pointer) onto the top of the stack. This is for references to
 arguments and locals.
 
 ```rust
-            Instruction::MovePlusSP(i) => {
+            Instruction::MovePlusFP(i) => {
                 let val = data.pop().unwrap();
-                let index = sp as usize + *i;
+                let index = fp as usize + *i;
                 // Accounts for top-level locals
                 while index >= data.len() {
                     data.push(0);
@@ -1547,27 +1547,27 @@ arguments and locals.
 
 #### Storing locals
 
-The `DupPlusSP` instruction is used by `compile_locals` to store a
+The `DupPlusFP` instruction is used by `compile_locals` to store a
 local once compiled onto the stack in the relative position from the
-stack pointer.
+frame pointer.
 
 ```rust
-            Instruction::DupPlusSP(i) => {
-                data.push(data[(sp + i) as usize]);
+            Instruction::DupPlusFP(i) => {
+                data.push(data[(fp + i) as usize]);
                 pc += 1;
             }
 ```
 
 #### Duplicating arguments
 
-The `MoveMinusSP` instruction is, again, a hack to work around limited
+The `MoveMinusFP` instruction is, again, a hack to work around limited
 addressing modes in this minimal virtual machine. It copies
-arguments from behind the stack pointer to in front of the stack
+arguments from behind the frame pointer to in front of the frame
 pointer.
 
 ```rust
-            Instruction::MoveMinusSP(local_offset, sp_offset) => {
-                data[sp as usize + local_offset] = data[(sp - (sp_offset + 4)) as usize];
+            Instruction::MoveMinusFP(local_offset, fp_offset) => {
+                data[fp as usize + local_offset] = data[(fp - (fp_offset + 4)) as usize];
                 pc += 1;
             }
 ```
@@ -1595,18 +1595,18 @@ exists being `print`).
 
 ```
 
-Otherwise it pushes the current stack pointer, then the program
+Otherwise it pushes the current frame pointer, then the program
 counter, and finally the number of arguments (not locals) onto the
 stack for preservation. Then it sets up the new program counter and
-stack pointer and creates space for all locals and arguments after the
-new stack pointer.
+frame pointer and creates space for all locals and arguments after the
+new frame pointer.
 
 ```rust
-                data.push(sp);
+                data.push(fp);
                 data.push(pc + 1);
                 data.push(pgrm.syms[label].narguments as i32);
                 pc = pgrm.syms[label].location;
-                sp = data.len() as i32;
+                fp = data.len() as i32;
 
                 // Set up space for all arguments/locals
                 let mut nlocals = pgrm.syms[label].nlocals;
@@ -1622,7 +1622,7 @@ new stack pointer.
 
 The return instructions pops the return value from the stack. Then it
 pops off all locals and arguments. Then it restores the program
-counter and stack pointer, and pops off the arguments before the stack
+counter and frame pointer, and pops off the arguments before the frame
 pointer. Finally it adds the return value back onto the stack.
 
 ```rust
@@ -1630,14 +1630,14 @@ pointer. Finally it adds the return value back onto the stack.
                 let ret = data.pop().unwrap();
 
                 // Clean up the local stack
-                while sp < data.len() as i32 {
+                while fp < data.len() as i32 {
                     data.pop();
                 }
 
-                // Restore pc and sp
+                // Restore pc and fp
                 let mut narguments = data.pop().unwrap();
                 pc = data.pop().unwrap();
-                sp = data.pop().unwrap();
+                fp = data.pop().unwrap();
 
                 // Clean up arguments
                 while narguments > 0 {
@@ -1652,7 +1652,7 @@ pointer. Finally it adds the return value back onto the stack.
 
 And yes, this implementation would be more efficient if instead of
 literally pushing and popping we just incremented/decremented a
-data-head-pointer.
+stack pointer.
 
 And that's it! We're completely done a basic parser, compiler, and
 virtual machine for a subet of Lua. Is it janky? Yeah. Is it simple?
