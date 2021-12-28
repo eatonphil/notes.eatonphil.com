@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 28 Dec 2021 08:12:26 +0000</lastBuildDate><item><title>Writing a minimal Lua implementation with a VM from scratch in Rust</title><link>http://notes.eatonphil.com/lua-in-rust.html</link><description>&lt;p&gt;By the end of this guide we'll have a minimal, working implementation
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 28 Dec 2021 08:27:41 +0000</lastBuildDate><item><title>Writing a minimal Lua implementation with a VM from scratch in Rust</title><link>http://notes.eatonphil.com/lua-in-rust.html</link><description>&lt;p&gt;By the end of this guide we'll have a minimal, working implementation
 of a small part of Lua from scratch. It will be able to run the
 following program (among others):&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs lua"&gt;function fib(n)
@@ -1389,7 +1389,8 @@ $ time lua test/fib.lua
 832040
 lua test/fib.lua  0.06s user 0.00s system 99% cpu 0.063 total
 &lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;This implementation is ~exponentially slower. Hurray!&lt;/p&gt;
+&lt;p&gt;This implementation is way slower! Time to revisit some of those
+aforementioned inefficiencies.&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/lua-in-rust.html</guid><pubDate>Wed, 29 Dec 2021 00:00:00 +0000</pubDate></item><item><title>My favorite software subreddits</title><link>http://notes.eatonphil.com/high-quality-subreddits-you-should-be-following.html</link><description>&lt;p&gt;If you are an experienced software developer whose only exposure to
 reddit is dank memes, &lt;a href="https://reddit.com/r/programming"&gt;proggit&lt;/a&gt; or even
 language-specific subreddits like
