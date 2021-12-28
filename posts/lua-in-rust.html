@@ -1,5 +1,5 @@
 # Writing a minimal Lua implementation with a VM from scratch in Rust
-## December 29, 2021
+## December 28, 2021
 ###### lua,compilers,interpreters,virtual machines,rust,parsing
 
 By the end of this guide we'll have a minimal, working implementation
@@ -21,9 +21,9 @@ print(fib(30));
 ```
 
 This is my second project in Rust and only the third time I've
-invented a VM so don't take my style as gospel. However, I have found
-some Rust parsing tutorials overly complex so I'm hoping you'll find
-this one simpler.
+invented an instruction set so don't take my style as gospel. However,
+I have found some Rust parsing tutorials overly complex so I'm hoping
+you'll find this one simpler.
 
 All [source code is available on Github](https://github.com/eatonphil/lust).
 
@@ -66,13 +66,13 @@ fn main() {
 }
 ```
 
-Easy peasy. Now let's implementing `lex`.
+Easy peasy. Now let's implement `lex`.
 
 ### Lexical analysis
 
-Lexical analysis drops whitespace (in Lua since it's not whitespace
+Lexical analysis drops whitespace (Lua is not whitespace
 sensitive) and chunks all source code characters into their
-smallest possible meaningful pieces like syntax, numbers, identifiers,
+smallest possible meaningful pieces like commas, numbers, identifiers,
 keywords, etc.
 
 In order to have useful error messages, we'll keep track of state in
@@ -213,7 +213,7 @@ pub fn lex(s: &Vec<char>) -> Result<Vec<Token>, String> {
 
 #### Whitespace
 
-Eating whitespace is just incrementing the location while you see a
+Eating whitespace is just incrementing the location while we see a
 space, tab, newline, etc.
 
 ```rust
@@ -236,7 +236,7 @@ fn eat_whitespace(raw: &Vec<char>, initial_loc: Location) -> Location {
 
 Lexing numbers iterates through the source starting at a position
 until it stops seeing decimal digits (this implementation only
-supports numbers).
+supports integers).
 
 ```rust
 fn lex_number(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
@@ -248,7 +248,11 @@ fn lex_number(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location
         next_loc = next_loc.increment(false);
         c = raw[next_loc.index];
     }
+```
 
+If there are no digits in the string then this is not a number.
+
+```rust
     if ident.len() > 0 {
         Some((
             Token {
@@ -264,12 +268,10 @@ fn lex_number(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location
 }
 ```
 
-If there are no digits in the string then this is not a number.
-
 #### Identifiers
 
 Identifiers are any collection of alphabet characters, numbers, and
-underscores. But they cannot start with a number.
+underscores.
 
 ```rust
 fn lex_identifier(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
@@ -281,7 +283,11 @@ fn lex_identifier(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Loca
         next_loc = next_loc.increment(false);
         c = raw[next_loc.index];
     }
+```
 
+ But they cannot start with a number.
+
+```rust
     // First character must not be a digit
     if ident.len() > 0 && !ident.chars().nth(0).unwrap().is_digit(10) {
         Some((
@@ -300,12 +306,8 @@ fn lex_identifier(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Loca
 
 #### Keywords
 
-Keywords are alphabetical like identifiers are but they are
-reserved. Aside from matching a list of strings we have to make sure
-there is a complete match. For example `function1` is not a keyword,
-it's a valid identifier. Whereas `function 1` is a valid set of tokens
-(the keyword `function` and the number `1`), even if it's not a valid
-Lua grammar.
+Keywords are alphabetical like identifiers are but they cannot be
+reused as variables by the user.
 
 
 ```rust
@@ -343,7 +345,15 @@ fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Locatio
     if value.len() == 0 {
         return None;
     }
+```
 
+Aside from matching a list of strings we have to make sure
+there is a complete match. For example `function1` is not a keyword,
+it's a valid identifier. Whereas `function 1` is a valid set of tokens
+(the keyword `function` and the number `1`), even if it's not a valid
+Lua grammar.
+
+```rust
     // If the next character would be part of a valid identifier, then
     // this is not a keyword.
     if next_loc.index < raw.len() - 1 {
@@ -366,8 +376,8 @@ fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Locatio
 
 #### Syntax
 
-Syntax is just language junk that isn't operators. Things like commas,
-parenthesis, etc.
+Syntax (in this context) is just language junk that isn't
+operators. Things like commas, parenthesis, etc.
 
 
 ```rust
@@ -396,9 +406,9 @@ fn lex_syntax(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location
 
 #### Operators
 
-Operators are basically syntax but it helps us later on to break these
-out into a seperate type of token. Operators are things like plus,
-minus, and less than symbols.
+Operators are things like plus, minus, and less than
+symbols. Operators are syntax but it helps us later on to break these
+out into a seperate type of token.
 
 ```rust
 fn lex_operator(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
@@ -511,7 +521,7 @@ And that's it for the AST!
 
 #### Some helpers
 
-Last before the fun part, we'll define a few helpers for validating
+Lastly before the fun part, we'll define a few helpers for validating
 each kind of token.
 
 ```rust
@@ -599,8 +609,8 @@ pub fn parse(raw: &Vec<char>, tokens: Vec<Token>) -> Result<AST, String> {
 #### Expression statements
 
 Expression statements are just a wrapper for the Rust type
-system. They call `parse_expression`, expect a semicolon afterward,
-and wrap the expression in a statement.
+system. They call `parse_expression` (which we'll define shortly),
+expect a semicolon afterward, and wrap the expression in a statement.
 
 ```rust
 
@@ -638,7 +648,7 @@ fn parse_expression_statement(
 Expressions in this minimal Lua are only one of function calls,
 literals (numbers, identifiers), or binary operations. To keep things
 very simple, binary operations cannot be combined. So instead of `1 +
-2 + 3` you'd need to do `local tmp1 = 1 + 2; local tmp2 = tmp1 + 3;`
+2 + 3` we'd need to do `local tmp1 = 1 + 2; local tmp2 = tmp1 + 3;`
 and so on.
 
 ```rust
@@ -721,7 +731,7 @@ argument passed to the function.
     }
 ```
 
-Otherwise if there wasn't an opening parenthesis then we could be
+Otherwise if there isn't an opening parenthesis then we could be
 parsing either a literal expression or a binary operation. If the
 token that follows is an operator token then we know it's a binary
 operation.
@@ -786,7 +796,7 @@ And now we're done parsing expressions!
 
 #### Function declarations
 
-Functions start with the `function` and an identifier token follow.
+Functions start with the `function` keyword, and an identifier token follows.
 
 ```rust
 fn parse_function(
@@ -846,7 +856,8 @@ comma separated list of identifiers.
     next_index += 1; // Skip past close paren
 ```
 
-And finally there must be an `end` keyword.
+Next we parse all statements in the function body until we find the
+`end` keyword.
 
 ```rust
 
@@ -881,7 +892,7 @@ And finally there must be an `end` keyword.
 }
 ```
 
-Phew, we're halfway through the parser.
+Phew! We're halfway through the parser.
 
 #### Return statements
 
@@ -927,7 +938,7 @@ fn parse_return(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(S
 #### Local declarations
 
 Local declarations start with the `local` keyword, then the local
-name, then an equals sign, then an expression, and then a semicolon.
+name, then an equal sign, then an expression, and then a semicolon.
 
 ```rust
 fn parse_local(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(Statement, usize)> {
@@ -1002,7 +1013,7 @@ fn parse_local(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(St
 
 This implementation of Lua doesn't support `elseif` so parsing `if`
 just checks for the `if` keyword followed by a test expression, then
-the `else` keyword, the if body (a list of statements), and then the
+the `else` keyword, then the if body (a list of statements), and then the
 `end` keyword.
 
 ```
@@ -1066,19 +1077,25 @@ And goshdarnit we're done parsing.
 
 ### Compiling to a made up virtual machine
 
-This is a slightly weird one, entirely stack-based other than the
-stack pointer and program counter. Basically the calling convention is
-that the caller puts arguments on the stack followed by the stack
-pointer, the program counter, and then the number of arguments (for
-cleanup). Inside the function declaration it copies the arguments from
-before the stack pointer to in front of it (yes I know, I know, this
-is completely dumb). Local variables are allocated space for on top of
-the arguments after the stack pointer.
+This virtual machine will be entirely stack-based other than the stack
+pointer and program counter.
+
+The calling convention is that the caller will put arguments on the
+stack followed by the stack pointer, the program counter, and then the
+number of arguments (for cleanup). Then it will alter the program
+counter and stack pointer. Then the caller will allocate space on the
+stack for all arguments and locals within the function.
+
+For simplicity in addressing modes, the function declaration once
+jumped to will copy the arguments from before the stack pointer to in
+front of it (yes I know, I know, this is silly).
 
 The virtual machine will support add, subtract, less than operations
 as well as jump, jump-if-not-zero, return, and call. It will support a
 few more memory-specific instructions for loading literals, loading
 identifiers, and managing arguments.
+
+I'll explain the non-obvious instructions as we implement them.
 
 ```rust
 use crate::parse::*;
@@ -1086,13 +1103,13 @@ use std::collections::HashMap;
 
 #[derive(Debug)]
 enum Instruction {
-    DupPlusSP(i32), // For loading identifiers
-    MoveMinusSP(usize, i32), // For copying arguments into function scope
-    MovePlusSP(usize), // For copying locals into fixed position in function scope
-    Store(i32), // For storing literals
+    DupPlusSP(i32),
+    MoveMinusSP(usize, i32),
+    MovePlusSP(usize),
+    Store(i32),
     Return,
     JumpIfNotZero(String),
-    Jump(String), // For unconditional jumps that aren't function calls.
+    Jump(String),
     Call(String, usize),
     Add,
     Subtract,
@@ -1180,8 +1197,7 @@ are only accessible within the current function scope.
 
 For each parameter, we'll copy the parameter on the stack before the
 stack pointer to a place in front of the stack pointer. This gets
-around addressing limitations in our virtual machine but is obviously
-very wasteful.
+around addressing mode limitations in our virtual machine.
 
 ```rust
     let mut new_locals = HashMap::<String, i32>::new();
@@ -1207,12 +1223,10 @@ Then we compile the body.
 
 Once the body is compiled we know the total number of locals so we can
 fill out the symbol table correctly. The location is importantly
-already stored because it is the location of the instructions when the
-function started not where it is currently after compiling the
-function body.
+already stored because it is the location of the instruction where the
+function started.
 
 ```rust
-    // Overwrite function lookup with total number of locals
     pgrm.syms.insert(
         fd.name.value,
         Symbol {
@@ -1223,7 +1237,7 @@ function body.
     );
 ```
 
-And finally we add a symbol linking the done label for the function to
+Finally we add a symbol linking the done label for the function to
 the position of the end of the function. Again, this allows us to skip
 past the function declaration when evaluating instructions from 0 to
 N.
@@ -1265,13 +1279,13 @@ fn compile_local(
 
 And specifically, the instruction pattern is to evaluate the
 expression and then copy it back into a relative position in the
-stack. This is also perhaps wasteful.
+stack.
 
 #### Literals
 
-Number literals are simply `store`-d with a specific instruction for
-pushing a number onto the stack. Identifier literals are copied to the
-top of the stack from their relative position to the stack pointer.
+Number literals use the `store` instruction for pushing a number onto
+the stack. Identifier literals are copied to the top of the stack from
+their position relative to the stack pointer.
 
 ```rust
 fn compile_literal(
@@ -1295,7 +1309,7 @@ fn compile_literal(
 
 #### Function calls
 
-Pretty simple, just compile all the arguments and then issue a call
+Pretty simple: just compile all the arguments and then issue a call
 instruction.
 
 ```rust
@@ -1354,7 +1368,7 @@ fn compile_binary_operation(
 #### Expressions
 
 Compiling expressions just dispatches to a compile helper based on the
-type of expression.
+type of expression. We've already written those three helpers.
 
 ```rust
 fn compile_expression(
@@ -1380,7 +1394,8 @@ fn compile_expression(
 
 #### If
 
-First we compile the test and then we jump to after the if the test result is not zero.
+First we compile the conditional test and then we jump to after the if
+the test result is not zero.
 
 ```rust
 fn compile_if(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, if_: If) {
@@ -1435,10 +1450,10 @@ debugging and iterating on the next bit.
 
 ### The virtual machine
 
-Ok so the easy part is that there are two registers, a program counter
-and a stack pointer. There's also a data stack. The stack pointer
-points to the location on the data stack where each function can start
-storing its locals.
+Ok so the easy part is that there are only two registers, a program
+counter and a stack pointer. There's also a data stack. The stack
+pointer points to the location on the data stack where each function
+can start storing its locals.
 
 Evaluation starts from 0 and goes until the last instruction.
 
@@ -1546,7 +1561,7 @@ stack pointer.
 #### Duplicating arguments
 
 The `MoveMinusSP` instruction is, again, a hack to work around limited
-addressing methods in this minimal virtual machine. It copies
+addressing modes in this minimal virtual machine. It copies
 arguments from behind the stack pointer to in front of the stack
 pointer.
 
@@ -1602,10 +1617,6 @@ new stack pointer.
             }
 ```
 
-And yes, this implementation would be more efficient if instead of
-literally pushing and popping we just incremented/decremented a
-data-head-pointer. Feel free to implement that!
-
 
 #### Return
 
@@ -1639,7 +1650,13 @@ pointer. Finally it adds the return value back onto the stack.
             }
 ```
 
-Is it janky? Yeah. Is it simple? Kind of? Does it work? It seems to!
+And yes, this implementation would be more efficient if instead of
+literally pushing and popping we just incremented/decremented a
+data-head-pointer.
+
+And that's it! We're completely done a basic parser, compiler, and
+virtual machine for a subet of Lua. Is it janky? Yeah. Is it simple?
+Kind of? Does it work? It seems to!
 
 ### Summary
 
@@ -1669,5 +1686,5 @@ $ time lua test/fib.lua
 lua test/fib.lua  0.06s user 0.00s system 99% cpu 0.063 total
 ```
 
-This implementation is way slower! Time to revisit some of those
-aforementioned inefficiencies.
+This implementation is way slower! Time to do some profiling and maybe
+revisit some of those aforementioned inefficiencies.
