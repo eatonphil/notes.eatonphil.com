@@ -1418,8 +1418,8 @@ virtual machine for a subet of Lua. Is it janky? Yeah. Is it simple?
 Kind of? Does it work? It seems to!</p>
 <h3 id="summary">Summary</h3><p>Ok we've got &lt;1200 lines of Rust enough to run some decent Lua
 programs. We run this fib program against this implementation and
-against Lua 5.4.3 (which isn't even LuaJIT) and what do we see?</p>
-<pre><code class="hljs bash">$ cargo build
+against Lua 5.4.3 (which isn't LuaJIT) and what do we see?</p>
+<pre><code class="hljs bash">$ cargo build --release
 $ cat test/fib.lua
 function fib(n)
    if n &lt; 2 then
@@ -1432,16 +1432,21 @@ function fib(n)
 end
 
 print(fib(30));
-$ time ./target/debug/lust test/fib.lua
+$ time ./target/release/lust test/fib.lua
 832040
-./target/debug/lust test/fib.lua  7.17s user 0.00s system 99% cpu 7.179 total
+./target/release/lust test/fib.lua  0.29s user 0.00s system 99% cpu 0.293 total
 $ time lua test/fib.lua
 832040
 lua test/fib.lua  0.06s user 0.00s system 99% cpu 0.063 total
 </code></pre>
-<p>This implementation is way slower! Time to do some profiling and maybe
+<p>This implementation is a bit slower! Time to do some profiling and maybe
 revisit some of those aforementioned inefficiencies.</p>
-<p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">I wrote a new blog post on parsing, compiling, and virtual machine evaluation for a super minimal Lua implementation written from scratch in Rust!<a href="https://t.co/8qFviEecJo">https://t.co/8qFviEecJo</a> <a href="https://t.co/d1MGArlErR">pic.twitter.com/d1MGArlErR</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1475828516835008513?ref_src=twsrc%5Etfw">December 28, 2021</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+<p class="note">
+  Big thanks to <a
+  href="https://twitter.com/christianfscott/status/1475832498663792640">Christian
+  Scott on Twitter</a> for pointing out I should not be benchmarking
+  with debug builds!
+</p><p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">I wrote a new blog post on parsing, compiling, and virtual machine evaluation for a super minimal Lua implementation written from scratch in Rust!<a href="https://t.co/8qFviEecJo">https://t.co/8qFviEecJo</a> <a href="https://t.co/d1MGArlErR">pic.twitter.com/d1MGArlErR</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1475828516835008513?ref_src=twsrc%5Etfw">December 28, 2021</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
 <style>.feedback{display:initial;}</style>
 	<div class="feedback">
 	  <h4>Feedback</h4>
