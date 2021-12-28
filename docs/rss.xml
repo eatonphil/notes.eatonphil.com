@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 28 Dec 2021 15:30:51 +0000</lastBuildDate><item><title>Writing a minimal Lua implementation with a virtual machine from scratch in Rust</title><link>http://notes.eatonphil.com/lua-in-rust.html</link><description>&lt;p&gt;By the end of this guide we'll have a minimal, working implementation
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 28 Dec 2021 23:25:46 +0000</lastBuildDate><item><title>Writing a minimal Lua implementation with a virtual machine from scratch in Rust</title><link>http://notes.eatonphil.com/lua-in-rust.html</link><description>&lt;p&gt;By the end of this guide we'll have a minimal, working implementation
 of a small part of Lua from scratch. It will be able to run the
 following program (among others):&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs lua"&gt;function fib(n)
@@ -36,7 +36,7 @@ fn main() {
     let args: Vec&amp;lt;String&amp;gt; = env::args().collect();
     let contents = fs::read_to_string(&amp;amp;args[1]).expect(&amp;quot;Could not read file&amp;quot;);
 
-    let raw: Vec&amp;lt;char&amp;gt; = contents.to_string().chars().collect();
+    let raw: Vec&amp;lt;char&amp;gt; = contents.chars().collect();
 
     let tokens = match lex::lex(&amp;amp;raw) {
         Ok(tokens) =&amp;gt; tokens,
@@ -90,7 +90,7 @@ as the current index in the file.&lt;/p&gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;And the &lt;code&gt;debug&lt;/code&gt; function will dump the current line with a pointer in
 text to the current column along with a message.&lt;/p&gt;
-&lt;pre&gt;&lt;code&gt;    pub fn debug&amp;lt;S: Into&amp;lt;String&amp;gt;&amp;gt;(&amp;amp;self, raw: &amp;amp;Vec&amp;lt;char&amp;gt;, msg: S) -&amp;gt; String {
+&lt;pre&gt;&lt;code&gt;    pub fn debug&amp;lt;S: Into&amp;lt;String&amp;gt;&amp;gt;(&amp;amp;self, raw: &amp;amp;[char], msg: S) -&amp;gt; String {
         let mut line = 0;
         let mut line_str = String::new();
         // Find the whole line of original source
@@ -99,7 +99,7 @@ text to the current column along with a message.&lt;/p&gt;
                 line += 1;
 
                 // Done discovering line in question
-                if line_str.len() &amp;gt; 0 {
+                if !line_str.is_empty() {
                     break;
                 }
 
@@ -139,7 +139,7 @@ pub struct Token {
 &lt;p&gt;The top-level &lt;code&gt;lex&lt;/code&gt; function will iterate over the file and call a lex
 helper for each kind of token, returning an array of all tokens on
 success. In between lexing it will "eat whitespace".&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs rust"&gt;pub fn lex(s: &amp;amp;Vec&amp;lt;char&amp;gt;) -&amp;gt; Result&amp;lt;Vec&amp;lt;Token&amp;gt;, String&amp;gt; {
+&lt;pre&gt;&lt;code class="hljs rust"&gt;pub fn lex(s: &amp;amp;[char]) -&amp;gt; Result&amp;lt;Vec&amp;lt;Token&amp;gt;, String&amp;gt; {
     let mut loc = Location {
         col: 0,
         index: 0,
@@ -163,8 +163,7 @@ success. In between lexing it will "eat whitespace".&lt;/p&gt;
 
         for lexer in lexers {
             let res = lexer(s, loc);
-            if res.is_some() {
-                let (t, next_loc) = res.unwrap();
+            if let Some((t, next_loc)) = res {
                 loc = next_loc;
                 tokens.push(t);
                 continue &amp;#39;outer;
@@ -179,7 +178,7 @@ success. In between lexing it will "eat whitespace".&lt;/p&gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;h4 id="whitespace"&gt;Whitespace&lt;/h4&gt;&lt;p&gt;Eating whitespace is just incrementing the location while we see a
 space, tab, newline, etc.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs rust"&gt;fn eat_whitespace(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, initial_loc: Location) -&amp;gt; Location {
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn eat_whitespace(raw: &amp;amp;[char], initial_loc: Location) -&amp;gt; Location {
     let mut c = raw[initial_loc.index];
     let mut next_loc = initial_loc;
     while [&amp;#39; &amp;#39;, &amp;#39;\n&amp;#39;, &amp;#39;\r&amp;#39;, &amp;#39;\t&amp;#39;].contains(&amp;amp;c) {
@@ -196,7 +195,7 @@ space, tab, newline, etc.&lt;/p&gt;
 &lt;h4 id="numbers"&gt;Numbers&lt;/h4&gt;&lt;p&gt;Lexing numbers iterates through the source starting at a position
 until it stops seeing decimal digits (this implementation only
 supports integers).&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs rust"&gt;fn lex_number(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, initial_loc: Location) -&amp;gt; Option&amp;lt;(Token, Location)&amp;gt; {
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn lex_number(raw: &amp;amp;[char], initial_loc: Location) -&amp;gt; Option&amp;lt;(Token, Location)&amp;gt; {
     let mut ident = String::new();
     let mut next_loc = initial_loc;
     let mut c = raw[initial_loc.index];
@@ -207,7 +206,7 @@ supports integers).&lt;/p&gt;
     }
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;If there are no digits in the string then this is not a number.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs rust"&gt;    if ident.len() &amp;gt; 0 {
+&lt;pre&gt;&lt;code class="hljs rust"&gt;    if !ident.is_empty() {
         Some((
             Token {
                 value: ident,
@@ -235,7 +234,7 @@ underscores.&lt;/p&gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;But they cannot start with a number.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs rust"&gt;    // First character must not be a digit
-    if ident.len() &amp;gt; 0 &amp;amp;&amp;amp; !ident.chars().nth(0).unwrap().is_digit(10) {
+    if ident.len() &amp;gt; 0 &amp;amp;&amp;amp; !ident.chars().next().unwrap().is_digit(10) {
         Some((
             Token {
                 value: ident,
@@ -251,7 +250,7 @@ underscores.&lt;/p&gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;h4 id="keywords"&gt;Keywords&lt;/h4&gt;&lt;p&gt;Keywords are alphabetical like identifiers are but they cannot be
 reused as variables by the user.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs rust"&gt;fn lex_keyword(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, initial_loc: Location) -&amp;gt; Option&amp;lt;(Token, Location)&amp;gt; {
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn lex_keyword(raw: &amp;amp;[char], initial_loc: Location) -&amp;gt; Option&amp;lt;(Token, Location)&amp;gt; {
     let syntax = [&amp;quot;function&amp;quot;, &amp;quot;end&amp;quot;, &amp;quot;if&amp;quot;, &amp;quot;then&amp;quot;, &amp;quot;local&amp;quot;, &amp;quot;return&amp;quot;];
 
     let mut next_loc = initial_loc;
@@ -282,7 +281,7 @@ reused as variables by the user.&lt;/p&gt;
         break;
     }
 
-    if value.len() == 0 {
+    if value.is_empty() {
         return None;
     }
 &lt;/code&gt;&lt;/pre&gt;
@@ -312,7 +311,7 @@ Lua grammar.&lt;/p&gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;h4 id="syntax"&gt;Syntax&lt;/h4&gt;&lt;p&gt;Syntax (in this context) is just language junk that isn't
 operators. Things like commas, parenthesis, etc.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs rust"&gt;fn lex_syntax(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, initial_loc: Location) -&amp;gt; Option&amp;lt;(Token, Location)&amp;gt; {
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn lex_syntax(raw: &amp;amp;[char], initial_loc: Location) -&amp;gt; Option&amp;lt;(Token, Location)&amp;gt; {
     let syntax = [&amp;quot;;&amp;quot;, &amp;quot;=&amp;quot;, &amp;quot;(&amp;quot;, &amp;quot;)&amp;quot;, &amp;quot;,&amp;quot;];
 
     for possible_syntax in syntax {
@@ -337,7 +336,7 @@ operators. Things like commas, parenthesis, etc.&lt;/p&gt;
 &lt;h4 id="operators"&gt;Operators&lt;/h4&gt;&lt;p&gt;Operators are things like plus, minus, and less than
 symbols. Operators are syntax but it helps us later on to break these
 out into a seperate type of token.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs rust"&gt;fn lex_operator(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, initial_loc: Location) -&amp;gt; Option&amp;lt;(Token, Location)&amp;gt; {
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn lex_operator(raw: &amp;amp;[char], initial_loc: Location) -&amp;gt; Option&amp;lt;(Token, Location)&amp;gt; {
     let operators = [&amp;quot;+&amp;quot;, &amp;quot;-&amp;quot;, &amp;quot;&amp;lt;&amp;quot;];
 
     for possible_syntax in operators {
@@ -377,7 +376,7 @@ pub enum Statement {
     Local(Local),
 }
 
-pub type AST = Vec&amp;lt;Statement&amp;gt;;
+pub type Ast = Vec&amp;lt;Statement&amp;gt;;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;There's almost nothing special at all about the rest of the tree
 definitions.&lt;/p&gt;
@@ -434,31 +433,31 @@ pub struct Return {
 &lt;p&gt;And that's it for the AST!&lt;/p&gt;
 &lt;h4 id="some-helpers"&gt;Some helpers&lt;/h4&gt;&lt;p&gt;Lastly before the fun part, we'll define a few helpers for validating
 each kind of token.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs rust"&gt;fn expect_keyword(tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;, index: usize, value: &amp;amp;str) -&amp;gt; bool {
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn expect_keyword(tokens: &amp;amp;[Token], index: usize, value: &amp;amp;str) -&amp;gt; bool {
     if index &amp;gt;= tokens.len() {
         return false;
     }
 
     let t = tokens[index].clone();
-    return t.kind == TokenKind::Keyword &amp;amp;&amp;amp; t.value == value;
+    t.kind == TokenKind::Keyword &amp;amp;&amp;amp; t.value == value
 }
 
-fn expect_syntax(tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;, index: usize, value: &amp;amp;str) -&amp;gt; bool {
+fn expect_syntax(tokens: &amp;amp;[Token], index: usize, value: &amp;amp;str) -&amp;gt; bool {
     if index &amp;gt;= tokens.len() {
         return false;
     }
 
     let t = tokens[index].clone();
-    return t.kind == TokenKind::Syntax &amp;amp;&amp;amp; t.value == value;
+    t.kind == TokenKind::Syntax &amp;amp;&amp;amp; t.value == value
 }
 
-fn expect_identifier(tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;, index: usize) -&amp;gt; bool {
+fn expect_identifier(tokens: &amp;amp;[Token], index: usize) -&amp;gt; bool {
     if index &amp;gt;= tokens.len() {
         return false;
     }
 
     let t = tokens[index].clone();
-    return t.kind == TokenKind::Identifier;
+    t.kind == TokenKind::Identifier
 }
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Now on to the fun part, actually detecting these trees!&lt;/p&gt;
@@ -467,11 +466,7 @@ fn expect_identifier(tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;, index: usize) -&
 function. For each statement in the file we look for function
 declarations, if statements, return statements, local declarations,
 and expression statements.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs rust"&gt;fn parse_statement(
-    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
-    tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;,
-    index: usize,
-) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn parse_statement(raw: &amp;amp;[char], tokens: &amp;amp;[Token], index: usize) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
     let parsers = [
         parse_if,
         parse_expression_statement,
@@ -489,14 +484,13 @@ and expression statements.&lt;/p&gt;
     None
 }
 
-pub fn parse(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, tokens: Vec&amp;lt;Token&amp;gt;) -&amp;gt; Result&amp;lt;AST, String&amp;gt; {
+pub fn parse(raw: &amp;amp;[char], tokens: Vec&amp;lt;Token&amp;gt;) -&amp;gt; Result&amp;lt;Ast, String&amp;gt; {
     let mut ast = vec![];
     let mut index = 0;
     let ntokens = tokens.len();
     while index &amp;lt; ntokens {
         let res = parse_statement(raw, &amp;amp;tokens, index);
-        if res.is_some() {
-            let (stmt, next_index) = res.unwrap();
+        if let Some((stmt, next_index)) = res {
             index = next_index;
             ast.push(stmt);
             continue;
@@ -513,17 +507,14 @@ system. They call &lt;code&gt;parse_expression&lt;/code&gt; (which we'll define 
 expect a semicolon afterward, and wrap the expression in a statement.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs rust"&gt;
 fn parse_expression_statement(
-    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
-    tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;,
+    raw: &amp;amp;[char],
+    tokens: &amp;amp;[Token],
     index: usize,
 ) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
     let mut next_index = index;
-    let res = parse_expression(raw, tokens, next_index);
-    if !res.is_some() {
-        return None;
-    }
+    let res = parse_expression(raw, tokens, next_index)?;
 
-    let (expr, next_next_index) = res.unwrap();
+    let (expr, next_next_index) = res;
     next_index = next_next_index;
     if !expect_syntax(tokens, next_index, &amp;quot;;&amp;quot;) {
         println!(
@@ -545,11 +536,7 @@ literals (numbers, identifiers), or binary operations. To keep things
 very simple, binary operations cannot be combined. So instead of &lt;code&gt;1 +
 2 + 3&lt;/code&gt; we'd need to do &lt;code&gt;local tmp1 = 1 + 2; local tmp2 = tmp1 + 3;&lt;/code&gt;
 and so on.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs rust"&gt;fn parse_expression(
-    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
-    tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;,
-    index: usize,
-) -&amp;gt; Option&amp;lt;(Expression, usize)&amp;gt; {
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn parse_expression(raw: &amp;amp;[char], tokens: &amp;amp;[Token], index: usize) -&amp;gt; Option&amp;lt;(Expression, usize)&amp;gt; {
     if index &amp;gt;= tokens.len() {
         return None;
     }
@@ -575,7 +562,7 @@ to parse a function call.&lt;/p&gt;
 &lt;p&gt;We need to call &lt;code&gt;parse_expression&lt;/code&gt; recursively for every possible
 argument passed to the function.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs rust"&gt;        while !expect_syntax(tokens, next_index, &amp;quot;)&amp;quot;) {
-            if arguments.len() &amp;gt; 0 {
+            if arguments.is_empty() {
                 if !expect_syntax(tokens, next_index, &amp;quot;,&amp;quot;) {
                     println!(
                         &amp;quot;{}&amp;quot;,
@@ -590,8 +577,7 @@ argument passed to the function.&lt;/p&gt;
             }
 
             let res = parse_expression(raw, tokens, next_index);
-            if res.is_some() {
-                let (arg, next_next_index) = res.unwrap();
+            if let Some((arg, next_next_index)) = res {
                 next_index = next_next_index;
                 arguments.push(arg);
             } else {
@@ -610,7 +596,7 @@ argument passed to the function.&lt;/p&gt;
         return Some((
             Expression::FunctionCall(FunctionCall {
                 name: tokens[index].clone(),
-                arguments: arguments,
+                arguments,
             }),
             next_index,
         ));
@@ -673,11 +659,7 @@ another literal.&lt;/p&gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;And now we're done parsing expressions!&lt;/p&gt;
 &lt;h4 id="function-declarations"&gt;Function declarations&lt;/h4&gt;&lt;p&gt;Functions start with the &lt;code&gt;function&lt;/code&gt; keyword, and an identifier token follows.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs rust"&gt;fn parse_function(
-    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
-    tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;,
-    index: usize,
-) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn parse_function(raw: &amp;amp;[char], tokens: &amp;amp;[Token], index: usize) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
     if !expect_keyword(tokens, index, &amp;quot;function&amp;quot;) {
         return None;
     }
@@ -711,7 +693,7 @@ comma separated list of identifiers.&lt;/p&gt;
     next_index += 1; // Skip past open paren
     let mut parameters: Vec&amp;lt;Token&amp;gt; = vec![];
     while !expect_syntax(tokens, next_index, &amp;quot;)&amp;quot;) {
-        if parameters.len() &amp;gt; 0 {
+        if !parameters.is_empty() {
             if !expect_syntax(tokens, next_index, &amp;quot;,&amp;quot;) {
                 println!(&amp;quot;{}&amp;quot;, tokens[next_index].loc.debug(raw, &amp;quot;Expected comma or close parenthesis after parameter in function declaration:&amp;quot;));
                 return None;
@@ -732,8 +714,7 @@ comma separated list of identifiers.&lt;/p&gt;
     let mut statements: Vec&amp;lt;Statement&amp;gt; = vec![];
     while !expect_keyword(tokens, next_index, &amp;quot;end&amp;quot;) {
         let res = parse_statement(raw, tokens, next_index);
-        if res.is_some() {
-            let (stmt, next_next_index) = res.unwrap();
+        if let Some((stmt, next_next_index)) = res {
             next_index = next_next_index;
             statements.push(stmt);
         } else {
@@ -751,8 +732,8 @@ comma separated list of identifiers.&lt;/p&gt;
 
     Some((
         Statement::FunctionDeclaration(FunctionDeclaration {
-            name: name,
-            parameters: parameters,
+            name,
+            parameters,
             body: statements,
         }),
         next_index,
@@ -762,14 +743,14 @@ comma separated list of identifiers.&lt;/p&gt;
 &lt;p&gt;Phew! We're halfway through the parser.&lt;/p&gt;
 &lt;h4 id="return-statements"&gt;Return statements&lt;/h4&gt;&lt;p&gt;Return statements just check for the &lt;code&gt;return&lt;/code&gt; keyword, an expression,
 and a semicolon.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs rust"&gt;fn parse_return(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;, index: usize) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn parse_return(raw: &amp;amp;[char], tokens: &amp;amp;[Token], index: usize) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
     if !expect_keyword(tokens, index, &amp;quot;return&amp;quot;) {
         return None;
     }
 
     let mut next_index = index + 1; // Skip past return
     let res = parse_expression(raw, tokens, next_index);
-    if !res.is_some() {
+    if res.is_none() {
         println!(
             &amp;quot;{}&amp;quot;,
             tokens[next_index]
@@ -798,7 +779,7 @@ and a semicolon.&lt;/p&gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;h4 id="local-declarations"&gt;Local declarations&lt;/h4&gt;&lt;p&gt;Local declarations start with the &lt;code&gt;local&lt;/code&gt; keyword, then the local
 name, then an equal sign, then an expression, and then a semicolon.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs rust"&gt;fn parse_local(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;, index: usize) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn parse_local(raw: &amp;amp;[char], tokens: &amp;amp;[Token], index: usize) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
     if !expect_keyword(tokens, index, &amp;quot;local&amp;quot;) {
         return None;
     }
@@ -831,7 +812,7 @@ name, then an equal sign, then an expression, and then a semicolon.&lt;/p&gt;
     next_index += 1; // Skip past =
 
     let res = parse_expression(raw, tokens, next_index);
-    if !res.is_some() {
+    if res.is_none() {
         println!(
             &amp;quot;{}&amp;quot;,
             tokens[next_index]
@@ -858,7 +839,7 @@ name, then an equal sign, then an expression, and then a semicolon.&lt;/p&gt;
 
     Some((
         Statement::Local(Local {
-            name: name,
+            name,
             expression: expr,
         }),
         next_index,
@@ -869,14 +850,14 @@ name, then an equal sign, then an expression, and then a semicolon.&lt;/p&gt;
 just checks for the &lt;code&gt;if&lt;/code&gt; keyword followed by a test expression, then
 the &lt;code&gt;else&lt;/code&gt; keyword, then the if body (a list of statements), and then the
 &lt;code&gt;end&lt;/code&gt; keyword.&lt;/p&gt;
-&lt;pre&gt;&lt;code&gt;fn parse_if(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;, index: usize) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
+&lt;pre&gt;&lt;code&gt;fn parse_if(raw: &amp;amp;[char], tokens: &amp;amp;[Token], index: usize) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
     if !expect_keyword(tokens, index, "if") {
         return None;
     }
 
     let mut next_index = index + 1; // Skip past if
     let res = parse_expression(raw, tokens, next_index);
-    if !res.is_some() {
+    if res.is_none() {
         println!(
             "{}",
             tokens[next_index]
@@ -898,8 +879,7 @@ the &lt;code&gt;else&lt;/code&gt; keyword, then the if body (a list of statement
     let mut statements: Vec&amp;lt;Statement&amp;gt; = vec![];
     while !expect_keyword(tokens, next_index, "end") {
         let res = parse_statement(raw, tokens, next_index);
-        if res.is_some() {
-            let (stmt, next_next_index) = res.unwrap();
+        if let Some((stmt, next_next_index)) = res {
             next_index = next_next_index;
             statements.push(stmt);
         } else {
@@ -917,7 +897,7 @@ the &lt;code&gt;else&lt;/code&gt; keyword, then the if body (a list of statement
 
     Some((
         Statement::If(If {
-            test: test,
+            test,
             body: statements,
         }),
         next_index,
@@ -975,7 +955,7 @@ pub struct Program {
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Compiling, similar to parsing, just calls the helper
 &lt;code&gt;compile_statement&lt;/code&gt; for each statement in the AST.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs rust"&gt;pub fn compile(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, ast: AST) -&amp;gt; Program {
+&lt;pre&gt;&lt;code class="hljs rust"&gt;pub fn compile(raw: &amp;amp;[char], ast: Ast) -&amp;gt; Program {
     let mut locals: HashMap&amp;lt;String, i32&amp;gt; = HashMap::new();
     let mut pgrm = Program {
         syms: HashMap::new(),
@@ -1011,7 +991,7 @@ from the 0th instruction at the top-level and have only
 non-function-declaration statements be evaluated.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_declaration(
     pgrm: &amp;amp;mut Program,
-    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    raw: &amp;amp;[char],
     _: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;,
     fd: FunctionDeclaration,
 ) {
@@ -1050,7 +1030,7 @@ function started.&lt;/p&gt;
         fd.name.value,
         Symbol {
             location: function_index as i32,
-            narguments: narguments,
+            narguments,
             nlocals: new_locals.keys().len(),
         },
     );
@@ -1076,7 +1056,7 @@ stored in a locals table mapped to the current number of locals
 token lookups into simply an offset from the frame pointer.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_local(
     pgrm: &amp;amp;mut Program,
-    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    raw: &amp;amp;[char],
     locals: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;,
     local: Local,
 ) {
@@ -1094,7 +1074,7 @@ the stack. Identifier literals are copied to the top of the stack from
 their position relative to the frame pointer.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_literal(
     pgrm: &amp;amp;mut Program,
-    _: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    _: &amp;amp;[char],
     locals: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;,
     lit: Literal,
 ) {
@@ -1132,7 +1112,7 @@ instruction based on the operator. All the operators are builtin and
 act on the top two elements on the stack.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_binary_operation(
     pgrm: &amp;amp;mut Program,
-    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    raw: &amp;amp;[char],
     locals: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;,
     bop: BinaryOperation,
 ) {
@@ -1162,7 +1142,7 @@ act on the top two elements on the stack.&lt;/p&gt;
 type of expression. We've already written those three helpers.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_expression(
     pgrm: &amp;amp;mut Program,
-    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    raw: &amp;amp;[char],
     locals: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;,
     exp: Expression,
 ) {
@@ -1181,7 +1161,7 @@ type of expression. We've already written those three helpers.&lt;/p&gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;h4 id="if"&gt;If&lt;/h4&gt;&lt;p&gt;First we compile the conditional test and then we jump to after the if
 the test result is not zero.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_if(pgrm: &amp;amp;mut Program, raw: &amp;amp;Vec&amp;lt;char&amp;gt;, locals: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;, if_: If) {
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_if(pgrm: &amp;amp;mut Program, raw: &amp;amp;[char], locals: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;, if_: If) {
     compile_expression(pgrm, raw, locals, if_.test);
     let done_label = format!(&amp;quot;if_else_{}&amp;quot;, pgrm.instructions.len());
     pgrm.instructions
@@ -1207,7 +1187,7 @@ the test result is not zero.&lt;/p&gt;
 expression and issue a return instruction.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_return(
     pgrm: &amp;amp;mut Program,
-    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    raw: &amp;amp;[char],
     locals: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;,
     ret: Return,
 ) {
@@ -1315,7 +1295,7 @@ exists being &lt;code&gt;print&lt;/code&gt;).&lt;/p&gt;
                         print!(&amp;quot;{}&amp;quot;, data.pop().unwrap());
                         print!(&amp;quot; &amp;quot;);
                     }
-                    println!(&amp;quot;&amp;quot;);
+                    println!();
                     pc += 1;
                     continue;
                 }

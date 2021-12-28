@@ -48,7 +48,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let contents = fs::read_to_string(&args[1]).expect("Could not read file");
 
-    let raw: Vec<char> = contents.to_string().chars().collect();
+    let raw: Vec<char> = contents.chars().collect();
 
     let tokens = match lex::lex(&raw) {
         Ok(tokens) => tokens,
@@ -117,7 +117,7 @@ And the `debug` function will dump the current line with a pointer in
 text to the current column along with a message.
 
 ```
-    pub fn debug<S: Into<String>>(&self, raw: &Vec<char>, msg: S) -> String {
+    pub fn debug<S: Into<String>>(&self, raw: &[char], msg: S) -> String {
         let mut line = 0;
         let mut line_str = String::new();
         // Find the whole line of original source
@@ -126,7 +126,7 @@ text to the current column along with a message.
                 line += 1;
 
                 // Done discovering line in question
-                if line_str.len() > 0 {
+                if !line_str.is_empty() {
                     break;
                 }
 
@@ -172,7 +172,7 @@ helper for each kind of token, returning an array of all tokens on
 success. In between lexing it will "eat whitespace".
 
 ```rust
-pub fn lex(s: &Vec<char>) -> Result<Vec<Token>, String> {
+pub fn lex(s: &[char]) -> Result<Vec<Token>, String> {
     let mut loc = Location {
         col: 0,
         index: 0,
@@ -196,8 +196,7 @@ pub fn lex(s: &Vec<char>) -> Result<Vec<Token>, String> {
 
         for lexer in lexers {
             let res = lexer(s, loc);
-            if res.is_some() {
-                let (t, next_loc) = res.unwrap();
+            if let Some((t, next_loc)) = res {
                 loc = next_loc;
                 tokens.push(t);
                 continue 'outer;
@@ -217,7 +216,7 @@ Eating whitespace is just incrementing the location while we see a
 space, tab, newline, etc.
 
 ```rust
-fn eat_whitespace(raw: &Vec<char>, initial_loc: Location) -> Location {
+fn eat_whitespace(raw: &[char], initial_loc: Location) -> Location {
     let mut c = raw[initial_loc.index];
     let mut next_loc = initial_loc;
     while [' ', '\n', '\r', '\t'].contains(&c) {
@@ -239,7 +238,7 @@ until it stops seeing decimal digits (this implementation only
 supports integers).
 
 ```rust
-fn lex_number(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
+fn lex_number(raw: &[char], initial_loc: Location) -> Option<(Token, Location)> {
     let mut ident = String::new();
     let mut next_loc = initial_loc;
     let mut c = raw[initial_loc.index];
@@ -253,7 +252,7 @@ fn lex_number(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location
 If there are no digits in the string then this is not a number.
 
 ```rust
-    if ident.len() > 0 {
+    if !ident.is_empty() {
         Some((
             Token {
                 value: ident,
@@ -289,7 +288,7 @@ fn lex_identifier(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Loca
 
 ```rust
     // First character must not be a digit
-    if ident.len() > 0 && !ident.chars().nth(0).unwrap().is_digit(10) {
+    if ident.len() > 0 && !ident.chars().next().unwrap().is_digit(10) {
         Some((
             Token {
                 value: ident,
@@ -311,7 +310,7 @@ reused as variables by the user.
 
 
 ```rust
-fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
+fn lex_keyword(raw: &[char], initial_loc: Location) -> Option<(Token, Location)> {
     let syntax = ["function", "end", "if", "then", "local", "return"];
 
     let mut next_loc = initial_loc;
@@ -342,7 +341,7 @@ fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Locatio
         break;
     }
 
-    if value.len() == 0 {
+    if value.is_empty() {
         return None;
     }
 ```
@@ -381,7 +380,7 @@ operators. Things like commas, parenthesis, etc.
 
 
 ```rust
-fn lex_syntax(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
+fn lex_syntax(raw: &[char], initial_loc: Location) -> Option<(Token, Location)> {
     let syntax = [";", "=", "(", ")", ","];
 
     for possible_syntax in syntax {
@@ -411,7 +410,7 @@ symbols. Operators are syntax but it helps us later on to break these
 out into a seperate type of token.
 
 ```rust
-fn lex_operator(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
+fn lex_operator(raw: &[char], initial_loc: Location) -> Option<(Token, Location)> {
     let operators = ["+", "-", "<"];
 
     for possible_syntax in operators {
@@ -459,7 +458,7 @@ pub enum Statement {
     Local(Local),
 }
 
-pub type AST = Vec<Statement>;
+pub type Ast = Vec<Statement>;
 ```
 
 There's almost nothing special at all about the rest of the tree
@@ -525,31 +524,31 @@ Lastly before the fun part, we'll define a few helpers for validating
 each kind of token.
 
 ```rust
-fn expect_keyword(tokens: &Vec<Token>, index: usize, value: &str) -> bool {
+fn expect_keyword(tokens: &[Token], index: usize, value: &str) -> bool {
     if index >= tokens.len() {
         return false;
     }
 
     let t = tokens[index].clone();
-    return t.kind == TokenKind::Keyword && t.value == value;
+    t.kind == TokenKind::Keyword && t.value == value
 }
 
-fn expect_syntax(tokens: &Vec<Token>, index: usize, value: &str) -> bool {
+fn expect_syntax(tokens: &[Token], index: usize, value: &str) -> bool {
     if index >= tokens.len() {
         return false;
     }
 
     let t = tokens[index].clone();
-    return t.kind == TokenKind::Syntax && t.value == value;
+    t.kind == TokenKind::Syntax && t.value == value
 }
 
-fn expect_identifier(tokens: &Vec<Token>, index: usize) -> bool {
+fn expect_identifier(tokens: &[Token], index: usize) -> bool {
     if index >= tokens.len() {
         return false;
     }
 
     let t = tokens[index].clone();
-    return t.kind == TokenKind::Identifier;
+    t.kind == TokenKind::Identifier
 }
 ```
 
@@ -564,11 +563,7 @@ declarations, if statements, return statements, local declarations,
 and expression statements.
 
 ```rust
-fn parse_statement(
-    raw: &Vec<char>,
-    tokens: &Vec<Token>,
-    index: usize,
-) -> Option<(Statement, usize)> {
+fn parse_statement(raw: &[char], tokens: &[Token], index: usize) -> Option<(Statement, usize)> {
     let parsers = [
         parse_if,
         parse_expression_statement,
@@ -586,14 +581,13 @@ fn parse_statement(
     None
 }
 
-pub fn parse(raw: &Vec<char>, tokens: Vec<Token>) -> Result<AST, String> {
+pub fn parse(raw: &[char], tokens: Vec<Token>) -> Result<Ast, String> {
     let mut ast = vec![];
     let mut index = 0;
     let ntokens = tokens.len();
     while index < ntokens {
         let res = parse_statement(raw, &tokens, index);
-        if res.is_some() {
-            let (stmt, next_index) = res.unwrap();
+        if let Some((stmt, next_index)) = res {
             index = next_index;
             ast.push(stmt);
             continue;
@@ -615,17 +609,14 @@ expect a semicolon afterward, and wrap the expression in a statement.
 ```rust
 
 fn parse_expression_statement(
-    raw: &Vec<char>,
-    tokens: &Vec<Token>,
+    raw: &[char],
+    tokens: &[Token],
     index: usize,
 ) -> Option<(Statement, usize)> {
     let mut next_index = index;
-    let res = parse_expression(raw, tokens, next_index);
-    if !res.is_some() {
-        return None;
-    }
+    let res = parse_expression(raw, tokens, next_index)?;
 
-    let (expr, next_next_index) = res.unwrap();
+    let (expr, next_next_index) = res;
     next_index = next_next_index;
     if !expect_syntax(tokens, next_index, ";") {
         println!(
@@ -652,11 +643,7 @@ very simple, binary operations cannot be combined. So instead of `1 +
 and so on.
 
 ```rust
-fn parse_expression(
-    raw: &Vec<char>,
-    tokens: &Vec<Token>,
-    index: usize,
-) -> Option<(Expression, usize)> {
+fn parse_expression(raw: &[char], tokens: &[Token], index: usize) -> Option<(Expression, usize)> {
     if index >= tokens.len() {
         return None;
     }
@@ -689,7 +676,7 @@ argument passed to the function.
 
 ```rust
         while !expect_syntax(tokens, next_index, ")") {
-            if arguments.len() > 0 {
+            if arguments.is_empty() {
                 if !expect_syntax(tokens, next_index, ",") {
                     println!(
                         "{}",
@@ -704,8 +691,7 @@ argument passed to the function.
             }
 
             let res = parse_expression(raw, tokens, next_index);
-            if res.is_some() {
-                let (arg, next_next_index) = res.unwrap();
+            if let Some((arg, next_next_index)) = res {
                 next_index = next_next_index;
                 arguments.push(arg);
             } else {
@@ -724,7 +710,7 @@ argument passed to the function.
         return Some((
             Expression::FunctionCall(FunctionCall {
                 name: tokens[index].clone(),
-                arguments: arguments,
+                arguments,
             }),
             next_index,
         ));
@@ -799,11 +785,7 @@ And now we're done parsing expressions!
 Functions start with the `function` keyword, and an identifier token follows.
 
 ```rust
-fn parse_function(
-    raw: &Vec<char>,
-    tokens: &Vec<Token>,
-    index: usize,
-) -> Option<(Statement, usize)> {
+fn parse_function(raw: &[char], tokens: &[Token], index: usize) -> Option<(Statement, usize)> {
     if !expect_keyword(tokens, index, "function") {
         return None;
     }
@@ -840,7 +822,7 @@ comma separated list of identifiers.
     next_index += 1; // Skip past open paren
     let mut parameters: Vec<Token> = vec![];
     while !expect_syntax(tokens, next_index, ")") {
-        if parameters.len() > 0 {
+        if !parameters.is_empty() {
             if !expect_syntax(tokens, next_index, ",") {
                 println!("{}", tokens[next_index].loc.debug(raw, "Expected comma or close parenthesis after parameter in function declaration:"));
                 return None;
@@ -864,8 +846,7 @@ Next we parse all statements in the function body until we find the
     let mut statements: Vec<Statement> = vec![];
     while !expect_keyword(tokens, next_index, "end") {
         let res = parse_statement(raw, tokens, next_index);
-        if res.is_some() {
-            let (stmt, next_next_index) = res.unwrap();
+        if let Some((stmt, next_next_index)) = res {
             next_index = next_next_index;
             statements.push(stmt);
         } else {
@@ -883,8 +864,8 @@ Next we parse all statements in the function body until we find the
 
     Some((
         Statement::FunctionDeclaration(FunctionDeclaration {
-            name: name,
-            parameters: parameters,
+            name,
+            parameters,
             body: statements,
         }),
         next_index,
@@ -900,14 +881,14 @@ Return statements just check for the `return` keyword, an expression,
 and a semicolon.
 
 ```rust
-fn parse_return(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(Statement, usize)> {
+fn parse_return(raw: &[char], tokens: &[Token], index: usize) -> Option<(Statement, usize)> {
     if !expect_keyword(tokens, index, "return") {
         return None;
     }
 
     let mut next_index = index + 1; // Skip past return
     let res = parse_expression(raw, tokens, next_index);
-    if !res.is_some() {
+    if res.is_none() {
         println!(
             "{}",
             tokens[next_index]
@@ -941,7 +922,7 @@ Local declarations start with the `local` keyword, then the local
 name, then an equal sign, then an expression, and then a semicolon.
 
 ```rust
-fn parse_local(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(Statement, usize)> {
+fn parse_local(raw: &[char], tokens: &[Token], index: usize) -> Option<(Statement, usize)> {
     if !expect_keyword(tokens, index, "local") {
         return None;
     }
@@ -974,7 +955,7 @@ fn parse_local(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(St
     next_index += 1; // Skip past =
 
     let res = parse_expression(raw, tokens, next_index);
-    if !res.is_some() {
+    if res.is_none() {
         println!(
             "{}",
             tokens[next_index]
@@ -1001,7 +982,7 @@ fn parse_local(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(St
 
     Some((
         Statement::Local(Local {
-            name: name,
+            name,
             expression: expr,
         }),
         next_index,
@@ -1017,14 +998,14 @@ the `else` keyword, then the if body (a list of statements), and then the
 `end` keyword.
 
 ```
-fn parse_if(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(Statement, usize)> {
+fn parse_if(raw: &[char], tokens: &[Token], index: usize) -> Option<(Statement, usize)> {
     if !expect_keyword(tokens, index, "if") {
         return None;
     }
 
     let mut next_index = index + 1; // Skip past if
     let res = parse_expression(raw, tokens, next_index);
-    if !res.is_some() {
+    if res.is_none() {
         println!(
             "{}",
             tokens[next_index]
@@ -1046,8 +1027,7 @@ fn parse_if(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(State
     let mut statements: Vec<Statement> = vec![];
     while !expect_keyword(tokens, next_index, "end") {
         let res = parse_statement(raw, tokens, next_index);
-        if res.is_some() {
-            let (stmt, next_next_index) = res.unwrap();
+        if let Some((stmt, next_next_index)) = res {
             next_index = next_next_index;
             statements.push(stmt);
         } else {
@@ -1065,7 +1045,7 @@ fn parse_if(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(State
 
     Some((
         Statement::If(If {
-            test: test,
+            test,
             body: statements,
         }),
         next_index,
@@ -1138,7 +1118,7 @@ Compiling, similar to parsing, just calls the helper
 `compile_statement` for each statement in the AST.
 
 ```rust
-pub fn compile(raw: &Vec<char>, ast: AST) -> Program {
+pub fn compile(raw: &[char], ast: Ast) -> Program {
     let mut locals: HashMap<String, i32> = HashMap::new();
     let mut pgrm = Program {
         syms: HashMap::new(),
@@ -1182,7 +1162,7 @@ non-function-declaration statements be evaluated.
 ```rust
 fn compile_declaration(
     pgrm: &mut Program,
-    raw: &Vec<char>,
+    raw: &[char],
     _: &mut HashMap<String, i32>,
     fd: FunctionDeclaration,
 ) {
@@ -1231,7 +1211,7 @@ function started.
         fd.name.value,
         Symbol {
             location: function_index as i32,
-            narguments: narguments,
+            narguments,
             nlocals: new_locals.keys().len(),
         },
     );
@@ -1266,7 +1246,7 @@ token lookups into simply an offset from the frame pointer.
 ```rust
 fn compile_local(
     pgrm: &mut Program,
-    raw: &Vec<char>,
+    raw: &[char],
     locals: &mut HashMap<String, i32>,
     local: Local,
 ) {
@@ -1290,7 +1270,7 @@ their position relative to the frame pointer.
 ```rust
 fn compile_literal(
     pgrm: &mut Program,
-    _: &Vec<char>,
+    _: &[char],
     locals: &mut HashMap<String, i32>,
     lit: Literal,
 ) {
@@ -1338,7 +1318,7 @@ act on the top two elements on the stack.
 ```rust
 fn compile_binary_operation(
     pgrm: &mut Program,
-    raw: &Vec<char>,
+    raw: &[char],
     locals: &mut HashMap<String, i32>,
     bop: BinaryOperation,
 ) {
@@ -1373,7 +1353,7 @@ type of expression. We've already written those three helpers.
 ```rust
 fn compile_expression(
     pgrm: &mut Program,
-    raw: &Vec<char>,
+    raw: &[char],
     locals: &mut HashMap<String, i32>,
     exp: Expression,
 ) {
@@ -1398,7 +1378,7 @@ First we compile the conditional test and then we jump to after the if
 the test result is not zero.
 
 ```rust
-fn compile_if(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, if_: If) {
+fn compile_if(pgrm: &mut Program, raw: &[char], locals: &mut HashMap<String, i32>, if_: If) {
     compile_expression(pgrm, raw, locals, if_.test);
     let done_label = format!("if_else_{}", pgrm.instructions.len());
     pgrm.instructions
@@ -1436,7 +1416,7 @@ expression and issue a return instruction.
 ```rust
 fn compile_return(
     pgrm: &mut Program,
-    raw: &Vec<char>,
+    raw: &[char],
     locals: &mut HashMap<String, i32>,
     ret: Return,
 ) {
@@ -1587,7 +1567,7 @@ exists being `print`).
                         print!("{}", data.pop().unwrap());
                         print!(" ");
                     }
-                    println!("");
+                    println!();
                     pc += 1;
                     continue;
                 }
