@@ -1,5 +1,1396 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 07 Dec 2021 14:50:27 +0000</lastBuildDate><item><title>My favorite software subreddits</title><link>http://notes.eatonphil.com/high-quality-subreddits-you-should-be-following.html</link><description>&lt;p&gt;If you are an experienced software developer whose only exposure to
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 28 Dec 2021 08:12:26 +0000</lastBuildDate><item><title>Writing a minimal Lua implementation with a VM from scratch in Rust</title><link>http://notes.eatonphil.com/lua-in-rust.html</link><description>&lt;p&gt;By the end of this guide we'll have a minimal, working implementation
+of a small part of Lua from scratch. It will be able to run the
+following program (among others):&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs lua"&gt;function fib(n)
+   if n &amp;lt; 2 then
+      return n;
+   end
+
+   local n1 = fib(n-1);
+   local n2 = fib(n-2);
+   return n1 + n2;
+end
+
+print(fib(30));
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This is my second project in Rust and only the third time I've
+invented a VM so don't take my style as gospel. However, I have found
+some Rust parsing tutorials overly complex so I'm hoping you'll find
+this one simpler.&lt;/p&gt;
+&lt;p&gt;All &lt;a href="https://github.com/eatonphil/lust"&gt;source code is available on Github&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id="entrypoint"&gt;Entrypoint&lt;/h3&gt;&lt;p&gt;Running &lt;code&gt;cargo init&lt;/code&gt; will give the boilerplate necessary. In
+&lt;code&gt;src/main.rs&lt;/code&gt; we'll accept a file name from the command line, perform
+lexical analysis to retrieve all tokens from the file, perform grammar
+analysis on the tokens to retrieve a tree structure, compile the tree
+to a linear set of virtual machine instructions, and finally interpret
+the virtual machine instructions.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;mod eval;
+mod lex;
+mod parse;
+
+use std::env;
+use std::fs;
+
+fn main() {
+    let args: Vec&amp;lt;String&amp;gt; = env::args().collect();
+    let contents = fs::read_to_string(&amp;amp;args[1]).expect(&amp;quot;Could not read file&amp;quot;);
+
+    let raw: Vec&amp;lt;char&amp;gt; = contents.to_string().chars().collect();
+
+    let tokens = match lex::lex(&amp;amp;raw) {
+        Ok(tokens) =&amp;gt; tokens,
+        Err(msg) =&amp;gt; panic!(&amp;quot;{}&amp;quot;, msg),
+    };
+
+    let ast = match parse::parse(&amp;amp;raw, tokens) {
+        Ok(ast) =&amp;gt; ast,
+        Err(msg) =&amp;gt; panic!(&amp;quot;{}&amp;quot;, msg),
+    };
+
+    let pgrm = eval::compile(&amp;amp;raw, ast);
+
+    eval::eval(pgrm);
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Easy peasy. Now let's implementing &lt;code&gt;lex&lt;/code&gt;.&lt;/p&gt;
+&lt;h3 id="lexical-analysis"&gt;Lexical analysis&lt;/h3&gt;&lt;p&gt;Lexical analysis drops whitespace (in Lua since it's not whitespace
+sensitive) and chunks all source code characters into their
+smallest possible meaningful pieces like syntax, numbers, identifiers,
+keywords, etc.&lt;/p&gt;
+&lt;p&gt;In order to have useful error messages, we'll keep track of state in
+the file with a &lt;code&gt;Location&lt;/code&gt; struct that implements &lt;code&gt;increment&lt;/code&gt; and
+&lt;code&gt;debug&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;This goes in &lt;code&gt;src/lex.rs&lt;/code&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;#[derive(Copy, Clone, Debug)]
+pub struct Location {
+    col: i32,
+    line: i32,
+    index: usize,
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The &lt;code&gt;increment&lt;/code&gt; function will update line and column numbers as well
+as the current index in the file.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;impl Location {
+    fn increment(&amp;amp;self, newline: bool) -&amp;gt; Location {
+        if newline {
+            Location {
+                index: self.index + 1,
+                col: 0,
+                line: self.line + 1,
+            }
+        } else {
+            Location {
+                index: self.index + 1,
+                col: self.col + 1,
+                line: self.line,
+            }
+        }
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And the &lt;code&gt;debug&lt;/code&gt; function will dump the current line with a pointer in
+text to the current column along with a message.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;    pub fn debug&amp;lt;S: Into&amp;lt;String&amp;gt;&amp;gt;(&amp;amp;self, raw: &amp;amp;Vec&amp;lt;char&amp;gt;, msg: S) -&amp;gt; String {
+        let mut line = 0;
+        let mut line_str = String::new();
+        // Find the whole line of original source
+        for c in raw {
+            if *c == '\n' {
+                line += 1;
+
+                // Done discovering line in question
+                if line_str.len() &amp;gt; 0 {
+                    break;
+                }
+
+                continue;
+            }
+
+            if self.line == line {
+                line_str.push_str(&amp;amp;c.to_string());
+            }
+        }
+
+        let space = " ".repeat(self.col as usize);
+        format!("{}\n\n{}\n{}^ Near here", msg.into(), line_str, space)
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The smallest individual unit after lexical analysis is a token which
+is either a keyword, number, identifier, operator, or syntax. (This
+implementation is clearly skipping lots of real Lua syntax like
+strings.)&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum TokenKind {
+    Identifier,
+    Syntax,
+    Keyword,
+    Number,
+    Operator,
+}
+
+#[derive(Debug, Clone)]
+pub struct Token {
+    pub value: String,
+    pub kind: TokenKind,
+    pub loc: Location,
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The top-level &lt;code&gt;lex&lt;/code&gt; function will iterate over the file and call a lex
+helper for each kind of token, returning an array of all tokens on
+success. In between lexing it will "eat whitespace".&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;pub fn lex(s: &amp;amp;Vec&amp;lt;char&amp;gt;) -&amp;gt; Result&amp;lt;Vec&amp;lt;Token&amp;gt;, String&amp;gt; {
+    let mut loc = Location {
+        col: 0,
+        index: 0,
+        line: 0,
+    };
+    let size = s.len();
+    let mut tokens: Vec&amp;lt;Token&amp;gt; = vec![];
+
+    let lexers = [
+        lex_keyword,
+        lex_identifier,
+        lex_number,
+        lex_syntax,
+        lex_operator,
+    ];
+    &amp;#39;outer: while loc.index &amp;lt; size {
+        loc = eat_whitespace(s, loc);
+        if loc.index == size {
+            break;
+        }
+
+        for lexer in lexers {
+            let res = lexer(s, loc);
+            if res.is_some() {
+                let (t, next_loc) = res.unwrap();
+                loc = next_loc;
+                tokens.push(t);
+                continue &amp;#39;outer;
+            }
+        }
+
+        return Err(loc.debug(s, &amp;quot;Unrecognized character while lexing:&amp;quot;));
+    }
+
+    Ok(tokens)
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="whitespace"&gt;Whitespace&lt;/h4&gt;&lt;p&gt;Eating whitespace is just incrementing the location while you see a
+space, tab, newline, etc.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn eat_whitespace(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, initial_loc: Location) -&amp;gt; Location {
+    let mut c = raw[initial_loc.index];
+    let mut next_loc = initial_loc;
+    while [&amp;#39; &amp;#39;, &amp;#39;\n&amp;#39;, &amp;#39;\r&amp;#39;, &amp;#39;\t&amp;#39;].contains(&amp;amp;c) {
+        next_loc = next_loc.increment(c == &amp;#39;\n&amp;#39;);
+        if next_loc.index == raw.len() {
+            break;
+        }
+        c = raw[next_loc.index];
+    }
+
+    next_loc
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="numbers"&gt;Numbers&lt;/h4&gt;&lt;p&gt;Lexing numbers iterates through the source starting at a position
+until it stops seeing decimal digits (this implementation only
+supports numbers).&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn lex_number(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, initial_loc: Location) -&amp;gt; Option&amp;lt;(Token, Location)&amp;gt; {
+    let mut ident = String::new();
+    let mut next_loc = initial_loc;
+    let mut c = raw[initial_loc.index];
+    while c.is_digit(10) {
+        ident.push_str(&amp;amp;c.to_string());
+        next_loc = next_loc.increment(false);
+        c = raw[next_loc.index];
+    }
+
+    if ident.len() &amp;gt; 0 {
+        Some((
+            Token {
+                value: ident,
+                loc: initial_loc,
+                kind: TokenKind::Number,
+            },
+            next_loc,
+        ))
+    } else {
+        None
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If there are no digits in the string then this is not a number.&lt;/p&gt;
+&lt;h4 id="identifiers"&gt;Identifiers&lt;/h4&gt;&lt;p&gt;Identifiers are any collection of alphabet characters, numbers, and
+underscores. But they cannot start with a number.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn lex_identifier(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, initial_loc: Location) -&amp;gt; Option&amp;lt;(Token, Location)&amp;gt; {
+    let mut ident = String::new();
+    let mut next_loc = initial_loc;
+    let mut c = raw[initial_loc.index];
+    while c.is_alphanumeric() || c == &amp;#39;_&amp;#39; {
+        ident.push_str(&amp;amp;c.to_string());
+        next_loc = next_loc.increment(false);
+        c = raw[next_loc.index];
+    }
+
+    // First character must not be a digit
+    if ident.len() &amp;gt; 0 &amp;amp;&amp;amp; !ident.chars().nth(0).unwrap().is_digit(10) {
+        Some((
+            Token {
+                value: ident,
+                loc: initial_loc,
+                kind: TokenKind::Identifier,
+            },
+            next_loc,
+        ))
+    } else {
+        None
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="keywords"&gt;Keywords&lt;/h4&gt;&lt;p&gt;Keywords are alphabetical like identifiers are but they are
+reserved. Aside from matching a list of strings we have to make sure
+there is a complete match. For example &lt;code&gt;function1&lt;/code&gt; is not a keyword,
+it's a valid identifier. Whereas &lt;code&gt;function 1&lt;/code&gt; is a valid set of tokens
+(the keyword &lt;code&gt;function&lt;/code&gt; and the number &lt;code&gt;1&lt;/code&gt;), even if it's not a valid
+Lua grammar.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn lex_keyword(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, initial_loc: Location) -&amp;gt; Option&amp;lt;(Token, Location)&amp;gt; {
+    let syntax = [&amp;quot;function&amp;quot;, &amp;quot;end&amp;quot;, &amp;quot;if&amp;quot;, &amp;quot;then&amp;quot;, &amp;quot;local&amp;quot;, &amp;quot;return&amp;quot;];
+
+    let mut next_loc = initial_loc;
+    let mut value = String::new();
+    &amp;#39;outer: for possible_syntax in syntax {
+        let mut c = raw[initial_loc.index];
+        next_loc = initial_loc;
+        while c.is_alphanumeric() || c == &amp;#39;_&amp;#39; {
+            value.push_str(&amp;amp;c.to_string());
+            next_loc = next_loc.increment(false);
+            c = raw[next_loc.index];
+
+            let n = next_loc.index - initial_loc.index;
+            if value != possible_syntax[..n] {
+                value = String::new();
+                continue &amp;#39;outer;
+            }
+        }
+
+        // Not a complete match
+        if value.len() &amp;lt; possible_syntax.len() {
+            value = String::new();
+            continue;
+        }
+
+        // If it got to this point it found a match, so exit early.
+        // We don&amp;#39;t need a longest match.
+        break;
+    }
+
+    if value.len() == 0 {
+        return None;
+    }
+
+    // If the next character would be part of a valid identifier, then
+    // this is not a keyword.
+    if next_loc.index &amp;lt; raw.len() - 1 {
+        let next_c = raw[next_loc.index];
+        if next_c.is_alphanumeric() || next_c == &amp;#39;_&amp;#39; {
+            return None;
+        }
+    }
+
+    Some((
+        Token {
+            value: value,
+            loc: initial_loc,
+            kind: TokenKind::Keyword,
+        },
+        next_loc,
+    ))
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="syntax"&gt;Syntax&lt;/h4&gt;&lt;p&gt;Syntax is just language junk that isn't operators. Things like commas,
+parenthesis, etc.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn lex_syntax(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, initial_loc: Location) -&amp;gt; Option&amp;lt;(Token, Location)&amp;gt; {
+    let syntax = [&amp;quot;;&amp;quot;, &amp;quot;=&amp;quot;, &amp;quot;(&amp;quot;, &amp;quot;)&amp;quot;, &amp;quot;,&amp;quot;];
+
+    for possible_syntax in syntax {
+        let c = raw[initial_loc.index];
+        let next_loc = initial_loc.increment(false);
+        // TODO: this won&amp;#39;t work with multiple-character syntax bits like &amp;gt;= or ==
+        if possible_syntax == c.to_string() {
+            return Some((
+                Token {
+                    value: possible_syntax.to_string(),
+                    loc: initial_loc,
+                    kind: TokenKind::Syntax,
+                },
+                next_loc,
+            ));
+        }
+    }
+
+    None
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="operators"&gt;Operators&lt;/h4&gt;&lt;p&gt;Operators are basically syntax but it helps us later on to break these
+out into a seperate type of token. Operators are things like plus,
+minus, and less than symbols.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn lex_operator(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, initial_loc: Location) -&amp;gt; Option&amp;lt;(Token, Location)&amp;gt; {
+    let operators = [&amp;quot;+&amp;quot;, &amp;quot;-&amp;quot;, &amp;quot;&amp;lt;&amp;quot;];
+
+    for possible_syntax in operators {
+        let c = raw[initial_loc.index];
+        let next_loc = initial_loc.increment(false);
+        // TODO: this won&amp;#39;t work with multiple-character operators like &amp;gt;= or ==
+        if possible_syntax == c.to_string() {
+            return Some((
+                Token {
+                    value: possible_syntax.to_string(),
+                    loc: initial_loc,
+                    kind: TokenKind::Operator,
+                },
+                next_loc,
+            ));
+        }
+    }
+
+    None
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And now we're all done lexing!&lt;/p&gt;
+&lt;h3 id="grammar-analysis"&gt;Grammar analysis&lt;/h3&gt;&lt;p&gt;Parsing finds grammatical (tree) patterns in a flat list of
+tokens. This is called a syntax tree or abstract syntax tree (AST).&lt;/p&gt;
+&lt;p&gt;The boring part is defining the tree. Generally speaking (and
+specifically for this project), the syntax tree is a list of
+statements. Statements can be function definitions or expression
+statements or if statements or return statements or local
+declarations.&lt;/p&gt;
+&lt;p&gt;This goes in &lt;code&gt;src/parse.rs&lt;/code&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;#[derive(Debug)]
+pub enum Statement {
+    Expression(Expression),
+    If(If),
+    FunctionDeclaration(FunctionDeclaration),
+    Return(Return),
+    Local(Local),
+}
+
+pub type AST = Vec&amp;lt;Statement&amp;gt;;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;There's almost nothing special at all about the rest of the tree
+definitions.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;#[derive(Debug)]
+pub enum Literal {
+    Identifier(Token),
+    Number(Token),
+}
+
+#[derive(Debug)]
+pub struct FunctionCall {
+    pub name: Token,
+    pub arguments: Vec&amp;lt;Expression&amp;gt;,
+}
+
+#[derive(Debug)]
+pub struct BinaryOperation {
+    pub operator: Token,
+    pub left: Box&amp;lt;Expression&amp;gt;,
+    pub right: Box&amp;lt;Expression&amp;gt;,
+}
+
+#[derive(Debug)]
+pub enum Expression {
+    FunctionCall(FunctionCall),
+    BinaryOperation(BinaryOperation),
+    Literal(Literal),
+}
+
+#[derive(Debug)]
+pub struct FunctionDeclaration {
+    pub name: Token,
+    pub parameters: Vec&amp;lt;Token&amp;gt;,
+    pub body: Vec&amp;lt;Statement&amp;gt;,
+}
+
+#[derive(Debug)]
+pub struct If {
+    pub test: Expression,
+    pub body: Vec&amp;lt;Statement&amp;gt;,
+}
+
+#[derive(Debug)]
+pub struct Local {
+    pub name: Token,
+    pub expression: Expression,
+}
+
+#[derive(Debug)]
+pub struct Return {
+    pub expression: Expression,
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And that's it for the AST!&lt;/p&gt;
+&lt;h4 id="some-helpers"&gt;Some helpers&lt;/h4&gt;&lt;p&gt;Last before the fun part, we'll define a few helpers for validating
+each kind of token.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn expect_keyword(tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;, index: usize, value: &amp;amp;str) -&amp;gt; bool {
+    if index &amp;gt;= tokens.len() {
+        return false;
+    }
+
+    let t = tokens[index].clone();
+    return t.kind == TokenKind::Keyword &amp;amp;&amp;amp; t.value == value;
+}
+
+fn expect_syntax(tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;, index: usize, value: &amp;amp;str) -&amp;gt; bool {
+    if index &amp;gt;= tokens.len() {
+        return false;
+    }
+
+    let t = tokens[index].clone();
+    return t.kind == TokenKind::Syntax &amp;amp;&amp;amp; t.value == value;
+}
+
+fn expect_identifier(tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;, index: usize) -&amp;gt; bool {
+    if index &amp;gt;= tokens.len() {
+        return false;
+    }
+
+    let t = tokens[index].clone();
+    return t.kind == TokenKind::Identifier;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now on to the fun part, actually detecting these trees!&lt;/p&gt;
+&lt;h4 id="top-level-parse"&gt;Top-level parse&lt;/h4&gt;&lt;p&gt;The top-level &lt;code&gt;parse&lt;/code&gt; function and it's major helper,
+&lt;code&gt;parse_statement&lt;/code&gt;, dispatch very similarly to the top-level lex
+function. For each statement in the file we look for function
+declarations, if statements, return statements, local declarations,
+and expression statements.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn parse_statement(
+    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;,
+    index: usize,
+) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
+    let parsers = [
+        parse_if,
+        parse_expression_statement,
+        parse_return,
+        parse_function,
+        parse_local,
+    ];
+    for parser in parsers {
+        let res = parser(raw, tokens, index);
+        if res.is_some() {
+            return res;
+        }
+    }
+
+    None
+}
+
+pub fn parse(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, tokens: Vec&amp;lt;Token&amp;gt;) -&amp;gt; Result&amp;lt;AST, String&amp;gt; {
+    let mut ast = vec![];
+    let mut index = 0;
+    let ntokens = tokens.len();
+    while index &amp;lt; ntokens {
+        let res = parse_statement(raw, &amp;amp;tokens, index);
+        if res.is_some() {
+            let (stmt, next_index) = res.unwrap();
+            index = next_index;
+            ast.push(stmt);
+            continue;
+        }
+
+        return Err(tokens[index].loc.debug(raw, &amp;quot;Invalid token while parsing:&amp;quot;));
+    }
+
+    Ok(ast)
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="expression-statements"&gt;Expression statements&lt;/h4&gt;&lt;p&gt;Expression statements are just a wrapper for the Rust type
+system. They call &lt;code&gt;parse_expression&lt;/code&gt;, expect a semicolon afterward,
+and wrap the expression in a statement.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;
+fn parse_expression_statement(
+    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;,
+    index: usize,
+) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
+    let mut next_index = index;
+    let res = parse_expression(raw, tokens, next_index);
+    if !res.is_some() {
+        return None;
+    }
+
+    let (expr, next_next_index) = res.unwrap();
+    next_index = next_next_index;
+    if !expect_syntax(tokens, next_index, &amp;quot;;&amp;quot;) {
+        println!(
+            &amp;quot;{}&amp;quot;,
+            tokens[next_index]
+                .loc
+                .debug(raw, &amp;quot;Expected semicolon after expression:&amp;quot;)
+        );
+        return None;
+    }
+
+    next_index += 1; // Skip past semicolon
+
+    Some((Statement::Expression(expr), next_index))
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="expressions"&gt;Expressions&lt;/h4&gt;&lt;p&gt;Expressions in this minimal Lua are only one of function calls,
+literals (numbers, identifiers), or binary operations. To keep things
+very simple, binary operations cannot be combined. So instead of &lt;code&gt;1 +
+2 + 3&lt;/code&gt; you'd need to do &lt;code&gt;local tmp1 = 1 + 2; local tmp2 = tmp1 + 3;&lt;/code&gt;
+and so on.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn parse_expression(
+    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;,
+    index: usize,
+) -&amp;gt; Option&amp;lt;(Expression, usize)&amp;gt; {
+    if index &amp;gt;= tokens.len() {
+        return None;
+    }
+
+    let t = tokens[index].clone();
+    let left = match t.kind {
+        TokenKind::Number =&amp;gt; Expression::Literal(Literal::Number(t)),
+        TokenKind::Identifier =&amp;gt; Expression::Literal(Literal::Identifier(t)),
+        _ =&amp;gt; {
+            return None;
+        }
+    };
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If what follows the first literal is an open parenthesis then we try
+to parse a function call.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;    let mut next_index = index + 1;
+    if expect_syntax(tokens, next_index, &amp;quot;(&amp;quot;) {
+        next_index += 1; // Skip past open paren
+
+        // Function call
+        let mut arguments: Vec&amp;lt;Expression&amp;gt; = vec![];
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We need to call &lt;code&gt;parse_expression&lt;/code&gt; recursively for every possible
+argument passed to the function.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;        while !expect_syntax(tokens, next_index, &amp;quot;)&amp;quot;) {
+            if arguments.len() &amp;gt; 0 {
+                if !expect_syntax(tokens, next_index, &amp;quot;,&amp;quot;) {
+                    println!(
+                        &amp;quot;{}&amp;quot;,
+                        tokens[next_index]
+                            .loc
+                            .debug(raw, &amp;quot;Expected comma between function call arguments:&amp;quot;)
+                    );
+                    return None;
+                }
+
+                next_index += 1; // Skip past comma
+            }
+
+            let res = parse_expression(raw, tokens, next_index);
+            if res.is_some() {
+                let (arg, next_next_index) = res.unwrap();
+                next_index = next_next_index;
+                arguments.push(arg);
+            } else {
+                println!(
+                    &amp;quot;{}&amp;quot;,
+                    tokens[next_index]
+                        .loc
+                        .debug(raw, &amp;quot;Expected valid expression in function call arguments:&amp;quot;)
+                );
+                return None;
+            }
+        }
+
+        next_index += 1; // Skip past closing paren
+
+        return Some((
+            Expression::FunctionCall(FunctionCall {
+                name: tokens[index].clone(),
+                arguments: arguments,
+            }),
+            next_index,
+        ));
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Otherwise if there wasn't an opening parenthesis then we could be
+parsing either a literal expression or a binary operation. If the
+token that follows is an operator token then we know it's a binary
+operation.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;
+    // Might be a literal expression
+    if next_index &amp;gt;= tokens.len() || tokens[next_index].clone().kind != TokenKind::Operator {
+        return Some((left, next_index));
+    }
+
+    // Otherwise is a binary operation
+    let op = tokens[next_index].clone();
+    next_index += 1; // Skip past op
+
+    if next_index &amp;gt;= tokens.len() {
+        println!(
+            &amp;quot;{}&amp;quot;,
+            tokens[next_index]
+                .loc
+                .debug(raw, &amp;quot;Expected valid right hand side binary operand:&amp;quot;)
+        );
+        return None;
+    }
+
+    let rtoken = tokens[next_index].clone();
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;It is at this point that we &lt;em&gt;could&lt;/em&gt; (but won't) call
+&lt;code&gt;parse_expression&lt;/code&gt; recursively. I don't want to deal with operator
+precedence right now so we'll just require that the right hand side is
+another literal.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;    let right = match rtoken.kind {
+        TokenKind::Number =&amp;gt; Expression::Literal(Literal::Number(rtoken)),
+        TokenKind::Identifier =&amp;gt; Expression::Literal(Literal::Identifier(rtoken)),
+        _ =&amp;gt; {
+            println!(
+                &amp;quot;{}&amp;quot;,
+                rtoken
+                    .loc
+                    .debug(raw, &amp;quot;Expected valid right hand side binary operand:&amp;quot;)
+            );
+            return None;
+        }
+    };
+    next_index += 1; // Skip past right hand operand
+
+    Some((
+        Expression::BinaryOperation(BinaryOperation {
+            left: Box::new(left),
+            right: Box::new(right),
+            operator: op,
+        }),
+        next_index,
+    ))
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And now we're done parsing expressions!&lt;/p&gt;
+&lt;h4 id="function-declarations"&gt;Function declarations&lt;/h4&gt;&lt;p&gt;Functions start with the &lt;code&gt;function&lt;/code&gt; and an identifier token follow.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn parse_function(
+    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;,
+    index: usize,
+) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
+    if !expect_keyword(tokens, index, &amp;quot;function&amp;quot;) {
+        return None;
+    }
+
+    let mut next_index = index + 1;
+    if !expect_identifier(tokens, next_index) {
+        println!(
+            &amp;quot;{}&amp;quot;,
+            tokens[next_index]
+                .loc
+                .debug(raw, &amp;quot;Expected valid identifier for function name:&amp;quot;)
+        );
+        return None;
+    }
+    let name = tokens[next_index].clone();
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;After the function name comes the argument list that can be empty or a
+comma separated list of identifiers.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;
+    next_index += 1; // Skip past name
+    if !expect_syntax(tokens, next_index, &amp;quot;(&amp;quot;) {
+        println!(
+            &amp;quot;{}&amp;quot;,
+            tokens[next_index]
+                .loc
+                .debug(raw, &amp;quot;Expected open parenthesis in function declaration:&amp;quot;)
+        );
+        return None;
+    }
+
+    next_index += 1; // Skip past open paren
+    let mut parameters: Vec&amp;lt;Token&amp;gt; = vec![];
+    while !expect_syntax(tokens, next_index, &amp;quot;)&amp;quot;) {
+        if parameters.len() &amp;gt; 0 {
+            if !expect_syntax(tokens, next_index, &amp;quot;,&amp;quot;) {
+                println!(&amp;quot;{}&amp;quot;, tokens[next_index].loc.debug(raw, &amp;quot;Expected comma or close parenthesis after parameter in function declaration:&amp;quot;));
+                return None;
+            }
+
+            next_index += 1; // Skip past comma
+        }
+
+        parameters.push(tokens[next_index].clone());
+        next_index += 1; // Skip past param
+    }
+
+    next_index += 1; // Skip past close paren
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And finally there must be an &lt;code&gt;end&lt;/code&gt; keyword.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;
+    let mut statements: Vec&amp;lt;Statement&amp;gt; = vec![];
+    while !expect_keyword(tokens, next_index, &amp;quot;end&amp;quot;) {
+        let res = parse_statement(raw, tokens, next_index);
+        if res.is_some() {
+            let (stmt, next_next_index) = res.unwrap();
+            next_index = next_next_index;
+            statements.push(stmt);
+        } else {
+            println!(
+                &amp;quot;{}&amp;quot;,
+                tokens[next_index]
+                    .loc
+                    .debug(raw, &amp;quot;Expected valid statement in function declaration:&amp;quot;)
+            );
+            return None;
+        }
+    }
+
+    next_index += 1; // Skip past end
+
+    Some((
+        Statement::FunctionDeclaration(FunctionDeclaration {
+            name: name,
+            parameters: parameters,
+            body: statements,
+        }),
+        next_index,
+    ))
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Phew, we're halfway through the parser.&lt;/p&gt;
+&lt;h4 id="return-statements"&gt;Return statements&lt;/h4&gt;&lt;p&gt;Return statements just check for the &lt;code&gt;return&lt;/code&gt; keyword, an expression,
+and a semicolon.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn parse_return(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;, index: usize) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
+    if !expect_keyword(tokens, index, &amp;quot;return&amp;quot;) {
+        return None;
+    }
+
+    let mut next_index = index + 1; // Skip past return
+    let res = parse_expression(raw, tokens, next_index);
+    if !res.is_some() {
+        println!(
+            &amp;quot;{}&amp;quot;,
+            tokens[next_index]
+                .loc
+                .debug(raw, &amp;quot;Expected valid expression in return statement:&amp;quot;)
+        );
+        return None;
+    }
+
+    let (expr, next_next_index) = res.unwrap();
+    next_index = next_next_index;
+    if !expect_syntax(tokens, next_index, &amp;quot;;&amp;quot;) {
+        println!(
+            &amp;quot;{}&amp;quot;,
+            tokens[next_index]
+                .loc
+                .debug(raw, &amp;quot;Expected semicolon in return statement:&amp;quot;)
+        );
+        return None;
+    }
+
+    next_index += 1; // Skip past semicolon
+
+    Some((Statement::Return(Return { expression: expr }), next_index))
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="local-declarations"&gt;Local declarations&lt;/h4&gt;&lt;p&gt;Local declarations start with the &lt;code&gt;local&lt;/code&gt; keyword, then the local
+name, then an equals sign, then an expression, and then a semicolon.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn parse_local(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;, index: usize) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
+    if !expect_keyword(tokens, index, &amp;quot;local&amp;quot;) {
+        return None;
+    }
+
+    let mut next_index = index + 1; // Skip past local
+
+    if !expect_identifier(tokens, next_index) {
+        println!(
+            &amp;quot;{}&amp;quot;,
+            tokens[next_index]
+                .loc
+                .debug(raw, &amp;quot;Expected valid identifier for local name:&amp;quot;)
+        );
+        return None;
+    }
+
+    let name = tokens[next_index].clone();
+    next_index += 1; // Skip past name
+
+    if !expect_syntax(tokens, next_index, &amp;quot;=&amp;quot;) {
+        println!(
+            &amp;quot;{}&amp;quot;,
+            tokens[next_index]
+                .loc
+                .debug(raw, &amp;quot;Expected = syntax after local name:&amp;quot;)
+        );
+        return None;
+    }
+
+    next_index += 1; // Skip past =
+
+    let res = parse_expression(raw, tokens, next_index);
+    if !res.is_some() {
+        println!(
+            &amp;quot;{}&amp;quot;,
+            tokens[next_index]
+                .loc
+                .debug(raw, &amp;quot;Expected valid expression in local declaration:&amp;quot;)
+        );
+        return None;
+    }
+
+    let (expr, next_next_index) = res.unwrap();
+    next_index = next_next_index;
+
+    if !expect_syntax(tokens, next_index, &amp;quot;;&amp;quot;) {
+        println!(
+            &amp;quot;{}&amp;quot;,
+            tokens[next_index]
+                .loc
+                .debug(raw, &amp;quot;Expected semicolon in return statement:&amp;quot;)
+        );
+        return None;
+    }
+
+    next_index += 1; // Skip past semicolon
+
+    Some((
+        Statement::Local(Local {
+            name: name,
+            expression: expr,
+        }),
+        next_index,
+    ))
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="if-statements"&gt;If statements&lt;/h4&gt;&lt;p&gt;This implementation of Lua doesn't support &lt;code&gt;elseif&lt;/code&gt; so parsing &lt;code&gt;if&lt;/code&gt;
+just checks for the &lt;code&gt;if&lt;/code&gt; keyword followed by a test expression, then
+the &lt;code&gt;else&lt;/code&gt; keyword, the if body (a list of statements), and then the
+&lt;code&gt;end&lt;/code&gt; keyword.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;fn parse_if(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, tokens: &amp;amp;Vec&amp;lt;Token&amp;gt;, index: usize) -&amp;gt; Option&amp;lt;(Statement, usize)&amp;gt; {
+    if !expect_keyword(tokens, index, "if") {
+        return None;
+    }
+
+    let mut next_index = index + 1; // Skip past if
+    let res = parse_expression(raw, tokens, next_index);
+    if !res.is_some() {
+        println!(
+            "{}",
+            tokens[next_index]
+                .loc
+                .debug(raw, "Expected valid expression for if test:")
+        );
+        return None;
+    }
+
+    let (test, next_next_index) = res.unwrap();
+    next_index = next_next_index;
+
+    if !expect_keyword(tokens, next_index, "then") {
+        return None;
+    }
+
+    next_index += 1; // Skip past then
+
+    let mut statements: Vec&amp;lt;Statement&amp;gt; = vec![];
+    while !expect_keyword(tokens, next_index, "end") {
+        let res = parse_statement(raw, tokens, next_index);
+        if res.is_some() {
+            let (stmt, next_next_index) = res.unwrap();
+            next_index = next_next_index;
+            statements.push(stmt);
+        } else {
+            println!(
+                "{}",
+                tokens[next_index]
+                    .loc
+                    .debug(raw, "Expected valid statement in if body:")
+            );
+            return None;
+        }
+    }
+
+    next_index += 1; // Skip past end
+
+    Some((
+        Statement::If(If {
+            test: test,
+            body: statements,
+        }),
+        next_index,
+    ))
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And goshdarnit we're done parsing.&lt;/p&gt;
+&lt;h3 id="compiling-to-a-made-up-virtual-machine"&gt;Compiling to a made up virtual machine&lt;/h3&gt;&lt;p&gt;This is a slightly weird one, entirely stack-based other than the
+stack pointer and program counter. Basically the calling convention is
+that the caller puts arguments on the stack followed by the stack
+pointer, the program counter, and then the number of arguments (for
+cleanup). Inside the function declaration it copies the arguments from
+before the stack pointer to in front of it (yes I know, I know, this
+is completely dumb). Local variables are allocated space for on top of
+the arguments after the stack pointer.&lt;/p&gt;
+&lt;p&gt;The virtual machine will support add, subtract, less than operations
+as well as jump, jump-if-not-zero, return, and call. It will support a
+few more memory-specific instructions for loading literals, loading
+identifiers, and managing arguments.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;use crate::parse::*;
+use std::collections::HashMap;
+
+#[derive(Debug)]
+enum Instruction {
+    DupPlusSP(i32), // For loading identifiers
+    MoveMinusSP(usize, i32), // For copying arguments into function scope
+    MovePlusSP(usize), // For copying locals into fixed position in function scope
+    Store(i32), // For storing literals
+    Return,
+    JumpIfNotZero(String),
+    Jump(String), // For unconditional jumps that aren&amp;#39;t function calls.
+    Call(String, usize),
+    Add,
+    Subtract,
+    LessThan,
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The result of compiling will be a &lt;code&gt;Program&lt;/code&gt; instance. This instance
+will contain symbol information and the actual instructions to run.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;#[derive(Debug)]
+struct Symbol {
+    location: i32,
+    narguments: usize,
+    nlocals: usize,
+}
+
+#[derive(Debug)]
+pub struct Program {
+    syms: HashMap&amp;lt;String, Symbol&amp;gt;,
+    instructions: Vec&amp;lt;Instruction&amp;gt;,
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Compiling, similar to parsing, just calls the helper
+&lt;code&gt;compile_statement&lt;/code&gt; for each statement in the AST.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;pub fn compile(raw: &amp;amp;Vec&amp;lt;char&amp;gt;, ast: AST) -&amp;gt; Program {
+    let mut locals: HashMap&amp;lt;String, i32&amp;gt; = HashMap::new();
+    let mut pgrm = Program {
+        syms: HashMap::new(),
+        instructions: Vec::new(),
+    };
+    for stmt in ast {
+        compile_statement(&amp;amp;mut pgrm, raw, &amp;amp;mut locals, stmt);
+    }
+
+    pgrm
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And &lt;code&gt;compile_statement&lt;/code&gt; dispatches to additional helpers based on the
+kind of statement.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_statement(
+    pgrm: &amp;amp;mut Program,
+    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    locals: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;,
+    stmt: Statement,
+) {
+    match stmt {
+        Statement::FunctionDeclaration(fd) =&amp;gt; compile_declaration(pgrm, raw, locals, fd),
+        Statement::Return(r) =&amp;gt; compile_return(pgrm, raw, locals, r),
+        Statement::If(if_) =&amp;gt; compile_if(pgrm, raw, locals, if_),
+        Statement::Local(loc) =&amp;gt; compile_local(pgrm, raw, locals, loc),
+        Statement::Expression(e) =&amp;gt; compile_expression(pgrm, raw, locals, e),
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="function-declarations"&gt;Function declarations&lt;/h4&gt;&lt;p&gt;Let's do the hard one first. First off, function declarations will
+include an unconditional guard around them so that we can evaluate
+from the 0th instruction at the top-level and have only
+non-function-declaration statements be evaluated.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_declaration(
+    pgrm: &amp;amp;mut Program,
+    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    _: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;,
+    fd: FunctionDeclaration,
+) {
+    // Jump to end of function to guard top-level
+    let done_label = format!(&amp;quot;function_done_{}&amp;quot;, pgrm.instructions.len());
+    pgrm.instructions
+        .push(Instruction::Jump(done_label.clone()));
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Then we'll add another limitation/simplification that local variables
+are only accessible within the current function scope.&lt;/p&gt;
+&lt;p&gt;For each parameter, we'll copy the parameter on the stack before the
+stack pointer to a place in front of the stack pointer. This gets
+around addressing limitations in our virtual machine but is obviously
+very wasteful.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;    let mut new_locals = HashMap::&amp;lt;String, i32&amp;gt;::new();
+
+    let function_index = pgrm.instructions.len() as i32;
+    let narguments = fd.parameters.len();
+    for (i, param) in fd.parameters.iter().enumerate() {
+        pgrm.instructions.push(Instruction::MoveMinusSP(
+            i,
+            narguments as i32 - (i as i32 + 1),
+        ));
+        new_locals.insert(param.value.clone(), i as i32);
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Then we compile the body.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;    for stmt in fd.body {
+        compile_statement(pgrm, raw, &amp;amp;mut new_locals, stmt);
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Once the body is compiled we know the total number of locals so we can
+fill out the symbol table correctly. The location is importantly
+already stored because it is the location of the instructions when the
+function started not where it is currently after compiling the
+function body.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;    // Overwrite function lookup with total number of locals
+    pgrm.syms.insert(
+        fd.name.value,
+        Symbol {
+            location: function_index as i32,
+            narguments: narguments,
+            nlocals: new_locals.keys().len(),
+        },
+    );
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And finally we add a symbol linking the done label for the function to
+the position of the end of the function. Again, this allows us to skip
+past the function declaration when evaluating instructions from 0 to
+N.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;    pgrm.syms.insert(
+        done_label,
+        Symbol {
+            location: pgrm.instructions.len() as i32,
+            narguments: 0,
+            nlocals: 0,
+        },
+    );
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Ok that wasn't so bad. And the rest are simpler.&lt;/p&gt;
+&lt;h4 id="local-declarations"&gt;Local declarations&lt;/h4&gt;&lt;p&gt;The expression for the local is compiled and then the local name is
+stored in a locals table mapped to the current number of locals
+(including arguments). This allows the compiler to turn &lt;code&gt;identifier&lt;/code&gt;
+token lookups into simply an offset from the stack pointer.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_local(
+    pgrm: &amp;amp;mut Program,
+    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    locals: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;,
+    local: Local,
+) {
+    let index = locals.keys().len();
+    locals.insert(local.name.value, index as i32);
+    compile_expression(pgrm, raw, locals, local.expression);
+    pgrm.instructions.push(Instruction::MovePlusSP(index));
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And specifically, the instruction pattern is to evaluate the
+expression and then copy it back into a relative position in the
+stack. This is also perhaps wasteful.&lt;/p&gt;
+&lt;h4 id="literals"&gt;Literals&lt;/h4&gt;&lt;p&gt;Number literals are simply &lt;code&gt;store&lt;/code&gt;-d with a specific instruction for
+pushing a number onto the stack. Identifier literals are copied to the
+top of the stack from their relative position to the stack pointer.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_literal(
+    pgrm: &amp;amp;mut Program,
+    _: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    locals: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;,
+    lit: Literal,
+) {
+    match lit {
+        Literal::Number(i) =&amp;gt; {
+            let n = i.value.parse::&amp;lt;i32&amp;gt;().unwrap();
+            pgrm.instructions.push(Instruction::Store(n));
+        }
+        Literal::Identifier(ident) =&amp;gt; {
+            pgrm.instructions
+                .push(Instruction::DupPlusSP(locals[&amp;amp;ident.value]));
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="function-calls"&gt;Function calls&lt;/h4&gt;&lt;p&gt;Pretty simple, just compile all the arguments and then issue a call
+instruction.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_function_call(
+    pgrm: &amp;amp;mut Program,
+    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    locals: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;,
+    fc: FunctionCall,
+) {
+    let len = fc.arguments.len();
+    for arg in fc.arguments {
+        compile_expression(pgrm, raw, locals, arg);
+    }
+
+    pgrm.instructions
+        .push(Instruction::Call(fc.name.value, len));
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="binary-operations"&gt;Binary operations&lt;/h4&gt;&lt;p&gt;Binary operations compile the left, then the right, and then issue an
+instruction based on the operator. All the operators are builtin and
+act on the top two elements on the stack.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_binary_operation(
+    pgrm: &amp;amp;mut Program,
+    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    locals: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;,
+    bop: BinaryOperation,
+) {
+    compile_expression(pgrm, raw, locals, *bop.left);
+    compile_expression(pgrm, raw, locals, *bop.right);
+    match bop.operator.value.as_str() {
+        &amp;quot;+&amp;quot; =&amp;gt; {
+            pgrm.instructions.push(Instruction::Add);
+        }
+        &amp;quot;-&amp;quot; =&amp;gt; {
+            pgrm.instructions.push(Instruction::Subtract);
+        }
+
+        &amp;quot;&amp;lt;&amp;quot; =&amp;gt; {
+            pgrm.instructions.push(Instruction::LessThan);
+        }
+        _ =&amp;gt; panic!(
+            &amp;quot;{}&amp;quot;,
+            bop.operator
+                .loc
+                .debug(raw, &amp;quot;Unable to compile binary operation:&amp;quot;)
+        ),
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="expressions"&gt;Expressions&lt;/h4&gt;&lt;p&gt;Compiling expressions just dispatches to a compile helper based on the
+type of expression.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_expression(
+    pgrm: &amp;amp;mut Program,
+    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    locals: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;,
+    exp: Expression,
+) {
+    match exp {
+        Expression::BinaryOperation(bop) =&amp;gt; {
+            compile_binary_operation(pgrm, raw, locals, bop);
+        }
+        Expression::FunctionCall(fc) =&amp;gt; {
+            compile_function_call(pgrm, raw, locals, fc);
+        }
+        Expression::Literal(lit) =&amp;gt; {
+            compile_literal(pgrm, raw, locals, lit);
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="if"&gt;If&lt;/h4&gt;&lt;p&gt;First we compile the test and then we jump to after the if the test result is not zero.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_if(pgrm: &amp;amp;mut Program, raw: &amp;amp;Vec&amp;lt;char&amp;gt;, locals: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;, if_: If) {
+    compile_expression(pgrm, raw, locals, if_.test);
+    let done_label = format!(&amp;quot;if_else_{}&amp;quot;, pgrm.instructions.len());
+    pgrm.instructions
+        .push(Instruction::JumpIfNotZero(done_label.clone()));
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Then we compile the body.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;    for stmt in if_.body {
+        compile_statement(pgrm, raw, locals, stmt);
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And finally make sure we insert the &lt;code&gt;done&lt;/code&gt; symbol in the right place after the if.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;    pgrm.syms.insert(
+        done_label,
+        Symbol {
+            location: pgrm.instructions.len() as i32 - 1,
+            nlocals: 0,
+            narguments: 0,
+        },
+    );
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="return"&gt;Return&lt;/h4&gt;&lt;p&gt;The final statement type is return. We simply compile the return
+expression and issue a return instruction.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;fn compile_return(
+    pgrm: &amp;amp;mut Program,
+    raw: &amp;amp;Vec&amp;lt;char&amp;gt;,
+    locals: &amp;amp;mut HashMap&amp;lt;String, i32&amp;gt;,
+    ret: Return,
+) {
+    compile_expression(pgrm, raw, locals, ret.expression);
+    pgrm.instructions.push(Instruction::Return);
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That's it for the compiler! Now the trickiest part. I lost a few hours
+debugging and iterating on the next bit.&lt;/p&gt;
+&lt;h3 id="the-virtual-machine"&gt;The virtual machine&lt;/h3&gt;&lt;p&gt;Ok so the easy part is that there are two registers, a program counter
+and a stack pointer. There's also a data stack. The stack pointer
+points to the location on the data stack where each function can start
+storing its locals.&lt;/p&gt;
+&lt;p&gt;Evaluation starts from 0 and goes until the last instruction.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;pub fn eval(pgrm: Program) {
+    let mut pc: i32 = 0;
+    let mut sp: i32 = 0;
+    let mut data: Vec&amp;lt;i32&amp;gt; = vec![];
+
+    while pc &amp;lt; pgrm.instructions.len() as i32 {
+        match &amp;amp;pgrm.instructions[pc as usize] {
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Each instruction will be responsible for incrementing the program
+counter or having it jump around.&lt;/p&gt;
+&lt;h4 id="addition,-subtraction,-less-than"&gt;Addition, subtraction, less than&lt;/h4&gt;&lt;p&gt;The easiest ones are the math operators. We just pop off the data
+stack, perform the operation, and store the result.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;            Instruction::Add =&amp;gt; {
+                let right = data.pop().unwrap();
+                let left = data.pop().unwrap();
+                data.push(left + right);
+                pc += 1;
+            }
+            Instruction::Subtract =&amp;gt; {
+                let right = data.pop().unwrap();
+                let left = data.pop().unwrap();
+                data.push(left - right);
+                pc += 1;
+            }
+            Instruction::LessThan =&amp;gt; {
+                let right = data.pop().unwrap();
+                let left = data.pop().unwrap();
+                data.push(if left &amp;lt; right { 1 } else { 0 });
+                pc += 1;
+            }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The &lt;code&gt;store&lt;/code&gt; instruction is another easy one. It just pushes a literal
+number onto the stack.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;            Instruction::Store(n) =&amp;gt; {
+                data.push(*n);
+                pc += 1;
+            }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="jump-variants"&gt;Jump variants&lt;/h4&gt;&lt;p&gt;The jump variants are easy too. Just grab the location and change the
+program counter. If it's a conditional jump then test the condition
+first.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;            Instruction::JumpIfNotZero(label) =&amp;gt; {
+                let top = data.pop().unwrap();
+                if top == 0 {
+                    pc = pgrm.syms[label].location;
+                }
+                pc += 1;
+            }
+            Instruction::Jump(label) =&amp;gt; {
+                pc = pgrm.syms[label].location;
+            }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="loading-from-a-variable"&gt;Loading from a variable&lt;/h4&gt;&lt;p&gt;The &lt;code&gt;MovePlusSP&lt;/code&gt; instruction copies a value from the stack (offset the
+stack pointer) onto the top of the stack. This is for references to
+arguments and locals.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;            Instruction::MovePlusSP(i) =&amp;gt; {
+                let val = data.pop().unwrap();
+                let index = sp as usize + *i;
+                // Accounts for top-level locals
+                while index &amp;gt;= data.len() {
+                    data.push(0);
+                }
+                data[index] = val;
+                pc += 1;
+            }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="storing-locals"&gt;Storing locals&lt;/h4&gt;&lt;p&gt;The &lt;code&gt;DupPlusSP&lt;/code&gt; instruction is used by &lt;code&gt;compile_locals&lt;/code&gt; to store a
+local once compiled onto the stack in the relative position from the
+stack pointer.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;            Instruction::DupPlusSP(i) =&amp;gt; {
+                data.push(data[(sp + i) as usize]);
+                pc += 1;
+            }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="duplicating-arguments"&gt;Duplicating arguments&lt;/h4&gt;&lt;p&gt;The &lt;code&gt;MoveMinusSP&lt;/code&gt; instruction is, again, a hack to work around limited
+addressing methods in this minimal virtual machine. It copies
+arguments from behind the stack pointer to in front of the stack
+pointer.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;            Instruction::MoveMinusSP(local_offset, sp_offset) =&amp;gt; {
+                data[sp as usize + local_offset] = data[(sp - (sp_offset + 4)) as usize];
+                pc += 1;
+            }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now we're down to the last two instructions: call and return.&lt;/p&gt;
+&lt;h4 id="call"&gt;Call&lt;/h4&gt;&lt;p&gt;Call has a special dispatch for builtin functions (the only one that
+exists being &lt;code&gt;print&lt;/code&gt;).&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;            Instruction::Call(label, narguments) =&amp;gt; {
+                // Handle builtin functions
+                if label == &amp;quot;print&amp;quot; {
+                    for _ in 0..*narguments {
+                        print!(&amp;quot;{}&amp;quot;, data.pop().unwrap());
+                        print!(&amp;quot; &amp;quot;);
+                    }
+                    println!(&amp;quot;&amp;quot;);
+                    pc += 1;
+                    continue;
+                }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Otherwise it pushes the current stack pointer, then the program
+counter, and finally the number of arguments (not locals) onto the
+stack for preservation. Then it sets up the new program counter and
+stack pointer and creates space for all locals and arguments after the
+new stack pointer.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;                data.push(sp);
+                data.push(pc + 1);
+                data.push(pgrm.syms[label].narguments as i32);
+                pc = pgrm.syms[label].location;
+                sp = data.len() as i32;
+
+                // Set up space for all arguments/locals
+                let mut nlocals = pgrm.syms[label].nlocals;
+                while nlocals &amp;gt; 0 {
+                    data.push(0);
+                    nlocals -= 1;
+                }
+            }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And yes, this implementation would be more efficient if instead of
+literally pushing and popping we just incremented/decremented a
+data-head-pointer. Feel free to implement that!&lt;/p&gt;
+&lt;h4 id="return"&gt;Return&lt;/h4&gt;&lt;p&gt;The return instructions pops the return value from the stack. Then it
+pops off all locals and arguments. Then it restores the program
+counter and stack pointer, and pops off the arguments before the stack
+pointer. Finally it adds the return value back onto the stack.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs rust"&gt;            Instruction::Return =&amp;gt; {
+                let ret = data.pop().unwrap();
+
+                // Clean up the local stack
+                while sp &amp;lt; data.len() as i32 {
+                    data.pop();
+                }
+
+                // Restore pc and sp
+                let mut narguments = data.pop().unwrap();
+                pc = data.pop().unwrap();
+                sp = data.pop().unwrap();
+
+                // Clean up arguments
+                while narguments &amp;gt; 0 {
+                    data.pop();
+                    narguments -= 1;
+                }
+
+                // Add back return value
+                data.push(ret);
+            }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Is it janky? Yeah. Is it simple? Kind of? Does it work? It seems to!&lt;/p&gt;
+&lt;h3 id="summary"&gt;Summary&lt;/h3&gt;&lt;p&gt;Ok we've got &amp;lt;1200 lines of Rust enough to run some decent Lua
+programs. We run this fib program against this implementation and
+against Lua 5.4.3 (which isn't even LuaJIT) and what do we see?&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ cargo build
+$ cat test/fib.lua
+function fib(n)
+   if n &amp;lt; 2 then
+      return n;
+   end
+
+   local n1 = fib(n-1);
+   local n2 = fib(n-2);
+   return n1 + n2;
+end
+
+print(fib(30));
+$ time ./target/debug/lust test/fib.lua
+832040
+./target/debug/lust test/fib.lua  7.17s user 0.00s system 99% cpu 7.179 total
+$ time lua test/fib.lua
+832040
+lua test/fib.lua  0.06s user 0.00s system 99% cpu 0.063 total
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This implementation is ~exponentially slower. Hurray!&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/lua-in-rust.html</guid><pubDate>Wed, 29 Dec 2021 00:00:00 +0000</pubDate></item><item><title>My favorite software subreddits</title><link>http://notes.eatonphil.com/high-quality-subreddits-you-should-be-following.html</link><description>&lt;p&gt;If you are an experienced software developer whose only exposure to
 reddit is dank memes, &lt;a href="https://reddit.com/r/programming"&gt;proggit&lt;/a&gt; or even
 language-specific subreddits like
 &lt;a href="https://reddit.com/r/python"&gt;/r/python&lt;/a&gt;, you're missing out.&lt;/p&gt;
