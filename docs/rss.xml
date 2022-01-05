@@ -1,5 +1,41 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 03 Jan 2022 15:47:34 +0000</lastBuildDate><item><title>Writing a minimal Lua implementation with a virtual machine from scratch in Rust</title><link>http://notes.eatonphil.com/lua-in-rust.html</link><description>&lt;p&gt;By the end of this guide we'll have a minimal, working implementation
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 05 Jan 2022 16:22:12 +0000</lastBuildDate><item><title>The year in books: 11 to recommend in 2021</title><link>http://notes.eatonphil.com/year-in-books-2021.html</link><description>&lt;p&gt;Last year (2021) I finished 17 books, a five year low. But that's ok!
+4 fiction and 13 non-fiction. Another 30 started but not finished.&lt;/p&gt;
+&lt;h3 id="non-fiction"&gt;Non-fiction&lt;/h3&gt;&lt;p&gt;It seems I was pretty focused on business history books and history of
+tech. The 8 non-fiction books I liked the most:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/34626431-designing-data-intensive-applications"&gt;Designing Data-Intensive Applications&lt;/a&gt;, a must-read for anyone interacting with a database&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/24715220-my-years-with-general-motors"&gt;My Years with General Motors&lt;/a&gt;, the business school classic; truly a good read. But sad to know that shortly after written, GM succumbs to the Japanese and South Korean competition&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/49195924-no-rules-rules"&gt;No Rules Rules: Netflix and the Culture of Reinvention&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/55297149-working-backwards"&gt;Working Backwards: Insights, Stories, and Secrets from Inside Amazon&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/54216469-working-in-public"&gt;Working in Public: The Making and Maintenance of Open Source Software&lt;/a&gt;, my review &lt;a href="https://www.goodreads.com/review/show/3478346828?book_show_action=false&amp;amp;from_review_page=1"&gt;here&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/22401445-intel-trinity-the"&gt;The Intel Trinity&lt;/a&gt;, an early history of Intel&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/19383579-the-hp-way"&gt;The HP Way&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/58208477-play-nice-but-win"&gt;Play Nice But Win&lt;/a&gt;, the story of Dell computers&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/36316219-west-with-the-night"&gt;West with the Night&lt;/a&gt;, beautiful memoir recommended by Ernest Hemingway and written in a similar style. Much more enjoyable than the other more popular colonial-African memoir, Out of Africa.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id="the-rest"&gt;The rest&lt;/h4&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/16059922-pour-your-heart-into-it"&gt;Pour Your Heart Into It: How Starbucks Built a Company One Cup at a Time&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/43063719-jump-starting-america"&gt;Jump-Starting America: How Breakthrough Science Can Revive Economic Growth and the American Dream&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/9118033-rework"&gt;ReWork&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/297901.Russia_and_the_Russians"&gt;Russia and the Russians: A History&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id="fiction"&gt;Fiction&lt;/h3&gt;&lt;p&gt;The 3 fiction books I liked the most:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/12970829-a-very-british-coup"&gt;A Very British Coup&lt;/a&gt;, hilarious and depressing. A great companion to the TV show "Yes, Minister"&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/8862633-mort"&gt;Mort&lt;/a&gt;, Terry Pratchett is a very funny author&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/18625885-selected-stories-of-philip-k-dick"&gt;Selected Stories of Philip K Dick&lt;/a&gt;, depressing and dystopian but very well written. I would not read again because it's too depressing&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id="the-rest"&gt;The rest&lt;/h4&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://www.goodreads.com/book/show/51135871-there-and-never-ever-back-again"&gt;There and NEVER, EVER BACK AGAIN: A Dark Lord's Diary&lt;/a&gt;, I was looking for more parodies like Bored of the Rings (which itself wasn't great). This was worse&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id="2022"&gt;2022&lt;/h3&gt;&lt;p&gt;This year I'm interested in continuing to find good business books and
+good books on the history of tech. I'm also getting into more American
+history to make up for all the years of not paying attention in high
+school.&lt;/p&gt;
+&lt;p&gt;I'm continuing to try to find good memoirs and fiction by non-English
+authors.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/year-in-books-2021.html</guid><pubDate>Wed, 05 Jan 2022 00:00:00 +0000</pubDate></item><item><title>Writing a minimal Lua implementation with a virtual machine from scratch in Rust</title><link>http://notes.eatonphil.com/lua-in-rust.html</link><description>&lt;p&gt;By the end of this guide we'll have a minimal, working implementation
 of a small part of Lua from scratch. It will be able to run the
 following program (among others):&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs lua"&gt;function fib(n)
