@@ -3,17 +3,27 @@
 ###### assembly,bootloaders
 
 I spent a few days playing around with bootloaders for the first
-time. Some of code here is buggy. But it's hard to find intermediate
-resources for bootloader programming so maybe parts of this will still
-be useful.
+time. This post builds up to a text editor with a few keyboard
+shortcuts.
 
-By the end of this post we'll have a small little text editor
-bootloader program.
+There are a definitely bugs. But it's hard to find intermediate
+resources for bootloader programming so maybe parts of this will be
+useful.
 
-### Snake
+If you already know the basics and the intermediates and just want a
+fantastic intermediate+ tutorial, maybe try
+[this](https://0x00sec.org/t/realmode-assembly-writing-bootable-stuff-part-5/3667). It
+is very good.
+
+The code on this post is available on
+[Github](https://github.com/eatonphil/bootloaders), but it's more of a
+mess than my usual project.
+
+### Motivation: Snake
 
 You remember [snake bootloader in a
-tweet](https://www.quaxio.com/bootloader_retro_game_tweet/)?
+tweet](https://www.quaxio.com/bootloader_retro_game_tweet/) from a few
+years ago?
 
 Install qemu (on macOS or Linux), nasm, and copy the `snake.asm`
 source code to disk from that blog post.
@@ -112,18 +122,12 @@ $ nasm -f bin snake.asm -o snake.bin
 $ qemu-system-x86_64 -fda snake.bin
 ```
 
-![Screenshot of snake bootloader](bootloader-basics-snake.gif)
+![Recording of snake bootloader](bootloader-basics-snake.gif)
 
 What a phenomenal hack.
 
-In this post I'll walk through some basics of bootloaders that I
-learned while I played around with making a few simple bootloader
-programs. I'm not going to get anywhere near that level of
-sophistication but I think it's excellent motivation.
-
-The source code for all of these programs and links to more resources
-are [messily available on
-Github](https://github.com/eatonphil/bootloaders).
+I'm not going to get anywhere near that level of sophistication in
+this post but I think it's great motivation.
 
 ### Hello world
 
@@ -132,7 +136,8 @@ I/O. Since you're thinking about bootloaders you already know assembly
 basics. Now all you have to do is learn the APIs.
 
 The hello world bootloader has been explained in detail (see
-[here](https://github.com/briansteffens/briansteffens.github.io/blob/master/blog/hello-world-from-a-bootloader/post.md)
+[here](https://github.com/briansteffens/briansteffens.github.io/blob/master/blog/hello-world-from-a-bootloader/post.md),
+[here](https://www.ired.team/miscellaneous-reversing-forensics/windows-kernel-internals/writing-a-custom-bootloader),
 and [here](http://3zanders.co.uk/2017/10/13/writing-a-bootloader/)) so
 I won't go into too much line-by-line depth.
 
@@ -160,8 +165,7 @@ times 510 - ($-$$) db 0 ; pad remaining 510 bytes with zeroes
 dw 0xaa55 ; magic bootloader magic - marks this 512 byte sector bootable!
 ```
 
-This is one of the simplest "operating systems" you can write. The
-computer boots, prints "Hello world!" and hangs.
+The computer boots, prints "Hello world!" and hangs.
 
 But aside from clerical settings (16-bit assembly, where the program
 exists in memory, padding to 512 bytes) the only real bootloader-y
@@ -229,10 +233,9 @@ screen.
 
 #### All together
 
-Since the display function reads from the same function the input
-function outputs to, we can just call both interrupts after
-eachother. Wrap this in a loop and we have the world's dumbest
-editor-operating system.
+Since the display function reads from the same register the input
+function outputs to, we can just call both interrupts after each
+other. Wrap this in a loop and we have the world's worst editor.
 
 ```
 $ cat ioloop.asm
@@ -247,7 +250,7 @@ main:
 
 .loop:
         ;; Read character
-        mov ah, 0x01
+        mov ah, 0
         int 0x16
 
         ;; Print character
@@ -273,7 +276,7 @@ $ nasm -f bin ioloop.asm -o ioloop.bin
 $ qemu-system-x86_64 -fda ioloop.bin
 ```
 
-![Screenshot of snake bootloader](bootloader-basics-ioloop.gif)
+![Recording of ioloop bootloader](bootloader-basics-ioloop.gif)
 
 ### Digression on abstraction
 
@@ -311,7 +314,7 @@ main:
 
 .loop:
         ;; Read character
-        mov ah, 0x01
+        mov ah, 0
         int 0x16
 
         ;; Print character
@@ -343,7 +346,7 @@ main:
 
 .loop:
         ;; Read character
-        mov ah, 0x01
+        mov ah, 0
         int 0x16
 
         ;; Print character
@@ -366,81 +369,7 @@ code every place you use a macro. The amount of generated code
 eventually becomes important in bootloaders because the code must
 fit into 512 bytes.
 
-### Digression on debugging
-
-I couldn't figure out how to get GDB attached. And you can't just
-print integers other than 0-9 because those are the only numbers in
-ASCII.
-
-So rather than spending more time figuring out how to get GDB attached
-I wrote two helper functions for displaying integers.
-
-First off a macro for printing a single ASCII character:
-
-```assembly
-%macro print_character 1
-        mov ax, %1
-        mov ah, 0x0e
-        int 0x10
-%endmacro
-```
-
-Then a macro that does division and adds 48 to the quotient (turning it into an ASCII number):
-
-```assembly
-%macro div3 3
-        mov eax, %2
-        mov ecx, %3
-        mov edx, 0
-        div ecx
-        add eax, 48             ; Convert to ascii number
-%endmacro
-```
-
-Then a macro for printing the at-most 3 digits of an 8-bit number:
-
-```assembly
-%macro print_uint8 1
-        mov eax, %1
-        and eax, 0xFF           ; Drop greater digits
-        div3 ax, eax, 100
-        print_character ax
-        div3 ax, edx, 10
-        print_character ax
-        add dx, 48              ; Convert remainder to ascii number
-        print_character dx
-%endmacro
-```
-
-The bitmask in the second line allows us to only print the first byte
-of a larger number.
-
-Otherwise we display the quotient of division by 100, then divide the
-remainder of that by 10 and print that quotient, and then the final
-remainder is the digit in the 1-s place.
-
-Finally, we can build a 2-byte version of this:
-
-```assembly
-%macro print_uint16 1
-        mov eax, %1
-        and eax, 0xFFFF         ; Drop greater digits
-        div3 ax, %1, 10000
-        print_character ax
-        div3 ax, edx, 1000
-        print_character ax
-        div3 ax, eax, 100
-        print_character ax
-        div3 ax, edx, 10
-        print_character ax
-        add dx, 48              ; Convert remainder to ascii number
-        print_character dx
-%endmacro
-```
-
-But we can't just reuse the code of the <code>print_uint8</code> macro
-because of the bitmask it does. A value like <code>300</code> would be
-printed incorrectly in that case.
+I lean more toward using macros in this code.
 
 ### Complex input
 
@@ -460,12 +389,12 @@ we can build a macro for reading the pressed character:
 
 ```assembly
 %macro mov_read_character_into 1
-	mov eax, [0x041a]
-	add eax, 0x03fe 	; Offset from 0x0400 - sizeof(uint16) (since head points to next free slot, not last/current slot)
-	and eax, 0xFFFF
+  mov eax, [0x041a]
+  add eax, 0x03fe   ; Offset from 0x0400 - sizeof(uint16) (since head points to next free slot, not last/current slot)
+  and eax, 0xFFFF
 
-	mov %1, [eax]
-	and %1, 0xFF
+  mov %1, [eax]
+  and %1, 0xFF
 %endmacro
 ```
 
@@ -473,8 +402,8 @@ And another macro for reading the pressed control character (if any):
 
 ```assembly
 %macro mov_read_ctrl_flag_into 1
-	mov %1, [0x0417]
-	and %1, 0x04 		; Grab 3rd bit: %1 & 0b0100
+  mov %1, [0x0417]
+  and %1, 0x04    ; Grab 3rd bit: %1 & 0b0100
 %endmacro
 ```
 
@@ -486,13 +415,13 @@ beginning of line).
 
 ```assembly
 %macro get_position 0
-	mov ah, 0x03
-	int 0x10
+  mov ah, 0x03
+  int 0x10
 %endmacro
 
 %macro set_position 0
-	mov ah, 0x02
-	int 0x10
+  mov ah, 0x02
+  int 0x10
 %endmacro
 ```
 
@@ -506,19 +435,19 @@ environment/language.
 ```assembly
 goto_end_of_line:
 ;; Get current character
-	mov ah, 0x08
-	int 0x10
+  mov ah, 0x08
+  int 0x10
 
 ;; Iterate until the character is null
-	cmp al, 0
-	jz .done
+  cmp al, 0
+  jz .done
 
-	inc dl
-	set_position
-	jmp goto_end_of_line
+  inc dl
+  set_position
+  jmp goto_end_of_line
 
 .done:
-	ret
+  ret
 ```
 
 Alright, let's put all these pieces together.
@@ -533,16 +462,16 @@ Start with the basics in `editor.asm`.
 bits 16
 org 0x7c00
 
-	jmp main
+  jmp main
 ```
 
 Then add a clear screen macro.
 
 ```assembly
 %macro cls 0
-	mov ah, 0x00
-	mov al, 0x03
-	int 0x10
+  mov ah, 0x00
+  mov al, 0x03
+  int 0x10
 %endmacro
 ```
 
@@ -550,48 +479,15 @@ Add macros for reading and printing.
 
 ```assembly
 %macro read_character 0
-	;; Read character
-	mov ah, 0
-	int 0x16
+  ;; Read character
+  mov ah, 0
+  int 0x16
 %endmacro
 
 %macro print_character 1
-	mov ax, %1
- 	mov ah, 0x0e
- 	int 0x10
-%endmacro
-```
-
-Add macros for debugging integers.
-
-```assembly
-%macro div3 3
-	mov eax, %2
-	mov ecx, %3
-	mov edx, 0
-	div ecx
-	add eax, 48 		; Convert to ascii number
-%endmacro
-
-%macro print_uint8 1
-	mov eax, %1
-	and eax, 0xFF		; Drop greater digits
-	div3 ax, eax, 100
-	print_character ax
-	div3 ax, edx, 10
-	print_character ax
-	add dx, 48 		; Convert remainder to ascii number
-	print_character dx
-%endmacro
-
-%macro print_uint16 1
-	mov eax, %1
-	and eax, 0xFFFF		; Drop greater digits
-	div3 ax, %1, 10000
-	print_character ax
-	div3 ax, edx, 1000
-	print_character ax
-	print_uint8 edx
+  mov ax, %1
+  mov ah, 0x0e
+  int 0x10
 %endmacro
 ```
 
@@ -599,47 +495,47 @@ Add cursor utilities.
 
 ```assembly
 %macro get_position 0
-	mov ah, 0x03
-	int 0x10
+  mov ah, 0x03
+  int 0x10
 %endmacro
 
 %macro set_position 0
-	mov ah, 0x02
-	int 0x10
+  mov ah, 0x02
+  int 0x10
 %endmacro
 
 goto_end_of_line:
 ;; Get current character
-	mov ah, 0x08
-	int 0x10
+  mov ah, 0x08
+  int 0x10
 
 ;; Iterate until the character is null
-	cmp al, 0
-	jz .done
+  cmp al, 0
+  jz .done
 
-	inc dl
-	set_position
-	jmp goto_end_of_line
+  inc dl
+  set_position
+  jmp goto_end_of_line
 
 .done:
-	ret
+  ret
 ```
 
 And keyboard utilities.
 
 ```assembly
 %macro mov_read_ctrl_flag_into 1
-	mov %1, [0x0417]
-	and %1, 0x04 		; Grab 3rd bit: %1 & 0b0100
+  mov %1, [0x0417]
+  and %1, 0x04    ; Grab 3rd bit: %1 & 0b0100
 %endmacro
 
 %macro mov_read_character_into 1
-	mov eax, [0x041a]
-	add eax, 0x03fe 	; Offset from 0x0400 - sizeof(uint16) (since head points to next free slot, not last/current slot)
-	and eax, 0xFFFF
+  mov eax, [0x041a]
+  add eax, 0x03fe   ; Offset from 0x0400 - sizeof(uint16) (since head points to next free slot, not last/current slot)
+  and eax, 0xFFFF
 
-	mov %1, [eax]
-	and %1, 0xFF
+  mov %1, [eax]
+  and %1, 0xFF
 %endmacro
 ```
 
@@ -648,7 +544,7 @@ handle it.
 
 ```assembly
 editor_action:
-	read_character
+  read_character
 ```
 
 Don't print ASCII garbage if the key pressed is an arrow key. Just do
@@ -657,45 +553,39 @@ limited one.)
 
 ```assembly
 ;; Ignore arrow keys
-	cmp ah, 0x4b 		; Left
-	jz .done
-	cmp ah, 0x50 		; Down
-	jz .done
-	cmp ah, 0x4d 		; Right
-	jz .done
-	cmp ah, 0x48 		; Up
-	jz .done
+  cmp ah, 0x4b    ; Left
+  jz .done
+  cmp ah, 0x50    ; Down
+  jz .done
+  cmp ah, 0x4d    ; Right
+  jz .done
+  cmp ah, 0x48    ; Up
+  jz .done
 ```
 
 Next handle backspace.
 
 ```assembly
 ;; Handle backspace
- 	cmp al, 0x08
- 	jz .is_backspace
+  cmp al, 0x08
+  jz .is_backspace
 
- 	cmp al, 0x7F 		; For mac keyboards
- 	jnz .done_backspace
+  cmp al, 0x7F    ; For mac keyboards
+  jnz .done_backspace
 
 .is_backspace:
 
- 	get_position
+  get_position
 ```
 
 If this key is pressed at the first line and the first column, do
 nothing.
 
 ```assembly
-;; Handle backspace
- 	cmp al, 0x08
- 	jz .is_backspace
-
- 	cmp al, 0x7F 		; For mac keyboards
- 	jnz .done_backspace
-
-.is_backspace:
-
- 	get_position
+;; Handle 0,0 coordinate (do nothing)
+  mov al, dh
+  add al, dl
+  jz .overwrite_character
 ```
 
 Otherwise if backspace is pressed not at the beginning of the line,
@@ -703,11 +593,11 @@ just overwrite the last character with the ASCII 0 (the code 0 not the
 digit 0).
 
 ```assembly
- 	cmp dl, 0
- 	jz .backspace_at_start_of_line
- 	dec dl 			; Decrement column
- 	set_position
- 	jmp .overwrite_character
+  cmp dl, 0
+  jz .backspace_at_start_of_line
+  dec dl      ; Decrement column
+  set_position
+  jmp .overwrite_character
 ```
 
 Otherwise you're at the beginning of the line and you need to jump to
@@ -715,17 +605,17 @@ the end of the previous line.
 
 ```assembly
 .backspace_at_start_of_line:
- 	dec dh 			; Decrement row
- 	set_position
+  dec dh      ; Decrement row
+  set_position
 
- 	call goto_end_of_line
+  call goto_end_of_line
 
 .overwrite_character:
- 	mov al, 0
- 	mov ah, 0x0a
- 	int 0x10
+  mov al, 0
+  mov ah, 0x0a
+  int 0x10
 
- 	jmp .done
+  jmp .done
 
 .done_backspace:
 ```
@@ -735,18 +625,18 @@ next line and set the column back to zero.
 
 ```assembly
 ;; Handle enter
-	mov_read_character_into ax
- 	cmp al, 0x0d
- 	jnz .done_enter
+  mov_read_character_into ax
+  cmp al, 0x0d
+  jnz .done_enter
 
- 	get_position
- 	inc dh 			; Increment line
- 	mov dl, 0 		; Reset column
- 	set_position
+  get_position
+  inc dh      ; Increment line
+  mov dl, 0     ; Reset column
+  set_position
 
- 	jmp .done
+  jmp .done
 
-.done enter
+.done_enter:
 ```
 
 Next we handle ctrl-a, jump to start of line.
@@ -755,19 +645,19 @@ Next we handle ctrl-a, jump to start of line.
 ;; Handle ctrl- shortcuts
 
 ;; Check ctrl key
-	mov_read_ctrl_flag_into ax
-  	jz .ctrl_not_set
+  mov_read_ctrl_flag_into ax
+    jz .ctrl_not_set
 
 ;; Handle ctrl-a shortcut
-	mov_read_character_into ax
-	cmp al, 1 		; For some reason with ctlr, these are offset from a-z
-	jnz .not_ctrl_a
+  mov_read_character_into ax
+  cmp al, 1     ; For some reason with ctlr, these are offset from a-z
+  jnz .not_ctrl_a
 
 ;; Reset column
-  	mov dl, 0
-  	set_position
+    mov dl, 0
+    set_position
 
-  	jmp .done
+    jmp .done
 
 .not_ctrl_a:
 ```
@@ -776,15 +666,15 @@ For ctrl-e, jump to the end of the line.
 
 ```assembly
 ;; Handle ctrl-e shortcut
-	mov_read_character_into ax
-	cmp al, 5
-	jnz .not_ctrl_e
+  mov_read_character_into ax
+  cmp al, 5
+  jnz .not_ctrl_e
 
-	call goto_end_of_line
-	jmp .done
+  call goto_end_of_line
+  jmp .done
 
 .not_ctrl_e:
- 	jmp .done
+  jmp .done
 
 .ctrl_not_set:
 ```
@@ -792,22 +682,22 @@ For ctrl-e, jump to the end of the line.
 Finally if none of these cases are met, just print the pressed character and return.
 
 ```assembly
-	mov_read_character_into ax
-	print_character ax
+  mov_read_character_into ax
+  print_character ax
 
 .done:
-	ret
+  ret
 ```
 
 Finally, create the main function that calls this editor code in a loop.
 
 ```assembly
 main:
-	cls
+  cls
 
 .loop:
-	call editor_action
-	jmp .loop
+  call editor_action
+  jmp .loop
 
 times 510 - ($-$$) db 0 ; pad remaining 510 bytes with zeroes
 dw 0xaa55 ; magic bootloader magic - marks this 512 byte sector bootable!
@@ -820,4 +710,6 @@ $ nasm -f bin editor.asm -o editor.bin
 $ qemu-system-x86_64 -fda editor.bin
 ```
 
-![A bad editor](bootloader-basics-editor.gif)
+![Recording of a bad editor](bootloader-basics-editor.gif)
+
+Tedious and buggy! But I learned something, I think.

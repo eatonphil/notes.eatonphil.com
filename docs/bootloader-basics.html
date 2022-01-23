@@ -44,13 +44,21 @@
     <div class="container">
       <div class="col-6">
         <p>I spent a few days playing around with bootloaders for the first
-time. Some of code here is buggy. But it's hard to find intermediate
-resources for bootloader programming so maybe parts of this will still
-be useful.</p>
-<p>By the end of this post we'll have a small little text editor
-bootloader program.</p>
-<h3 id="snake">Snake</h3><p>You remember <a href="https://www.quaxio.com/bootloader_retro_game_tweet/">snake bootloader in a
-tweet</a>?</p>
+time. This post builds up to a text editor with a few keyboard
+shortcuts.</p>
+<p>There are a definitely bugs. But it's hard to find intermediate
+resources for bootloader programming so maybe parts of this will be
+useful.</p>
+<p>If you already know the basics and the intermediates and just want a
+fantastic intermediate+ tutorial, maybe try
+<a href="https://0x00sec.org/t/realmode-assembly-writing-bootable-stuff-part-5/3667">this</a>. It
+is very good.</p>
+<p>The code on this post is available on
+<a href="https://github.com/eatonphil/bootloaders">Github</a>, but it's more of a
+mess than my usual project.</p>
+<h3 id="motivation:-snake">Motivation: Snake</h3><p>You remember <a href="https://www.quaxio.com/bootloader_retro_game_tweet/">snake bootloader in a
+tweet</a> from a few
+years ago?</p>
 <p>Install qemu (on macOS or Linux), nasm, and copy the <code>snake.asm</code>
 source code to disk from that blog post.</p>
 <pre><code class="hljs assembly">$ cat snake.asm
@@ -142,20 +150,16 @@ dw 0xaa55                              ; Boot signature at the end of bootloader
 <pre><code class="hljs bash">$ nasm -f bin snake.asm -o snake.bin
 $ qemu-system-x86_64 -fda snake.bin
 </code></pre>
-<p><img src="bootloader-basics-snake.gif" alt="Screenshot of snake bootloader"></p>
+<p><img src="bootloader-basics-snake.gif" alt="Recording of snake bootloader"></p>
 <p>What a phenomenal hack.</p>
-<p>In this post I'll walk through some basics of bootloaders that I
-learned while I played around with making a few simple bootloader
-programs. I'm not going to get anywhere near that level of
-sophistication but I think it's excellent motivation.</p>
-<p>The source code for all of these programs and links to more resources
-are <a href="https://github.com/eatonphil/bootloaders">messily available on
-Github</a>.</p>
+<p>I'm not going to get anywhere near that level of sophistication in
+this post but I think it's great motivation.</p>
 <h3 id="hello-world">Hello world</h3><p>Bootloaders are a mix of assembly programming and BIOS APIs for
 I/O. Since you're thinking about bootloaders you already know assembly
 basics. Now all you have to do is learn the APIs.</p>
 <p>The hello world bootloader has been explained in detail (see
-<a href="https://github.com/briansteffens/briansteffens.github.io/blob/master/blog/hello-world-from-a-bootloader/post.md">here</a>
+<a href="https://github.com/briansteffens/briansteffens.github.io/blob/master/blog/hello-world-from-a-bootloader/post.md">here</a>,
+<a href="https://www.ired.team/miscellaneous-reversing-forensics/windows-kernel-internals/writing-a-custom-bootloader">here</a>,
 and <a href="http://3zanders.co.uk/2017/10/13/writing-a-bootloader/">here</a>) so
 I won't go into too much line-by-line depth.</p>
 <p>In fact, let's just pull the code from the latter blog post.</p>
@@ -179,8 +183,7 @@ hello: db &quot;Hello world!&quot;,0
 times 510 - ($-$$) db 0 ; pad remaining 510 bytes with zeroes
 dw 0xaa55 ; magic bootloader magic - marks this 512 byte sector bootable!
 </code></pre>
-<p>This is one of the simplest "operating systems" you can write. The
-computer boots, prints "Hello world!" and hangs.</p>
+<p>The computer boots, prints "Hello world!" and hangs.</p>
 <p>But aside from clerical settings (16-bit assembly, where the program
 exists in memory, padding to 512 bytes) the only real bootloader-y
 magic in there is <code>int 0x10</code>, a BIOS interrupt.</p>
@@ -223,10 +226,9 @@ screen.</p>
         mov al, 0x03
         int 0x10
 </code></pre>
-<h4 id="all-together">All together</h4><p>Since the display function reads from the same function the input
-function outputs to, we can just call both interrupts after
-eachother. Wrap this in a loop and we have the world's dumbest
-editor-operating system.</p>
+<h4 id="all-together">All together</h4><p>Since the display function reads from the same register the input
+function outputs to, we can just call both interrupts after each
+other. Wrap this in a loop and we have the world's worst editor.</p>
 <pre><code>$ cat ioloop.asm
 bits 16
 org 0x7c00
@@ -239,7 +241,7 @@ main:
 
 .loop:
         ;; Read character
-        mov ah, 0x01
+        mov ah, 0
         int 0x16
 
         ;; Print character
@@ -259,7 +261,7 @@ dw 0xaa55 ; magic bootloader magic - marks this 512 byte sector bootable!
 <pre><code class="hljs bash">$ nasm -f bin ioloop.asm -o ioloop.bin
 $ qemu-system-x86_64 -fda ioloop.bin
 </code></pre>
-<p><img src="bootloader-basics-ioloop.gif" alt="Screenshot of snake bootloader"></p>
+<p><img src="bootloader-basics-ioloop.gif" alt="Recording of ioloop bootloader"></p>
 <h3 id="digression-on-abstraction">Digression on abstraction</h3><p>There are two ways to build abstractions: assembly functions and nasm
 macros.</p>
 <p>We could build a clear screen function like this:</p>
@@ -288,7 +290,7 @@ main:
 
 .loop:
         ;; Read character
-        mov ah, 0x01
+        mov ah, 0
         int 0x16
 
         ;; Print character
@@ -317,7 +319,7 @@ main:
 
 .loop:
         ;; Read character
-        mov ah, 0x01
+        mov ah, 0
         int 0x16
 
         ;; Print character
@@ -337,63 +339,7 @@ stack. The benefit of a function call is that you're not duplicating
 code every place you use a macro. The amount of generated code
 eventually becomes important in bootloaders because the code must
 fit into 512 bytes.</p>
-<h3 id="digression-on-debugging">Digression on debugging</h3><p>I couldn't figure out how to get GDB attached. And you can't just
-print integers other than 0-9 because those are the only numbers in
-ASCII.</p>
-<p>So rather than spending more time figuring out how to get GDB attached
-I wrote two helper functions for displaying integers.</p>
-<p>First off a macro for printing a single ASCII character:</p>
-<pre><code class="hljs assembly">%macro print_character 1
-        mov ax, %1
-        mov ah, 0x0e
-        int 0x10
-%endmacro
-</code></pre>
-<p>Then a macro that does division and adds 48 to the quotient (turning it into an ASCII number):</p>
-<pre><code class="hljs assembly">%macro div3 3
-        mov eax, %2
-        mov ecx, %3
-        mov edx, 0
-        div ecx
-        add eax, 48             ; Convert to ascii number
-%endmacro
-</code></pre>
-<p>Then a macro for printing the at-most 3 digits of an 8-bit number:</p>
-<pre><code class="hljs assembly">%macro print_uint8 1
-        mov eax, %1
-        and eax, 0xFF           ; Drop greater digits
-        div3 ax, eax, 100
-        print_character ax
-        div3 ax, edx, 10
-        print_character ax
-        add dx, 48              ; Convert remainder to ascii number
-        print_character dx
-%endmacro
-</code></pre>
-<p>The bitmask in the second line allows us to only print the first byte
-of a larger number.</p>
-<p>Otherwise we display the quotient of division by 100, then divide the
-remainder of that by 10 and print that quotient, and then the final
-remainder is the digit in the 1-s place.</p>
-<p>Finally, we can build a 2-byte version of this:</p>
-<pre><code class="hljs assembly">%macro print_uint16 1
-        mov eax, %1
-        and eax, 0xFFFF         ; Drop greater digits
-        div3 ax, %1, 10000
-        print_character ax
-        div3 ax, edx, 1000
-        print_character ax
-        div3 ax, eax, 100
-        print_character ax
-        div3 ax, edx, 10
-        print_character ax
-        add dx, 48              ; Convert remainder to ascii number
-        print_character dx
-%endmacro
-</code></pre>
-<p>But we can't just reuse the code of the <code>print_uint8</code> macro
-because of the bitmask it does. A value like <code>300</code> would be
-printed incorrectly in that case.</p>
+<p>I lean more toward using macros in this code.</p>
 <h3 id="complex-input">Complex input</h3><p>Reading ASCII characters is not complicated as we saw above. But what
 if we want to build Readline style shortcuts like Ctrl-e for jumping
 to the start of the line?</p>
@@ -406,31 +352,31 @@ pressed.</p>
 <a href="https://www.tau.ac.il/~flaxer/edu/course/processcontrol/BiosDataArea.pdf">here</a>),
 we can build a macro for reading the pressed character:</p>
 <pre><code class="hljs assembly">%macro mov_read_character_into 1
-    mov eax, [0x041a]
-    add eax, 0x03fe     ; Offset from 0x0400 - sizeof(uint16) (since head points to next free slot, not last/current slot)
-    and eax, 0xFFFF
+  mov eax, [0x041a]
+  add eax, 0x03fe   ; Offset from 0x0400 - sizeof(uint16) (since head points to next free slot, not last/current slot)
+  and eax, 0xFFFF
 
-    mov %1, [eax]
-    and %1, 0xFF
+  mov %1, [eax]
+  and %1, 0xFF
 %endmacro
 </code></pre>
 <p>And another macro for reading the pressed control character (if any):</p>
 <pre><code class="hljs assembly">%macro mov_read_ctrl_flag_into 1
-    mov %1, [0x0417]
-    and %1, 0x04        ; Grab 3rd bit: %1 &amp; 0b0100
+  mov %1, [0x0417]
+  and %1, 0x04    ; Grab 3rd bit: %1 &amp; 0b0100
 %endmacro
 </code></pre>
 <h3 id="cursor-location">Cursor location</h3><p>Lastly we'll use some cursor APIs that that allow us to handle
 newlines, backspace on the first column of a line, and ctrl-e (jump to
 beginning of line).</p>
 <pre><code class="hljs assembly">%macro get_position 0
-    mov ah, 0x03
-    int 0x10
+  mov ah, 0x03
+  int 0x10
 %endmacro
 
 %macro set_position 0
-    mov ah, 0x02
-    int 0x10
+  mov ah, 0x02
+  int 0x10
 %endmacro
 </code></pre>
 <p>But there's something buggy about my <code>goto_end_of_line</code>
@@ -441,19 +387,19 @@ not in some program state like you might do in a high-level
 environment/language.</p>
 <pre><code class="hljs assembly">goto_end_of_line:
 ;; Get current character
-    mov ah, 0x08
-    int 0x10
+  mov ah, 0x08
+  int 0x10
 
 ;; Iterate until the character is null
-    cmp al, 0
-    jz .done
+  cmp al, 0
+  jz .done
 
-    inc dl
-    set_position
-    jmp goto_end_of_line
+  inc dl
+  set_position
+  jmp goto_end_of_line
 
 .done:
-    ret
+  ret
 </code></pre>
 <p>Alright, let's put all these pieces together.</p>
 <h3 id="editor-with-keyboard-shortcuts">Editor with keyboard shortcuts</h3><p>Start with the basics in <code>editor.asm</code>.</p>
@@ -462,196 +408,160 @@ environment/language.</p>
 bits 16
 org 0x7c00
 
-    jmp main
+  jmp main
 </code></pre>
 <p>Then add a clear screen macro.</p>
 <pre><code class="hljs assembly">%macro cls 0
-    mov ah, 0x00
-    mov al, 0x03
-    int 0x10
+  mov ah, 0x00
+  mov al, 0x03
+  int 0x10
 %endmacro
 </code></pre>
 <p>Add macros for reading and printing.</p>
 <pre><code class="hljs assembly">%macro read_character 0
-    ;; Read character
-    mov ah, 0
-    int 0x16
+  ;; Read character
+  mov ah, 0
+  int 0x16
 %endmacro
 
 %macro print_character 1
-    mov ax, %1
-    mov ah, 0x0e
-    int 0x10
-%endmacro
-</code></pre>
-<p>Add macros for debugging integers.</p>
-<pre><code class="hljs assembly">%macro div3 3
-    mov eax, %2
-    mov ecx, %3
-    mov edx, 0
-    div ecx
-    add eax, 48         ; Convert to ascii number
-%endmacro
-
-%macro print_uint8 1
-    mov eax, %1
-    and eax, 0xFF       ; Drop greater digits
-    div3 ax, eax, 100
-    print_character ax
-    div3 ax, edx, 10
-    print_character ax
-    add dx, 48      ; Convert remainder to ascii number
-    print_character dx
-%endmacro
-
-%macro print_uint16 1
-    mov eax, %1
-    and eax, 0xFFFF     ; Drop greater digits
-    div3 ax, %1, 10000
-    print_character ax
-    div3 ax, edx, 1000
-    print_character ax
-    print_uint8 edx
+  mov ax, %1
+  mov ah, 0x0e
+  int 0x10
 %endmacro
 </code></pre>
 <p>Add cursor utilities.</p>
 <pre><code class="hljs assembly">%macro get_position 0
-    mov ah, 0x03
-    int 0x10
+  mov ah, 0x03
+  int 0x10
 %endmacro
 
 %macro set_position 0
-    mov ah, 0x02
-    int 0x10
+  mov ah, 0x02
+  int 0x10
 %endmacro
 
 goto_end_of_line:
 ;; Get current character
-    mov ah, 0x08
-    int 0x10
+  mov ah, 0x08
+  int 0x10
 
 ;; Iterate until the character is null
-    cmp al, 0
-    jz .done
+  cmp al, 0
+  jz .done
 
-    inc dl
-    set_position
-    jmp goto_end_of_line
+  inc dl
+  set_position
+  jmp goto_end_of_line
 
 .done:
-    ret
+  ret
 </code></pre>
 <p>And keyboard utilities.</p>
 <pre><code class="hljs assembly">%macro mov_read_ctrl_flag_into 1
-    mov %1, [0x0417]
-    and %1, 0x04        ; Grab 3rd bit: %1 &amp; 0b0100
+  mov %1, [0x0417]
+  and %1, 0x04    ; Grab 3rd bit: %1 &amp; 0b0100
 %endmacro
 
 %macro mov_read_character_into 1
-    mov eax, [0x041a]
-    add eax, 0x03fe     ; Offset from 0x0400 - sizeof(uint16) (since head points to next free slot, not last/current slot)
-    and eax, 0xFFFF
+  mov eax, [0x041a]
+  add eax, 0x03fe   ; Offset from 0x0400 - sizeof(uint16) (since head points to next free slot, not last/current slot)
+  and eax, 0xFFFF
 
-    mov %1, [eax]
-    and %1, 0xFF
+  mov %1, [eax]
+  and %1, 0xFF
 %endmacro
 </code></pre>
 <p>Now we can start the editor loop where we wait for a keypress and
 handle it.</p>
 <pre><code class="hljs assembly">editor_action:
-    read_character
+  read_character
 </code></pre>
 <p>Don't print ASCII garbage if the key pressed is an arrow key. Just do
 nothing. (This isn't good editor behavior in general but ours is a
 limited one.)</p>
 <pre><code class="hljs assembly">;; Ignore arrow keys
-    cmp ah, 0x4b        ; Left
-    jz .done
-    cmp ah, 0x50        ; Down
-    jz .done
-    cmp ah, 0x4d        ; Right
-    jz .done
-    cmp ah, 0x48        ; Up
-    jz .done
+  cmp ah, 0x4b    ; Left
+  jz .done
+  cmp ah, 0x50    ; Down
+  jz .done
+  cmp ah, 0x4d    ; Right
+  jz .done
+  cmp ah, 0x48    ; Up
+  jz .done
 </code></pre>
 <p>Next handle backspace.</p>
 <pre><code class="hljs assembly">;; Handle backspace
-    cmp al, 0x08
-    jz .is_backspace
+  cmp al, 0x08
+  jz .is_backspace
 
-    cmp al, 0x7F        ; For mac keyboards
-    jnz .done_backspace
+  cmp al, 0x7F    ; For mac keyboards
+  jnz .done_backspace
 
 .is_backspace:
 
-    get_position
+  get_position
 </code></pre>
 <p>If this key is pressed at the first line and the first column, do
 nothing.</p>
-<pre><code class="hljs assembly">;; Handle backspace
-    cmp al, 0x08
-    jz .is_backspace
-
-    cmp al, 0x7F        ; For mac keyboards
-    jnz .done_backspace
-
-.is_backspace:
-
-    get_position
+<pre><code class="hljs assembly">;; Handle 0,0 coordinate (do nothing)
+  mov al, dh
+  add al, dl
+  jz .overwrite_character
 </code></pre>
 <p>Otherwise if backspace is pressed not at the beginning of the line,
 just overwrite the last character with the ASCII 0 (the code 0 not the
 digit 0).</p>
-<pre><code class="hljs assembly">    cmp dl, 0
-    jz .backspace_at_start_of_line
-    dec dl          ; Decrement column
-    set_position
-    jmp .overwrite_character
+<pre><code class="hljs assembly">  cmp dl, 0
+  jz .backspace_at_start_of_line
+  dec dl      ; Decrement column
+  set_position
+  jmp .overwrite_character
 </code></pre>
 <p>Otherwise you're at the beginning of the line and you need to jump to
 the end of the previous line.</p>
 <pre><code class="hljs assembly">.backspace_at_start_of_line:
-    dec dh          ; Decrement row
-    set_position
+  dec dh      ; Decrement row
+  set_position
 
-    call goto_end_of_line
+  call goto_end_of_line
 
 .overwrite_character:
-    mov al, 0
-    mov ah, 0x0a
-    int 0x10
+  mov al, 0
+  mov ah, 0x0a
+  int 0x10
 
-    jmp .done
+  jmp .done
 
 .done_backspace:
 </code></pre>
 <p>Next we handle the Enter key. This should move the cursor onto the
 next line and set the column back to zero.</p>
 <pre><code class="hljs assembly">;; Handle enter
-    mov_read_character_into ax
-    cmp al, 0x0d
-    jnz .done_enter
+  mov_read_character_into ax
+  cmp al, 0x0d
+  jnz .done_enter
 
-    get_position
-    inc dh          ; Increment line
-    mov dl, 0       ; Reset column
-    set_position
+  get_position
+  inc dh      ; Increment line
+  mov dl, 0     ; Reset column
+  set_position
 
-    jmp .done
+  jmp .done
 
-.done enter
+.done_enter:
 </code></pre>
 <p>Next we handle ctrl-a, jump to start of line.</p>
 <pre><code class="hljs assembly">;; Handle ctrl- shortcuts
 
 ;; Check ctrl key
-    mov_read_ctrl_flag_into ax
+  mov_read_ctrl_flag_into ax
     jz .ctrl_not_set
 
 ;; Handle ctrl-a shortcut
-    mov_read_character_into ax
-    cmp al, 1       ; For some reason with ctlr, these are offset from a-z
-    jnz .not_ctrl_a
+  mov_read_character_into ax
+  cmp al, 1     ; For some reason with ctlr, these are offset from a-z
+  jnz .not_ctrl_a
 
 ;; Reset column
     mov dl, 0
@@ -663,32 +573,32 @@ next line and set the column back to zero.</p>
 </code></pre>
 <p>For ctrl-e, jump to the end of the line.</p>
 <pre><code class="hljs assembly">;; Handle ctrl-e shortcut
-    mov_read_character_into ax
-    cmp al, 5
-    jnz .not_ctrl_e
+  mov_read_character_into ax
+  cmp al, 5
+  jnz .not_ctrl_e
 
-    call goto_end_of_line
-    jmp .done
+  call goto_end_of_line
+  jmp .done
 
 .not_ctrl_e:
-    jmp .done
+  jmp .done
 
 .ctrl_not_set:
 </code></pre>
 <p>Finally if none of these cases are met, just print the pressed character and return.</p>
-<pre><code class="hljs assembly">    mov_read_character_into ax
-    print_character ax
+<pre><code class="hljs assembly">  mov_read_character_into ax
+  print_character ax
 
 .done:
-    ret
+  ret
 </code></pre>
 <p>Finally, create the main function that calls this editor code in a loop.</p>
 <pre><code class="hljs assembly">main:
-    cls
+  cls
 
 .loop:
-    call editor_action
-    jmp .loop
+  call editor_action
+  jmp .loop
 
 times 510 - ($-$$) db 0 ; pad remaining 510 bytes with zeroes
 dw 0xaa55 ; magic bootloader magic - marks this 512 byte sector bootable!
@@ -697,7 +607,8 @@ dw 0xaa55 ; magic bootloader magic - marks this 512 byte sector bootable!
 <pre><code class="hljs bash">$ nasm -f bin editor.asm -o editor.bin
 $ qemu-system-x86_64 -fda editor.bin
 </code></pre>
-<p><img src="bootloader-basics-editor.gif" alt="A bad editor"></p>
+<p><img src="bootloader-basics-editor.gif" alt="Recording of a bad editor"></p>
+<p>Tedious and buggy! But I learned something, I think.</p>
 <style>.feedback{display:initial;}</style>
 	<div class="feedback">
 	  <h4>Feedback</h4>
@@ -728,7 +639,7 @@ $ qemu-system-x86_64 -fda editor.bin
 	  </div>
 	  <div class="feedback">
 	    <p>Frequent Topics</p>
-	    <div class="tags"><a href="/tags/javascript.html" class="tag">javascript (21)</a><a href="/tags/compilers.html" class="tag">compilers (13)</a><a href="/tags/parsing.html" class="tag">parsing (13)</a><a href="/tags/golang.html" class="tag">golang (10)</a><a href="/tags/postgres.html" class="tag">postgres (9)</a><a href="/tags/management.html" class="tag">management (8)</a><a href="/tags/lisp.html" class="tag">lisp (8)</a><a href="/tags/interpreters.html" class="tag">interpreters (8)</a><a href="/tags/databases.html" class="tag">databases (7)</a><a href="/tags/sql.html" class="tag">sql (7)</a><a href="/tags/python.html" class="tag">python (6)</a><a href="/tags/typescript.html" class="tag">typescript (5)</a><a href="/tags/books.html" class="tag">books (5)</a><a href="/tags/x86-amd64.html" class="tag">x86/amd64 (5)</a><a href="/tags/linux.html" class="tag">linux (5)</a><a href="/tags/communication.html" class="tag">communication (5)</a><a href="/tags/json.html" class="tag">json (5)</a><a href="/tags/docker.html" class="tag">docker (4)</a><a href="/tags/learning.html" class="tag">learning (4)</a><a href="/tags/d.html" class="tag">d (4)</a></div>
+	    <div class="tags"><a href="/tags/javascript.html" class="tag">javascript (21)</a><a href="/tags/parsing.html" class="tag">parsing (13)</a><a href="/tags/compilers.html" class="tag">compilers (13)</a><a href="/tags/golang.html" class="tag">golang (10)</a><a href="/tags/postgres.html" class="tag">postgres (9)</a><a href="/tags/management.html" class="tag">management (8)</a><a href="/tags/interpreters.html" class="tag">interpreters (8)</a><a href="/tags/lisp.html" class="tag">lisp (8)</a><a href="/tags/databases.html" class="tag">databases (7)</a><a href="/tags/sql.html" class="tag">sql (7)</a><a href="/tags/python.html" class="tag">python (6)</a><a href="/tags/communication.html" class="tag">communication (5)</a><a href="/tags/typescript.html" class="tag">typescript (5)</a><a href="/tags/x86-amd64.html" class="tag">x86/amd64 (5)</a><a href="/tags/json.html" class="tag">json (5)</a><a href="/tags/linux.html" class="tag">linux (5)</a><a href="/tags/books.html" class="tag">books (5)</a><a href="/tags/leadership.html" class="tag">leadership (4)</a><a href="/tags/assembly.html" class="tag">assembly (4)</a><a href="/tags/learning.html" class="tag">learning (4)</a></div>
 	  </div>
 	</div>
       </div>
