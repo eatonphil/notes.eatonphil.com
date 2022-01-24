@@ -1,7 +1,8 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 24 Jan 2022 01:30:14 +0000</lastBuildDate><item><title>Bootloader basics</title><link>http://notes.eatonphil.com/bootloader-basics.html</link><description>&lt;p&gt;I spent a few days playing around with bootloaders for the first
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 24 Jan 2022 02:37:10 +0000</lastBuildDate><item><title>Bootloader basics</title><link>http://notes.eatonphil.com/bootloader-basics.html</link><description>&lt;p&gt;I spent a few days playing around with bootloaders for the first
 time. This post builds up to a text editor with a few keyboard
-shortcuts.&lt;/p&gt;
+shortcuts. I'll be giving a virtual talk based on this work at &lt;a href="https://www.meetup.com/hackernights/"&gt;Hacker
+Nights on Jan 27&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;There are a definitely bugs. But it's hard to find intermediate
 resources for bootloader programming so maybe parts of this will be
 useful.&lt;/p&gt;
