@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 23 Jan 2022 23:45:19 +0000</lastBuildDate><item><title>Bootloader basics</title><link>http://notes.eatonphil.com/bootloader-basics.html</link><description>&lt;p&gt;I spent a few days playing around with bootloaders for the first
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 24 Jan 2022 01:30:14 +0000</lastBuildDate><item><title>Bootloader basics</title><link>http://notes.eatonphil.com/bootloader-basics.html</link><description>&lt;p&gt;I spent a few days playing around with bootloaders for the first
 time. This post builds up to a text editor with a few keyboard
 shortcuts.&lt;/p&gt;
 &lt;p&gt;There are a definitely bugs. But it's hard to find intermediate
@@ -297,7 +297,7 @@ eventually becomes important in bootloaders because the code must
 fit into 512 bytes.&lt;/p&gt;
 &lt;p&gt;I lean more toward using macros in this code.&lt;/p&gt;
 &lt;h3 id="complex-input"&gt;Complex input&lt;/h3&gt;&lt;p&gt;Reading ASCII characters is not complicated as we saw above. But what
-if we want to build Readline style shortcuts like Ctrl-e for jumping
+if we want to build Readline style shortcuts like ctrl-a for jumping
 to the start of the line?&lt;/p&gt;
 &lt;p&gt;Using INT 16,0 as we do above is fine. But rather than solely reading
 from the result of that function call, there is a section of memory
@@ -323,7 +323,7 @@ we can build a macro for reading the pressed character:&lt;/p&gt;
 %endmacro
 &lt;/code&gt;&lt;/pre&gt;
 &lt;h3 id="cursor-location"&gt;Cursor location&lt;/h3&gt;&lt;p&gt;Lastly we'll use some cursor APIs that that allow us to handle
-newlines, backspace on the first column of a line, and ctrl-e (jump to
+newlines, backspace on the first column of a line, and ctrl-a (jump to
 beginning of line).&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs assembly"&gt;%macro get_position 0
   mov ah, 0x03

@@ -374,7 +374,7 @@ I lean more toward using macros in this code.
 ### Complex input
 
 Reading ASCII characters is not complicated as we saw above. But what
-if we want to build Readline style shortcuts like Ctrl-e for jumping
+if we want to build Readline style shortcuts like ctrl-a for jumping
 to the start of the line?
 
 Using INT 16,0 as we do above is fine. But rather than solely reading
@@ -410,7 +410,7 @@ And another macro for reading the pressed control character (if any):
 ### Cursor location
 
 Lastly we'll use some cursor APIs that that allow us to handle
-newlines, backspace on the first column of a line, and ctrl-e (jump to
+newlines, backspace on the first column of a line, and ctrl-a (jump to
 beginning of line).
 
 ```assembly

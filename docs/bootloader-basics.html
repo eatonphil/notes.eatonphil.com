@@ -341,7 +341,7 @@ eventually becomes important in bootloaders because the code must
 fit into 512 bytes.</p>
 <p>I lean more toward using macros in this code.</p>
 <h3 id="complex-input">Complex input</h3><p>Reading ASCII characters is not complicated as we saw above. But what
-if we want to build Readline style shortcuts like Ctrl-e for jumping
+if we want to build Readline style shortcuts like ctrl-a for jumping
 to the start of the line?</p>
 <p>Using INT 16,0 as we do above is fine. But rather than solely reading
 from the result of that function call, there is a section of memory
@@ -367,7 +367,7 @@ we can build a macro for reading the pressed character:</p>
 %endmacro
 </code></pre>
 <h3 id="cursor-location">Cursor location</h3><p>Lastly we'll use some cursor APIs that that allow us to handle
-newlines, backspace on the first column of a line, and ctrl-e (jump to
+newlines, backspace on the first column of a line, and ctrl-a (jump to
 beginning of line).</p>
 <pre><code class="hljs assembly">%macro get_position 0
   mov ah, 0x03
