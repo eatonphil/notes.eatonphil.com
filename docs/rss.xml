@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 31 Jan 2022 17:31:38 +0000</lastBuildDate><item><title>How to recommend books, or, stop recommending SICP</title><link>http://notes.eatonphil.com/recommending-a-book.html</link><description>&lt;p&gt;Many "must-read" books are not well-written. I &lt;a href="https://www.goodreads.com/user/show/50930981-phil-eaton"&gt;try to read a
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 31 Jan 2022 17:34:35 +0000</lastBuildDate><item><title>How to recommend books, or, stop recommending SICP</title><link>http://notes.eatonphil.com/recommending-a-book.html</link><description>&lt;p&gt;Many "must-read" books are not well-written. I &lt;a href="https://www.goodreads.com/user/show/50930981-phil-eaton"&gt;try to read a
 lot&lt;/a&gt;, but I
 still have a low tolerance for bad writing and bad editing. I write
 this post both to discourage thoughtless recommendations and to
@@ -23,9 +23,9 @@ you'd disagree that most people are not like you.&lt;/p&gt;
 &lt;h3 id="why"&gt;Why&lt;/h3&gt;&lt;p&gt;I have a few, not-mutually-exclusive guesses why "must-read" books are
 often poorly written.&lt;/p&gt;
 &lt;p&gt;One guess is intelligence signalling. That it is human nature for a
-person to suggest a book in an attempt make themself look smart rather
+person to suggest a book in an attempt make herself look smart rather
 than to best assist the person asking for a suggestion.&lt;/p&gt;
-&lt;p&gt;Another guess is that most people dont't read enough to have a good
+&lt;p&gt;Another guess is that most people don't read enough to have a good
 feel for better or worse writing and editing.&lt;/p&gt;
 &lt;p&gt;And a final guess is that books that are worth reading might not
 always be well-written. This is the most unfortunate guess of all. I
