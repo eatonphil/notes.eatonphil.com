@@ -1,5 +1,48 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 24 Jan 2022 02:37:10 +0000</lastBuildDate><item><title>Bootloader basics</title><link>http://notes.eatonphil.com/bootloader-basics.html</link><description>&lt;p&gt;I spent a few days playing around with bootloaders for the first
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 31 Jan 2022 17:31:38 +0000</lastBuildDate><item><title>How to recommend books, or, stop recommending SICP</title><link>http://notes.eatonphil.com/recommending-a-book.html</link><description>&lt;p&gt;Many "must-read" books are not well-written. I &lt;a href="https://www.goodreads.com/user/show/50930981-phil-eaton"&gt;try to read a
+lot&lt;/a&gt;, but I
+still have a low tolerance for bad writing and bad editing. I write
+this post both to discourage thoughtless recommendations and to
+encourage the receivers of bad recommendations.&lt;/p&gt;
+&lt;p&gt;For software developers, Structure and Interpretation of Computer
+Programs is a prime example. Written for freshman at MIT, it is
+ostensibly an entry-level text. But it requires such a level of
+competence in math and physics, and the prose itself is so dense and
+archaic, that I couldn't imagine suggesting it to anyone.&lt;/p&gt;
+&lt;p&gt;And yet it is one of the most recommended books for developers.&lt;/p&gt;
+&lt;p&gt;This is not to say that SICP is a bad book or that you should not read
+it. I just don't think it should ever be suggested to anyone.&lt;/p&gt;
+&lt;h3 id="goal"&gt;Goal&lt;/h3&gt;&lt;p&gt;The core goal of a book recommendation is for the reader to get
+enjoyment or education from it. If you can't continue or finish a
+book, you get nothing from it.&lt;/p&gt;
+&lt;p&gt;You, the recommender, diminish your impact if you can only recommend
+books that people won't continue or finish.&lt;/p&gt;
+&lt;h4 id="non-goal"&gt;Non-goal&lt;/h4&gt;&lt;p&gt;Some people have the capacity to read and love challenging books. If
+that is you, you are not the audience of this post. I don't think
+you'd disagree that most people are not like you.&lt;/p&gt;
+&lt;h3 id="why"&gt;Why&lt;/h3&gt;&lt;p&gt;I have a few, not-mutually-exclusive guesses why "must-read" books are
+often poorly written.&lt;/p&gt;
+&lt;p&gt;One guess is intelligence signalling. That it is human nature for a
+person to suggest a book in an attempt make themself look smart rather
+than to best assist the person asking for a suggestion.&lt;/p&gt;
+&lt;p&gt;Another guess is that most people dont't read enough to have a good
+feel for better or worse writing and editing.&lt;/p&gt;
+&lt;p&gt;And a final guess is that books that are worth reading might not
+always be well-written. This is the most unfortunate guess of all. I
+don't disagree that sometimes it is necessary to learn from
+poorly-written books. But I begrudge because of how much joy I
+get from reading well-written books, fiction and non-fiction.&lt;/p&gt;
+&lt;p&gt;I have a feeling my guesses apply to recommendations in
+general: music, art, film, musicals, restaurants, etc.&lt;/p&gt;
+&lt;h3 id="instead"&gt;Instead&lt;/h3&gt;&lt;p&gt;My suggestion then to folks who are in the position of giving
+recommendations:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;If you had a hard time reading a book or it took you too long to read it (yes, this threshold is different for everyone), don't recommend it&lt;/li&gt;
+&lt;li&gt;Don't be scared to recommend nothing, or to recommend against (rather than for) a certain book&lt;/li&gt;
+&lt;li&gt;Read more books&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;What do you think?&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/recommending-a-book.html</guid><pubDate>Mon, 31 Jan 2022 00:00:00 +0000</pubDate></item><item><title>Bootloader basics</title><link>http://notes.eatonphil.com/bootloader-basics.html</link><description>&lt;p&gt;I spent a few days playing around with bootloaders for the first
 time. This post builds up to a text editor with a few keyboard
 shortcuts. I'll be giving a virtual talk based on this work at &lt;a href="https://www.meetup.com/hackernights/"&gt;Hacker
 Nights on Jan 27&lt;/a&gt;.&lt;/p&gt;
