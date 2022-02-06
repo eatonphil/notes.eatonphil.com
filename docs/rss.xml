@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 06 Feb 2022 15:07:40 +0000</lastBuildDate><item><title>How to recommend books, or, stop recommending SICP</title><link>http://notes.eatonphil.com/recommending-a-book.html</link><description>&lt;p&gt;Many "must-read" books are not well-written. I &lt;a href="https://www.goodreads.com/user/show/50930981-phil-eaton"&gt;try to read a
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 06 Feb 2022 15:37:08 +0000</lastBuildDate><item><title>How to recommend books, or, stop recommending SICP</title><link>http://notes.eatonphil.com/recommending-a-book.html</link><description>&lt;p&gt;Many "must-read" books are not well-written. I &lt;a href="https://www.goodreads.com/user/show/50930981-phil-eaton"&gt;try to read a
 lot&lt;/a&gt;, but I
 still have a low tolerance for bad writing and bad editing. I write
 this post both to discourage thoughtless recommendations and to
@@ -4361,7 +4361,7 @@ a similar name if you browse 3.10+).&lt;/p&gt;
   I mistakenly claimed the previous parser was
   handwritten. It was not.
   &lt;br /&gt;&lt;br /&gt;
-  Thanks &lt;a href="https://twitter.com/jryans"&gt;J. Ryan Stinnet&lt;/a&gt; for
+  Thanks &lt;a href="https://twitter.com/jryans"&gt;J. Ryan Stinnett&lt;/a&gt; for
   a correction about the change in speed in the new PEG parser.
 &lt;/p&gt;&lt;h3 id="gcc:-handwritten"&gt;GCC: Handwritten&lt;/h3&gt;&lt;p&gt;Source code for the C parser available
 &lt;a href="https://github.com/gcc-mirror/gcc/blob/master/gcc/c/c-parser.c"&gt;here&lt;/a&gt;. It
