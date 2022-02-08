@@ -29,11 +29,13 @@ HOME_PAGE = """
   <h2 class="fp-h2"></h2>
   <p>
     Hey! I'm Phil. I run <a
-    href="https://multiprocess.io">Multiprocess Labs</a> where I build
-    <a href="https://github.com/multiprocessio">open-source data
+    href="https://multiprocess.io">Multiprocess Labs</a> (just me)
+    where I build <a
+    href="https://github.com/multiprocessio">open-source data
     tools</a> like <a
     href="https://datastation.multiprocess.io">DataStation</a>, an
-    open-source data IDE for developers.
+    open-source data IDE for developers. Aside from the open-source
+    tools I do contract development (see below).
   </p>
   <h3 class="fp-h3">Hang out</h3>
   <p>
@@ -46,9 +48,10 @@ HOME_PAGE = """
   <h3 class="fp-h3">Contract Development</h3>
   <p>
     I've been a developer and manager for the last 10 years; leading
-    frontend, fullstack and backend teams at startups and Oracle. If I
-    can help you out, <a href="mailto:phil@multiprocess.io">please get
-    in touch</a>!
+    frontend, fullstack and backend teams at startups and Oracle. As a
+    contractor I help small companies build web-related software
+    faster. If I can help you out, <a
+    href="mailto:phil@multiprocess.io">please get in touch</a>!
   </p>
   <h3 class="fp-h3">Elsewhere</h3>
   <p>
