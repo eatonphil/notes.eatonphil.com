@@ -28,40 +28,51 @@ HOME_PAGE = """
 <div class="fp-section fp-section--about">
   <h2 class="fp-h2"></h2>
   <p>
-    Hello! I'm Phil, based in Queens, NY. I've been a developer and
-    manager in the past. Some of the most viewed posts on this site are about
-    building <a href="/tags/compilers.html">compilers</a>, <a
-    href="/tags/databases.html">databases</a>, and <a
-    href="/tags/emulators.html">emulators</a> from scratch.
-  </p>
-  <p>
-    I am building <a href="https://multiprocess.io/">Multiprocess
-    Labs</a> around <a
+    Hey! I'm Phil. I run <a
+    href="https://multiprocess.io">Multiprocess Labs</a> (just me)
+    where I build <a
+    href="https://github.com/multiprocessio">open-source data
+    tools</a> like <a
     href="https://datastation.multiprocess.io">DataStation</a>, an
-    open-source data IDE to help you create dashboards and exports on
-    data from every database, API, and file without cumbersome ETL
-    processes.
+    open-source data IDE for developers. Aside from the open-source
+    tools I do contract development (see below).
   </p>
+  <h3 class="fp-h3">Hang out</h3>
   <p>
-    I also run a <a href="https://discord.gg/PmmShtF7WS">Discord community
-    for developers</a> working on or interested in challenging
-    programming projects like compilers, databases, emulators,
-    etc. Come to share and learn from other folks!
+    If you're looking for a developer community along the lines of
+    this blog, check out Multiprocess's <a
+    href="https://discord.multiprocess.io">hacker Discord</a> and the
+    Multiprocess virtual meetup, <a
+    href="https://multiprocess.io/hackernights">Hacker Nights</a>.
   </p>
+  <h3 class="fp-h3">Contract Development</h3>
   <p>
-    You can find me elsewhere on <a
+    I've been a developer and manager for the last 10 years; leading
+    frontend, fullstack and backend teams at startups and Oracle. As a
+    contractor I help small companies build web-related software
+    faster. If I can help you out, <a
+    href="mailto:phil@multiprocess.io">please get in touch</a>!
+  </p>
+  <h3 class="fp-h3">Elsewhere</h3>
+  <p>
+    You can find me on <a
     href="https://github.com/eatonphil">Github</a>, <a
     href="https://twitter.com/phil_eaton">Twitter</a>, <a
     href="https://www.linkedin.com/in/phil-e-97a490178/">LinkedIn</a>,
     and <a
     href="https://www.goodreads.com/user/show/50930981-phil-eaton">Goodreads</a>.
   </p>
+  <h3 class="fp-h3">Start here</h3>
   <p>
-    I love <a href="mailto:me@eatonphil.com">hearing from you</a>!
+    Some of the most viewed posts on this site are about <a
+    href="/tags/compilers.html">compilers</a>, <a
+    href="/tags/databases.html">databases</a>, <a
+    href="/tags/parsers.html">parsers</a> and <a
+    href="/tags/emulators.html">emulators</a>.
   </p>
 </div>
 <div class="fp-section fp-section--tags">
-  <h2 class="fp-h2">Frequent Topics</h2>
+  <h2 class="fp-h2">Frequent</h2>
   <div class="tags">
     {tags}
   </div>
@@ -75,7 +86,7 @@ HOME_PAGE = """
 </div>
 """
 TEMPLATE = open('template.html').read()
-TAG = "Notes on software, organizations, product development, and professional growth"
+TAG = "Notes on software development"
 
 class Renderer(mistune.Renderer):
     def __init__(self):

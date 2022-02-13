@@ -13,10 +13,12 @@ techniques used by various major programming language implementations.
 ### CPython: PEG parser
 
 Until CPython 3.10 (which hasn't been released yet) the default parser
-was built using [pgen](https://www.python.org/dev/peps/pep-0269/). The
-team thought the PEG parser was a [better fit for expressing the
-language](https://www.python.org/dev/peps/pep-0617/), and at the time
-took a reported 10% speed and memory usage hit switching off pgen.
+was built using [pgen](https://www.python.org/dev/peps/pep-0269/), a
+custom parser generator. The team thought the PEG parser was a [better
+fit for expressing the
+language](https://www.python.org/dev/peps/pep-0617/). At the time the
+switch from pgen to PEG parser improved speed 10% but increased memory
+usage by 10% as well.
 
 The PEG grammar is defined
 [here](https://github.com/python/cpython/blob/v3.9.6/Grammar/python.gram). (It
@@ -28,6 +30,9 @@ a similar name if you browse 3.10+).
   by <a href="https://www.reddit.com/r/ProgrammingLanguages/comments/p8vvcs/parser_generators_vs_handwritten_parsers/h9tbuve/?utm_source=reddit&utm_medium=web2x&context=3">MegaIng</a> on Reddit. Originally
   I mistakenly claimed the previous parser was
   handwritten. It was not.
+  <br /><br />
+  Thanks <a href="https://twitter.com/jryans">J. Ryan Stinnett</a> for
+  a correction about the change in speed in the new PEG parser.
 </p>
 
 ### GCC: Handwritten

@@ -1,5 +1,53 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 13 Feb 2022 15:08:16 +0000</lastBuildDate><item><title>Bootloader basics</title><link>http://notes.eatonphil.com/bootloader-basics.html</link><description>&lt;p&gt;I spent a few days playing around with bootloaders for the first
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 13 Feb 2022 15:09:32 +0000</lastBuildDate><item><title>How to recommend books, or, stop recommending SICP</title><link>http://notes.eatonphil.com/recommending-a-book.html</link><description>&lt;p&gt;Many "must-read" books are not well-written. I &lt;a href="https://www.goodreads.com/user/show/50930981-phil-eaton"&gt;try to read a
+lot&lt;/a&gt;, but I
+still have a low tolerance for bad writing and bad editing. I write
+this post both to discourage thoughtless recommendations and to
+encourage the receivers of bad recommendations.&lt;/p&gt;
+&lt;p&gt;For software developers, Structure and Interpretation of Computer
+Programs is a prime example. Written for freshman at MIT, it is
+ostensibly an entry-level text. But it requires such a level of
+competence in math and physics, and the prose itself is so dense and
+archaic, that I couldn't imagine suggesting it to anyone.&lt;/p&gt;
+&lt;p&gt;And yet it is one of the most recommended books for developers.&lt;/p&gt;
+&lt;p&gt;This is not to say that SICP is a bad book or that you should not read
+it. I just don't think it should ever be suggested to anyone.&lt;/p&gt;
+&lt;h3 id="goal"&gt;Goal&lt;/h3&gt;&lt;p&gt;The core goal of a book recommendation is for the reader to get
+enjoyment or education from it. If you can't continue or finish a
+book, you get nothing from it.&lt;/p&gt;
+&lt;p&gt;You, the recommender, diminish your impact if you can only recommend
+books that people won't continue or finish.&lt;/p&gt;
+&lt;h4 id="non-goal"&gt;Non-goal&lt;/h4&gt;&lt;p&gt;Some people have the capacity to read and love challenging books. If
+that is you, you are not the audience of this post. I don't think
+you'd disagree that most people are not like you.&lt;/p&gt;
+&lt;h3 id="why"&gt;Why&lt;/h3&gt;&lt;p&gt;I have a few, not-mutually-exclusive guesses why "must-read" books are
+often poorly written.&lt;/p&gt;
+&lt;p&gt;One guess is intelligence signalling. That it is human nature for a
+person to suggest a book in an attempt make herself look smart rather
+than to best assist the person asking for a suggestion.&lt;/p&gt;
+&lt;p&gt;Another guess is that most people don't read enough to have a good
+feel for better or worse writing and editing.&lt;/p&gt;
+&lt;p&gt;And a final guess is that books that are worth reading might not
+always be well-written. This is the most unfortunate guess of all. I
+don't disagree that sometimes it is necessary to learn from
+poorly-written books. But I begrudge this because of how much joy I
+get from reading well-written books, fiction and non-fiction.&lt;/p&gt;
+&lt;p&gt;I have a feeling my guesses apply to recommendations in
+general: music, art, film, musicals, restaurants, etc.&lt;/p&gt;
+&lt;h3 id="instead"&gt;Instead&lt;/h3&gt;&lt;p&gt;My suggestion then to folks who are in the position of giving
+recommendations:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;If you had a hard time reading a book or it took you too long to read it (yes, this threshold is different for everyone), don't recommend it&lt;/li&gt;
+&lt;li&gt;Don't be scared to recommend nothing, or to recommend against (rather than for) a certain book&lt;/li&gt;
+&lt;li&gt;Read more books&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;And definitely don't recommend books you haven't read.&lt;/p&gt;
+&lt;h3 id="mea-culpa"&gt;Mea culpa&lt;/h3&gt;&lt;p&gt;I've definitely done a bad job recommending books in the past,
+including recommending books I haven't read. I've been trying to do
+better in the last 5 years or so.&lt;/p&gt;
+&lt;p&gt;What do you think?&lt;/p&gt;
+&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;I wrote a new blog post: a bit of flame bait on how to recommend books and why so many must-read books are impossible to read.&lt;br&gt;&lt;br&gt;Or: stop recommending SICP.&lt;br&gt;&lt;br&gt;If you love challenging books, you are neither the norm nor the audience of this post. 😀&lt;a href="https://t.co/ZU92kgr4Kf"&gt;https://t.co/ZU92kgr4Kf&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1488204810541219840?ref_src=twsrc%5Etfw"&gt;January 31, 2022&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/recommending-a-book.html</guid><pubDate>Mon, 31 Jan 2022 00:00:00 +0000</pubDate></item><item><title>Bootloader basics</title><link>http://notes.eatonphil.com/bootloader-basics.html</link><description>&lt;p&gt;I spent a few days playing around with bootloaders for the first
 time. This post builds up to a text editor with a few keyboard
 shortcuts. I'll be giving a virtual talk based on this work at &lt;a href="https://www.meetup.com/hackernights/"&gt;Hacker
 Nights on Jan 27&lt;/a&gt;.&lt;/p&gt;
@@ -4297,10 +4345,12 @@ programming languages actually use parser generators anymore?&lt;/p&gt;
 &lt;p&gt;To find out, this post presents a non-definitive survey of the parsing
 techniques used by various major programming language implementations.&lt;/p&gt;
 &lt;h3 id="cpython:-peg-parser"&gt;CPython: PEG parser&lt;/h3&gt;&lt;p&gt;Until CPython 3.10 (which hasn't been released yet) the default parser
-was built using &lt;a href="https://www.python.org/dev/peps/pep-0269/"&gt;pgen&lt;/a&gt;. The
-team thought the PEG parser was a &lt;a href="https://www.python.org/dev/peps/pep-0617/"&gt;better fit for expressing the
-language&lt;/a&gt;, and at the time
-took a reported 10% speed and memory usage hit switching off pgen.&lt;/p&gt;
+was built using &lt;a href="https://www.python.org/dev/peps/pep-0269/"&gt;pgen&lt;/a&gt;, a
+custom parser generator. The team thought the PEG parser was a &lt;a href="https://www.python.org/dev/peps/pep-0617/"&gt;better
+fit for expressing the
+language&lt;/a&gt;. At the time the
+switch from pgen to PEG parser improved speed 10% but increased memory
+usage by 10% as well.&lt;/p&gt;
 &lt;p&gt;The PEG grammar is defined
 &lt;a href="https://github.com/python/cpython/blob/v3.9.6/Grammar/python.gram"&gt;here&lt;/a&gt;. (It
 is getting renamed in 3.10 though so check the directory for a file of
@@ -4310,6 +4360,9 @@ a similar name if you browse 3.10+).&lt;/p&gt;
   by &lt;a href="https://www.reddit.com/r/ProgrammingLanguages/comments/p8vvcs/parser_generators_vs_handwritten_parsers/h9tbuve/?utm_source=reddit&amp;utm_medium=web2x&amp;context=3"&gt;MegaIng&lt;/a&gt; on Reddit. Originally
   I mistakenly claimed the previous parser was
   handwritten. It was not.
+  &lt;br /&gt;&lt;br /&gt;
+  Thanks &lt;a href="https://twitter.com/jryans"&gt;J. Ryan Stinnett&lt;/a&gt; for
+  a correction about the change in speed in the new PEG parser.
 &lt;/p&gt;&lt;h3 id="gcc:-handwritten"&gt;GCC: Handwritten&lt;/h3&gt;&lt;p&gt;Source code for the C parser available
 &lt;a href="https://github.com/gcc-mirror/gcc/blob/master/gcc/c/c-parser.c"&gt;here&lt;/a&gt;. It
 used to use Bison until &lt;a href="The old Bison-based C and
