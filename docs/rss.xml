@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 24 Jan 2022 02:37:10 +0000</lastBuildDate><item><title>Bootloader basics</title><link>http://notes.eatonphil.com/bootloader-basics.html</link><description>&lt;p&gt;I spent a few days playing around with bootloaders for the first
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software, organizations, product development, and professional growth</title><link>http://notes.eatonphil.com/</link><description>Notes on software, organizations, product development, and professional growth</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 13 Feb 2022 15:08:16 +0000</lastBuildDate><item><title>Bootloader basics</title><link>http://notes.eatonphil.com/bootloader-basics.html</link><description>&lt;p&gt;I spent a few days playing around with bootloaders for the first
 time. This post builds up to a text editor with a few keyboard
 shortcuts. I'll be giving a virtual talk based on this work at &lt;a href="https://www.meetup.com/hackernights/"&gt;Hacker
 Nights on Jan 27&lt;/a&gt;.&lt;/p&gt;
@@ -2835,7 +2835,7 @@ $$ LANGUAGE plpgsql;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;It's not a very useful function because &lt;code&gt;length&lt;/code&gt; already exists but
 the point is to see a basic custom function.&lt;/p&gt;
-&lt;p&gt;All statements in PL/pgSQL must end in a statement. Arguments do not
+&lt;p&gt;All statements in PL/pgSQL must end in a semicolon. Arguments do not
 have to be named. If they are not named they get default names of &lt;code&gt;$1&lt;/code&gt;
 to &lt;code&gt;$N&lt;/code&gt;.&lt;/p&gt;
 &lt;h4 id="named/unnamed-arguments"&gt;Named/unnamed arguments&lt;/h4&gt;&lt;p&gt;Here's how the function could be written without named arguments:&lt;/p&gt;

@@ -69,7 +69,7 @@ $$ LANGUAGE plpgsql;
 </code></pre>
 <p>It's not a very useful function because <code>length</code> already exists but
 the point is to see a basic custom function.</p>
-<p>All statements in PL/pgSQL must end in a statement. Arguments do not
+<p>All statements in PL/pgSQL must end in a semicolon. Arguments do not
 have to be named. If they are not named they get default names of <code>$1</code>
 to <code>$N</code>.</p>
 <h4 id="named/unnamed-arguments">Named/unnamed arguments</h4><p>Here's how the function could be written without named arguments:</p>
