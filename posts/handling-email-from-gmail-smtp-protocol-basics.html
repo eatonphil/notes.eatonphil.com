@@ -1,0 +1,47 @@
+# Receiving email from Gmail: SMTP protocol basics from scratch in Go
+## February 20, 2022
+###### go,smtp,networking
+
+I've never run my own mail server before. Before today I had no clue
+how email worked under the hood.
+
+I've heard no few times how hard it is to *send* mail (because of spam
+filters). But how hard can it be to hook up DNS to my personal server
+and receive email to my domain sent from Gmail or another real-world
+client?
+
+I knew it would be simpler to just send local mail with a
+local mail client but that didn't seem as surely real. If I could send
+email from my Gmail account and receive it in my server then I'd have
+a satisfying understanding of how some parts of email works.
+
+I spent the afternoon digging into this.
+
+### DNS
+
+First I bought a domain. (I needed to be able to mess around with
+records without blowing up anything important.)
+
+I knew that MX records controlled where mail for a domain is sent. But
+I had to [look up the
+specifics](https://en.wikipedia.org/wiki/MX_record). You need to
+create an MX record that points to an A or AAAA name. So you need both
+an MX record and an A record.
+
+![MX and A record settings](/dnsrecords.png)
+
+Done.
+
+### What protocols?
+
+I knew that you send email with SMTP and you read it with POP3 or
+IMAP. But it hadn't clicked before that the mail server has to speak
+SMTP and if you only ever read on the server (which is of course
+impractical in the real world) you don't need POP3 or IMAP.
+
+![SMTP vs POP3](https://cdn.educba.com/academy/wp-content/uploads/2019/07/smtp-protocol.png)
+
+So to meaningfully receive email from Gmail all I needed to do was implement SMTP.
+
+### SMTP
+
