@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 21 Feb 2022 02:47:17 +0000</lastBuildDate><item><title>SMTP protocol basics from scratch in Go: receiving email from Gmail</title><link>http://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</link><description>&lt;p&gt;I've never run my own mail server before. Before today I had no clue
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 21 Feb 2022 13:16:18 +0000</lastBuildDate><item><title>SMTP protocol basics from scratch in Go: receiving email from Gmail</title><link>http://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</link><description>&lt;p&gt;I've never run my own mail server before. Before today I had no clue
 how email worked under the hood other than the very few times I've set
 up mail clients.&lt;/p&gt;
 &lt;p&gt;I've heard no few times how hard it is to &lt;em&gt;send&lt;/em&gt; mail from a
@@ -7,9 +7,9 @@ self-hosted server (because of spam filters). But how hard can it be
 to hook up DNS to my personal server and receive email to my domain
 sent from Gmail or another real-world client?&lt;/p&gt;
 &lt;p&gt;I knew it would be simpler to just send local mail to a local mail
-server with a local mail client but that didn't seem as surely
-real. But if I could send email from my Gmail account and receive it
-in my server that would feel more rewarding.&lt;/p&gt;
+server with a local mail client but that didn't seem as real. If I
+could send email from my Gmail account and receive it in my server I'd
+be happy.&lt;/p&gt;
 &lt;p&gt;I spent the afternoon digging into this. All code is &lt;a href="https://github.com/eatonphil/gomail"&gt;available on
 Github&lt;/a&gt;. The "live stream" is in
 the &lt;a href="https://discord.multiprocess.io"&gt;Multiprocess Discord&lt;/a&gt;'s
@@ -177,22 +177,22 @@ send to the client.&lt;/p&gt;
 
         c.logInfo("Awaiting EHLO")
 
-    line, err := c.readLine()
-    if err != nil {
-        c.logError(err)
-        return
-    }
+        line, err := c.readLine()
+        if err != nil {
+                c.logError(err)
+                return
+        }
 
-    if !strings.HasPrefix(line, "EHLO") {
-        c.logError(errors.New("Expected EHLO got: " + line))
-        return
-    }
+        if !strings.HasPrefix(line, "EHLO") {
+                c.logError(errors.New("Expected EHLO got: " + line))
+                return
+        }
 
-    msg := message{
-        smtpCommands: map[string]string{},
-        atmHeaders:  map[string]string{},
-    }
-    msg.clientDomain = line[len("EHLO "):]
+        msg := message{
+                smtpCommands: map[string]string{},
+                atmHeaders:  map[string]string{},
+        }
+        msg.clientDomain = line[len("EHLO "):]
 
         c.logInfo("Received EHLO")
 
@@ -220,42 +220,42 @@ command we respond with a &lt;code&gt;354&lt;/code&gt; instead of a &lt;code&gt;
 &lt;p&gt;In code:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs go"&gt;        ...
 
-    c.logInfo(&amp;quot;Done EHLO&amp;quot;)
+        c.logInfo(&amp;quot;Done EHLO&amp;quot;)
 
-    for line != &amp;quot;&amp;quot; {
-        line, err = c.readLine()
-        if err != nil {
-            c.logError(err)
-            return
+        for line != &amp;quot;&amp;quot; {
+                line, err = c.readLine()
+                if err != nil {
+                        c.logError(err)
+                        return
+                }
+
+                pieces := strings.SplitN(line, &amp;quot;:&amp;quot;, 2)
+                smtpCommand := strings.ToUpper(pieces[0])
+
+                // Special command without a value
+                if smtpCommand == &amp;quot;DATA&amp;quot; {
+                        err = c.writeLine(&amp;quot;354&amp;quot;)
+                        if err != nil {
+                                c.logError(err)
+                                return
+                        }
+
+                        break
+                }
+
+                smtpValue := pieces[1]
+                msg.smtpCommands[smtpCommand] = smtpValue
+
+                c.logInfo(&amp;quot;Got command: &amp;quot; + line)
+
+                err = c.writeLine(&amp;quot;250 OK&amp;quot;)
+                if err != nil {
+                        c.logError(err)
+                        return
+                }
         }
 
-        pieces := strings.SplitN(line, &amp;quot;:&amp;quot;, 2)
-        smtpCommand := strings.ToUpper(pieces[0])
-
-        // Special command without a value
-        if smtpCommand == &amp;quot;DATA&amp;quot; {
-            err = c.writeLine(&amp;quot;354&amp;quot;)
-            if err != nil {
-                c.logError(err)
-                return
-            }
-
-            break
-        }
-
-        smtpValue := pieces[1]
-        msg.smtpCommands[smtpCommand] = smtpValue
-
-        c.logInfo(&amp;quot;Got command: &amp;quot; + line)
-
-        err = c.writeLine(&amp;quot;250 OK&amp;quot;)
-        if err != nil {
-            c.logError(err)
-            return
-        }
-    }
-
-    c.logInfo(&amp;quot;Done SMTP commands, reading ARPA text message headers&amp;quot;)
+        c.logInfo(&amp;quot;Done SMTP commands, reading ARPA text message headers&amp;quot;)
 
         // TODO
 &lt;/code&gt;&lt;/pre&gt;
@@ -274,44 +274,44 @@ lines. This stumped me for a bit.&lt;/p&gt;
 look for these possibly multi-line headers where a CRLF followed by
 whitespace isn't a line delimiter.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs go"&gt;func (c *connection) readMultiLine() (string, error) {
-    for {
-        noMoreReads := false
-        for i, b := range c.buf {
-            if i &amp;gt; 1 &amp;amp;&amp;amp;
-                b != &amp;#39; &amp;#39; &amp;amp;&amp;amp;
-                b != &amp;#39;\t&amp;#39; &amp;amp;&amp;amp;
-                c.buf[i-2] == &amp;#39;\r&amp;#39; &amp;amp;&amp;amp;
-                c.buf[i-1] == &amp;#39;\n&amp;#39; {
-                // i-2 because drop the CRLF, no one cares after this
-                line := string(c.buf[:i-2])
-                c.buf = c.buf[i:]
-                return line, nil
-            }
+        for {
+                noMoreReads := false
+                for i, b := range c.buf {
+                        if i &amp;gt; 1 &amp;amp;&amp;amp;
+                                b != &amp;#39; &amp;#39; &amp;amp;&amp;amp;
+                                b != &amp;#39;\t&amp;#39; &amp;amp;&amp;amp;
+                                c.buf[i-2] == &amp;#39;\r&amp;#39; &amp;amp;&amp;amp;
+                                c.buf[i-1] == &amp;#39;\n&amp;#39; {
+                                // i-2 because drop the CRLF, no one cares after this
+                                line := string(c.buf[:i-2])
+                                c.buf = c.buf[i:]
+                                return line, nil
+                        }
 
-            noMoreReads = c.isBodyClose(i)
+                        noMoreReads = c.isBodyClose(i)
+                }
+
+                if !noMoreReads {
+                        b := make([]byte, 1024)
+                        n, err := c.conn.Read(b)
+                        if err != nil {
+                                return &amp;quot;&amp;quot;, err
+                        }
+
+                        c.buf = append(c.buf, b[:n]...)
+
+                        // If this gets here more than once it&amp;#39;s going to be an infinite loop
+                }
         }
-
-        if !noMoreReads {
-            b := make([]byte, 1024)
-            n, err := c.conn.Read(b)
-            if err != nil {
-                return &amp;quot;&amp;quot;, err
-            }
-
-            c.buf = append(c.buf, b[:n]...)
-
-            // If this gets here more than once it&amp;#39;s going to be an infinite loop
-        }
-    }
 }
 
 func (c *connection) isBodyClose(i int) bool {
-    return i &amp;gt; 4 &amp;amp;&amp;amp;
-        c.buf[i-4] == &amp;#39;\r&amp;#39; &amp;amp;&amp;amp;
-        c.buf[i-3] == &amp;#39;\n&amp;#39; &amp;amp;&amp;amp;
-        c.buf[i-2] == &amp;#39;.&amp;#39; &amp;amp;&amp;amp;
-        c.buf[i-1] == &amp;#39;\r&amp;#39; &amp;amp;&amp;amp;
-        c.buf[i-0] == &amp;#39;\n&amp;#39;
+        return i &amp;gt; 4 &amp;amp;&amp;amp;
+                c.buf[i-4] == &amp;#39;\r&amp;#39; &amp;amp;&amp;amp;
+                c.buf[i-3] == &amp;#39;\n&amp;#39; &amp;amp;&amp;amp;
+                c.buf[i-2] == &amp;#39;.&amp;#39; &amp;amp;&amp;amp;
+                c.buf[i-1] == &amp;#39;\r&amp;#39; &amp;amp;&amp;amp;
+                c.buf[i-0] == &amp;#39;\n&amp;#39;
 }
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Now back in the &lt;code&gt;handle&lt;/code&gt; function we can read through all of these
@@ -319,39 +319,39 @@ headers. According to RFC 822, we're done when we see a double CRLF,
 which in our code will show up as an empty line.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs go"&gt;        ...
 
-    c.logInfo(&amp;quot;Done SMTP headers, reading ARPA text message headers&amp;quot;)
+        c.logInfo(&amp;quot;Done SMTP headers, reading ARPA text message headers&amp;quot;)
 
-    for {
-        line, err = c.readMultiLine()
-        if err != nil {
-            c.logError(err)
-            return
+        for {
+                line, err = c.readMultiLine()
+                if err != nil {
+                        c.logError(err)
+                        return
+                }
+
+                if strings.TrimSpace(line) == &amp;quot;&amp;quot; {
+                        break
+                }
+
+                pieces := strings.SplitN(line, &amp;quot;: &amp;quot;, 2)
+                atmHeader := strings.ToUpper(pieces[0])
+                atmValue := pieces[1]
+                msg.atmHeaders[atmHeader] = atmValue
+
+                if atmHeader == &amp;quot;SUBJECT&amp;quot; {
+                        msg.subject = atmValue
+                }
+                if atmHeader == &amp;quot;TO&amp;quot; {
+                        msg.to = atmValue
+                }
+                if atmHeader == &amp;quot;FROM&amp;quot; {
+                        msg.from = atmValue
+                }
+                if atmHeader == &amp;quot;DATE&amp;quot; {
+                        msg.date = atmValue
+                }
         }
 
-        if strings.TrimSpace(line) == &amp;quot;&amp;quot; {
-            break
-        }
-
-        pieces := strings.SplitN(line, &amp;quot;: &amp;quot;, 2)
-        atmHeader := strings.ToUpper(pieces[0])
-        atmValue := pieces[1]
-        msg.atmHeaders[atmHeader] = atmValue
-
-        if atmHeader == &amp;quot;SUBJECT&amp;quot; {
-            msg.subject = atmValue
-        }
-        if atmHeader == &amp;quot;TO&amp;quot; {
-            msg.to = atmValue
-        }
-        if atmHeader == &amp;quot;FROM&amp;quot; {
-            msg.from = atmValue
-        }
-        if atmHeader == &amp;quot;DATE&amp;quot; {
-            msg.date = atmValue
-        }
-    }
-
-    c.logInfo(&amp;quot;Done ARPA text message headers, reading body&amp;quot;)
+        c.logInfo(&amp;quot;Done ARPA text message headers, reading body&amp;quot;)
 
         // TODO
 &lt;/code&gt;&lt;/pre&gt;
@@ -360,43 +360,43 @@ SMTP RFC the body ends with a CRLF followed by a dot (period) followed
 by a CRLF.&lt;/p&gt;
 &lt;p&gt;So we'll write another helper to read until this marker.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs go"&gt;func (c *connection) readToEndOfBody() (string, error) {
-    for {
-        for i := range c.buf {
-            if c.isBodyClose(i) {
-                return string(c.buf[:i-4]), nil
-            }
-        }
+        for {
+                for i := range c.buf {
+                        if c.isBodyClose(i) {
+                                return string(c.buf[:i-4]), nil
+                        }
+                }
 
-        b := make([]byte, 1024)
-        n, err := c.conn.Read(b)
-        if err != nil {
-            return &amp;quot;&amp;quot;, err
-        }
+                b := make([]byte, 1024)
+                n, err := c.conn.Read(b)
+                if err != nil {
+                        return &amp;quot;&amp;quot;, err
+                }
 
-        c.buf = append(c.buf, b[:n]...)
-    }
+                c.buf = append(c.buf, b[:n]...)
+        }
 }
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;And we can finish up the &lt;code&gt;handle&lt;/code&gt; function.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs go"&gt;    c.logInfo(&amp;quot;Done ARPA text message headers, reading body&amp;quot;)
+&lt;pre&gt;&lt;code class="hljs go"&gt;        c.logInfo(&amp;quot;Done ARPA text message headers, reading body&amp;quot;)
 
-    msg.body, err = c.readToEndOfBody()
-    if err != nil {
-        c.logError(err)
-        return
-    }
+        msg.body, err = c.readToEndOfBody()
+        if err != nil {
+                c.logError(err)
+                return
+        }
 
-    c.logInfo(&amp;quot;Got body (%d bytes)&amp;quot;, len(msg.body))
+        c.logInfo(&amp;quot;Got body (%d bytes)&amp;quot;, len(msg.body))
 
-    err = c.writeLine(&amp;quot;250 OK&amp;quot;)
-    if err != nil {
-        c.logError(err)
-        return
-    }
+        err = c.writeLine(&amp;quot;250 OK&amp;quot;)
+        if err != nil {
+                c.logError(err)
+                return
+        }
 
-    c.logInfo(&amp;quot;Message:\n%s\n&amp;quot;, msg.body)
+        c.logInfo(&amp;quot;Message:\n%s\n&amp;quot;, msg.body)
 
-    c.logInfo(&amp;quot;Connection closed&amp;quot;)
+        c.logInfo(&amp;quot;Connection closed&amp;quot;)
 }
 &lt;/code&gt;&lt;/pre&gt;
 &lt;h3 id="compile,-setcap,-run,-and-send"&gt;Compile, setcap, run, and send&lt;/h3&gt;&lt;pre&gt;&lt;code class="hljs bash"&gt;$ go build
@@ -438,7 +438,7 @@ text message headers we notice that Gmail 1) sets a Content-Type
 header and 2) it's value is &lt;code&gt;multipart/alternative&lt;/code&gt;. I don't know
 where Content-Type as a valid header is defined because it's not in
 RFC 822. Maybe it's some "new-fangled" adhoc standard or maybe it's
-just an in extension RFC.&lt;/p&gt;
+just in an extension RFC.&lt;/p&gt;
 &lt;p&gt;In any case this looks like multipart bodies in HTTP. I don't want to
 deal with that so I'm just going to stop here.&lt;/p&gt;
 &lt;p&gt;But I &lt;em&gt;am&lt;/em&gt; curious about text-only email systems. So I &lt;code&gt;sudo dnf
@@ -468,10 +468,10 @@ What hath god wrought
 2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Connection closed
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;And I'm happy to call it a night.&lt;/p&gt;
+&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;I wrote a new blog post on building an SMTP server from scratch in Go that is correctly enough hooked up you can receive emails sent from Gmail to it!&lt;br&gt;&lt;br&gt;Good fun and some learning too.&lt;a href="https://t.co/8pYkkAbFnI"&gt;https://t.co/8pYkkAbFnI&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1495586245896028160?ref_src=twsrc%5Etfw"&gt;February 21, 2022&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 &lt;p&gt;p.s. if you want to see more networking software/hardware internals
 check out
 &lt;a href="https://reddit.com/r/networkdevelopment"&gt;/r/NetworkDevelopment&lt;/a&gt;.&lt;/p&gt;
-&lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;I wrote a new blog post on building an SMTP server from scratch in Go that is correctly enough hooked up you can receive emails sent from Gmail to it!&lt;br&gt;&lt;br&gt;Good fun and some learning too.&lt;a href="https://t.co/8pYkkAbFnI"&gt;https://t.co/8pYkkAbFnI&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1495586245896028160?ref_src=twsrc%5Etfw"&gt;February 21, 2022&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</guid><pubDate>Sun, 20 Feb 2022 00:00:00 +0000</pubDate></item><item><title>How to recommend books, or, stop recommending SICP</title><link>http://notes.eatonphil.com/recommending-a-book.html</link><description>&lt;p&gt;Many "must-read" books are not well-written. I &lt;a href="https://www.goodreads.com/user/show/50930981-phil-eaton"&gt;try to read a
 lot&lt;/a&gt;, but I
 still have a low tolerance for bad writing and bad editing. I write
