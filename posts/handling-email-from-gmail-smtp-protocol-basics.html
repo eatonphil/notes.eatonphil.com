@@ -17,7 +17,9 @@ real. But if I could send email from my Gmail account and receive it
 in my server that would feel more rewarding.
 
 I spent the afternoon digging into this. All code is [available on
-Github](https://github.com/eatonphil/gomail).
+Github](https://github.com/eatonphil/gomail). The "live stream" is in
+the [Multiprocess Discord](https://discord.multiprocess.io)'s
+#hacking-networks channel.
 
 ### DNS
 
@@ -70,36 +72,36 @@ First off I'd need to run a TCP server on port 25.
 package main
 
 import (
-	"errors"
-	"log"
-	"net"
-	"strconv"
-	"strings"
+        "errors"
+        "log"
+        "net"
+        "strconv"
+        "strings"
 )
 
 func logError(err error) {
-	log.Printf("[ERROR] %s\n", err)
+        log.Printf("[ERROR] %s\n", err)
 }
 
 func logInfo(msg string) {
-	log.Printf("[INFO] %s\n", msg)
+        log.Printf("[INFO] %s\n", msg)
 }
 
 type message struct {
-	clientDomain string
-	smtpHeaders  map[string]string
-	atmHeaders   map[string]string
-	body         string
-	from         string
-	date         string
-	subject      string
-	to           string
+        clientDomain string
+        smtpCommands  map[string]string
+        atmHeaders   map[string]string
+        body         string
+        from         string
+        date         string
+        subject      string
+        to           string
 }
 
 type connection struct {
-	conn net.Conn
-	id   int
-	buf  []byte
+        conn net.Conn
+        id   int
+        buf  []byte
 }
 
 // TODO
@@ -109,26 +111,26 @@ func (c *connection) handle() {
 }
 
 func main() {
-	l, err := net.Listen("tcp", "0.0.0.0:25")
-	if err != nil {
-		panic(err)
-	}
-	defer l.Close()
+        l, err := net.Listen("tcp", "0.0.0.0:25")
+        if err != nil {
+                panic(err)
+        }
+        defer l.Close()
 
-	logInfo("Listening")
+        logInfo("Listening")
 
-	id := 0
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			logError(err)
-			continue
-		}
+        id := 0
+        for {
+                conn, err := l.Accept()
+                if err != nil {
+                        logError(err)
+                        continue
+                }
 
-		id += 1
-		c := connection{conn, id, nil}
-		go c.handle()
-	}
+                id += 1
+                c := connection{conn, id, nil}
+                go c.handle()
+        }
 }
 ```
 
@@ -146,17 +148,17 @@ So we'll add a helper function for writing lines that end in CRLF:
 
 ```go
 func (c *connection) writeLine(msg string) error {
-	msg += "\r\n"
-	for len(msg) > 0 {
-		n, err := c.conn.Write([]byte(msg))
-		if err != nil {
-			return err
-		}
+        msg += "\r\n"
+        for len(msg) > 0 {
+                n, err := c.conn.Write([]byte(msg))
+                if err != nil {
+                        return err
+                }
 
-		msg = msg[n:]
-	}
+                msg = msg[n:]
+        }
 
-	return nil
+        return nil
 }
 ```
 
@@ -164,14 +166,16 @@ And then we'll send that `220` in the `handle` function.
 
 ```go
 func (c *connection) handle() {
-	defer c.conn.Close()
-	c.logInfo("Connection accepted")
+        defer c.conn.Close()
+        c.logInfo("Connection accepted")
 
-	err := c.writeLine("220")
-	if err != nil {
-		c.logError(err)
-		return
-	}
+        err := c.writeLine("220")
+        if err != nil {
+                c.logError(err)
+                return
+        }
+
+        c.logInfo("Awaiting EHLO")
 
         // TODO
 ```
@@ -185,24 +189,24 @@ store that buffer in the connection object.
 
 ```go
 func (c *connection) readLine() (string, error) {
-	for {
-		b := make([]byte, 1024)
-		n, err := c.conn.Read(b)
-		if err != nil {
-			return "", err
-		}
+        for {
+                b := make([]byte, 1024)
+                n, err := c.conn.Read(b)
+                if err != nil {
+                        return "", err
+                }
 
-		c.buf = append(c.buf, b[:n]...)
-		for i, b := range c.buf {
-			// If end of line
-			if b == '\n' && i > 0 && c.buf[i-1] == '\r' {
-				// i-1 because drop the CRLF, no one cares after this
-				line := string(c.buf[:i-1])
-				c.buf = c.buf[i+1:]
-				return line, nil
-			}
-		}
-	}
+                c.buf = append(c.buf, b[:n]...)
+                for i, b := range c.buf {
+                        // If end of line
+                        if b == '\n' && i > 0 && c.buf[i-1] == '\r' {
+                                // i-1 because drop the CRLF, no one cares after this
+                                line := string(c.buf[:i-1])
+                                c.buf = c.buf[i+1:]
+                                return line, nil
+                        }
+                }
+        }
 }
 ```
 
@@ -218,15 +222,9 @@ response grammar since we don't have additional keywords we want to
 send to the client.
 
 ```
-func (c *connection) handle() {
-	defer c.conn.Close()
-	c.logInfo("Connection accepted")
+        ...
 
-	err := c.writeLine("220")
-	if err != nil {
-		c.logError(err)
-		return
-	}
+        c.logInfo("Awaiting EHLO")
 
 	line, err := c.readLine()
 	if err != nil {
@@ -234,26 +232,342 @@ func (c *connection) handle() {
 		return
 	}
 
-	msg := message{
-		smtpHeaders: map[string]string{},
-		atmHeaders:  map[string]string{},
-	}
-	if strings.HasPrefix(line, "EHLO") {
+	if !strings.HasPrefix(line, "EHLO") {
 		c.logError(errors.New("Expected EHLO got: " + line))
 		return
 	}
 
+	msg := message{
+		smtpCommands: map[string]string{},
+		atmHeaders:  map[string]string{},
+	}
 	msg.clientDomain = line[len("EHLO "):]
 
-	c.logInfo("Received EHLO")
+        c.logInfo("Received EHLO")
 
-	err = c.writeLine("250 ")
+        err = c.writeLine("250 ")
+        if err != nil {
+                c.logError(err)
+                return
+        }
+
+        c.logInfo("Done EHLO")
+
+        // TODO
+```
+
+### Additional commands
+
+Next up there are a few commands we need to read before we get to the
+message body. These include the recipient and the sender
+address. These are formatted vaguely similar to HTTP headers. They
+have a key on the left side of a colon and a value on the right. They
+may have a required order too, I'm not sure.
+
+In response to the commands we'll send a `250 OK`, although I'm not
+sure where in the RFC that is suggested.
+
+In our code we'll just keep looking for these commands until we find
+the `DATA` command. This indicates the body is to follow. And to this
+command we respond with a `354` instead of a `250 OK`.
+
+![DATA response](/dataresponse.png)
+
+In code:
+
+```go
+        ...
+
+	c.logInfo("Done EHLO")
+
+	for line != "" {
+		line, err = c.readLine()
+		if err != nil {
+			c.logError(err)
+			return
+		}
+
+		pieces := strings.SplitN(line, ":", 2)
+		smtpCommand := strings.ToUpper(pieces[0])
+
+		// Special command without a value
+		if smtpCommand == "DATA" {
+			err = c.writeLine("354")
+			if err != nil {
+				c.logError(err)
+				return
+			}
+
+			break
+		}
+
+		smtpValue := pieces[1]
+		msg.smtpCommands[smtpCommand] = smtpValue
+
+		c.logInfo("Got command: " + line)
+
+		err = c.writeLine("250 OK")
+		if err != nil {
+			c.logError(err)
+			return
+		}
+	}
+
+	c.logInfo("Done SMTP commands, reading ARPA text message headers")
+
+        // TODO
+```
+
+### Message body, headers
+
+Now that we've seen the `DATA` command we are within *a* message
+body. Within this body we still have to read some additional headers.
+
+Through trial-and-error I know to look for some headers like
+`Subject`. By searching the RFC I noticed a reference to [RFC
+822](https://datatracker.ietf.org/doc/html/rfc822) where these headers
+are defined.
+
+![ARPA text message headers](/response.png)
+
+These are ARPA internet text message headers apparantly. They also
+look like HTTP headers but unlike HTTP headers they can span multiple
+lines. This stumped me for a bit.
+
+![Multi-line headers](/longheaders.png)
+
+I decided to write a new `readLine` function that would specifically
+look for these possibly multi-line headers where a CRLF followed by
+whitespace isn't a line delimiter.
+
+```go
+func (c *connection) readMultiLine() (string, error) {
+	for {
+		noMoreReads := false
+		for i, b := range c.buf {
+			if i > 1 &&
+				b != ' ' &&
+				b != '\t' &&
+				c.buf[i-2] == '\r' &&
+				c.buf[i-1] == '\n' {
+				// i-2 because drop the CRLF, no one cares after this
+				line := string(c.buf[:i-2])
+				c.buf = c.buf[i:]
+				return line, nil
+			}
+
+			noMoreReads = c.isBodyClose(i)
+		}
+
+		if !noMoreReads {
+			b := make([]byte, 1024)
+			n, err := c.conn.Read(b)
+			if err != nil {
+				return "", err
+			}
+
+			c.buf = append(c.buf, b[:n]...)
+
+			// If this gets here more than once it's going to be an infinite loop
+		}
+	}
+}
+
+func (c *connection) isBodyClose(i int) bool {
+	return i > 4 &&
+		c.buf[i-4] == '\r' &&
+		c.buf[i-3] == '\n' &&
+		c.buf[i-2] == '.' &&
+		c.buf[i-1] == '\r' &&
+		c.buf[i-0] == '\n'
+}
+```
+
+Now back in the `handle` function we can read through all of these
+headers. According to RFC 822, we're done when we see a double CRLF,
+which in our code will show up as an empty line.
+
+```go
+        ...
+
+	c.logInfo("Done SMTP headers, reading ARPA text message headers")
+
+	for {
+		line, err = c.readMultiLine()
+		if err != nil {
+			c.logError(err)
+			return
+		}
+
+		if strings.TrimSpace(line) == "" {
+			break
+		}
+
+		pieces := strings.SplitN(line, ": ", 2)
+		atmHeader := strings.ToUpper(pieces[0])
+		atmValue := pieces[1]
+		msg.atmHeaders[atmHeader] = atmValue
+
+		if atmHeader == "SUBJECT" {
+			msg.subject = atmValue
+		}
+		if atmHeader == "TO" {
+			msg.to = atmValue
+		}
+		if atmHeader == "FROM" {
+			msg.from = atmValue
+		}
+		if atmHeader == "DATE" {
+			msg.date = atmValue
+		}
+	}
+
+	c.logInfo("Done ARPA text message headers, reading body")
+
+        // TODO
+```
+
+### Body, for real
+
+We're finally at the email body as the user typed it. According to the
+SMTP RFC the body ends with a CRLF followed by a dot (period) followed
+by a CRLF.
+
+So we'll write another helper to read until this marker.
+
+```go
+func (c *connection) readToEndOfBody() (string, error) {
+	for {
+		for i := range c.buf {
+			if c.isBodyClose(i) {
+				return string(c.buf[:i-4]), nil
+			}
+		}
+
+		b := make([]byte, 1024)
+		n, err := c.conn.Read(b)
+		if err != nil {
+			return "", err
+		}
+
+		c.buf = append(c.buf, b[:n]...)
+	}
+}
+```
+
+And we can finish up the `handle` function.
+
+```go
+	c.logInfo("Done ARPA text message headers, reading body")
+
+	msg.body, err = c.readToEndOfBody()
 	if err != nil {
 		c.logError(err)
 		return
 	}
 
-	c.logInfo("Done EHLO")
+	c.logInfo("Got body (%d bytes)", len(msg.body))
 
-        // TODO
+	err = c.writeLine("250 OK")
+	if err != nil {
+		c.logError(err)
+		return
+	}
+
+	c.logInfo("Message:\n%s\n", msg.body)
+
+	c.logInfo("Connection closed")
+}
 ```
+
+### Compile, setcap, run, and send
+
+```bash
+$ go build
+$ sudo setcap 'cap_net_bind_service=+ep' ./gomail
+$ ./gomail
+```
+
+And send an email in Gmail! It can be to any user since we haven't
+implemented anything regarding users. I'll send `What hath god
+wrought` as the subject and message to `morse@binutils.org`.
+
+And I see:
+
+```bash
+2022/02/21 02:17:19 [INFO] Listening
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Connection accepted
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Awaiting EHLO
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Received EHLO
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Done EHLO
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Got header: MAIL FROM:<philneaton95@gmail.com>
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Got header: RCPT TO:<morse@binutils.org>
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Done SMTP headers, reading ARPA text message headers
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Done ARPA text message headers, reading body
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Got body (256 bytes)
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Message:
+--000000000000c4758905d87ddb81
+Content-Type: text/plain; charset="UTF-8"
+
+What hath god wrought
+
+--000000000000c4758905d87ddb81
+Content-Type: text/html; charset="UTF-8"
+
+<div dir="ltr">What hath god wrought</div>
+
+--000000000000c4758905d87ddb81--
+
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Connection closed
+```
+
+Which is pretty sweet!
+
+### Multipart wut
+
+Ok this body still clearly has some format. And if we dump the ARPA
+text message headers we notice that Gmail 1) sets a Content-Type
+header and 2) it's value is `multipart/alternative`. I don't know
+where Content-Type as a valid header is defined because it's not in
+RFC 822. Maybe it's some "new-fangled" adhoc standard or maybe it's
+just an in extension RFC.
+
+In any case this looks like multipart bodies in HTTP. I don't want to
+deal with that so I'm just going to stop here.
+
+But I *am* curious about text-only email systems. So I `sudo dnf
+install php sendmail` and write a quick PHP script (thanks to @Josh on
+Discord for the suggestion):
+
+```php
+<?php
+  mail("morse@binutils.org", "What hath god wrought", "What hath god wrought", "");
+?>
+```
+
+And run it:
+
+```
+$ php test.php
+```
+
+And in my `gomail` window I see:
+
+```
+2022/02/21 02:24:17 [INFO] Listening
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Connection accepted
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Awaiting EHLO
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Received EHLO
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Done EHLO
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Got header: MAIL From:<phil@dev1.eatonphil.com>
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Got header: RCPT To:<morse@binutils.org>
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Done SMTP headers, reading ARPA text message headers
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Done ARPA text message headers, reading body
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Got body (21 bytes)
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Message:
+What hath god wrought
+
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Connection closed
+```
+
+And I'm happy to call it a night.

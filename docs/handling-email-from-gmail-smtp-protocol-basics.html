@@ -3,8 +3,8 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     
-    <title>SMTP protocol basics from scratch in Go: receiving email from Gmail | notes.eatonphil.com</title>
-    <meta name="description" content="SMTP protocol basics from scratch in Go: receiving email from Gmail" />
+    <title>hacking-networks channel. | notes.eatonphil.com</title>
+    <meta name="description" content="hacking-networks channel." />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
@@ -33,7 +33,7 @@
 	  </div>
 
           <h2>February 20, 2022</h2>
-          <h1>SMTP protocol basics from scratch in Go: receiving email from Gmail</h1>
+          <h1>hacking-networks channel.</h1>
           <div class="row" style="padding-bottom: 5px">
             <div class="tags"><a href="/tags/golang.html" class="tag">golang</a><a href="/tags/smtp.html" class="tag">smtp</a><a href="/tags/networking.html" class="tag">networking</a></div>
           </div>
@@ -55,7 +55,8 @@ server with a local mail client but that didn't seem as surely
 real. But if I could send email from my Gmail account and receive it
 in my server that would feel more rewarding.</p>
 <p>I spent the afternoon digging into this. All code is <a href="https://github.com/eatonphil/gomail">available on
-Github</a>.</p>
+Github</a>. The "live stream" is in
+the <a href="https://discord.multiprocess.io">Multiprocess Discord</a>'s</p>
 <h3 id="dns">DNS</h3><p>First I bought a domain. (I needed to be able to mess around with
 records without blowing up anything important.)</p>
 <p>I knew that MX records controlled where mail for a domain is sent. But
@@ -85,36 +86,36 @@ it</a>.</p>
 <pre><code class="hljs go">package main
 
 import (
-    &quot;errors&quot;
-    &quot;log&quot;
-    &quot;net&quot;
-    &quot;strconv&quot;
-    &quot;strings&quot;
+        &quot;errors&quot;
+        &quot;log&quot;
+        &quot;net&quot;
+        &quot;strconv&quot;
+        &quot;strings&quot;
 )
 
 func logError(err error) {
-    log.Printf(&quot;[ERROR] %s\n&quot;, err)
+        log.Printf(&quot;[ERROR] %s\n&quot;, err)
 }
 
 func logInfo(msg string) {
-    log.Printf(&quot;[INFO] %s\n&quot;, msg)
+        log.Printf(&quot;[INFO] %s\n&quot;, msg)
 }
 
 type message struct {
-    clientDomain string
-    smtpHeaders  map[string]string
-    atmHeaders   map[string]string
-    body         string
-    from         string
-    date         string
-    subject      string
-    to           string
+        clientDomain string
+        smtpHeaders  map[string]string
+        atmHeaders   map[string]string
+        body         string
+        from         string
+        date         string
+        subject      string
+        to           string
 }
 
 type connection struct {
-    conn net.Conn
-    id   int
-    buf  []byte
+        conn net.Conn
+        id   int
+        buf  []byte
 }
 
 // TODO
@@ -124,26 +125,26 @@ func (c *connection) handle() {
 }
 
 func main() {
-    l, err := net.Listen(&quot;tcp&quot;, &quot;0.0.0.0:25&quot;)
-    if err != nil {
-        panic(err)
-    }
-    defer l.Close()
-
-    logInfo(&quot;Listening&quot;)
-
-    id := 0
-    for {
-        conn, err := l.Accept()
+        l, err := net.Listen(&quot;tcp&quot;, &quot;0.0.0.0:25&quot;)
         if err != nil {
-            logError(err)
-            continue
+                panic(err)
         }
+        defer l.Close()
 
-        id += 1
-        c := connection{conn, id, nil}
-        go c.handle()
-    }
+        logInfo(&quot;Listening&quot;)
+
+        id := 0
+        for {
+                conn, err := l.Accept()
+                if err != nil {
+                        logError(err)
+                        continue
+                }
+
+                id += 1
+                c := connection{conn, id, nil}
+                go c.handle()
+        }
 }
 </code></pre>
 <p>Just a basic TCP server that passes off connections inside a
@@ -154,29 +155,29 @@ followed by additional text. Like most commands in SMTP it must be
 ended with CRLF (<code>\r\n</code>).</p>
 <p>So we'll add a helper function for writing lines that end in CRLF:</p>
 <pre><code class="hljs go">func (c *connection) writeLine(msg string) error {
-    msg += &quot;\r\n&quot;
-    for len(msg) &gt; 0 {
-        n, err := c.conn.Write([]byte(msg))
-        if err != nil {
-            return err
+        msg += &quot;\r\n&quot;
+        for len(msg) &gt; 0 {
+                n, err := c.conn.Write([]byte(msg))
+                if err != nil {
+                        return err
+                }
+
+                msg = msg[n:]
         }
 
-        msg = msg[n:]
-    }
-
-    return nil
+        return nil
 }
 </code></pre>
 <p>And then we'll send that <code>220</code> in the <code>handle</code> function.</p>
 <pre><code class="hljs go">func (c *connection) handle() {
-    defer c.conn.Close()
-    c.logInfo(&quot;Connection accepted&quot;)
+        defer c.conn.Close()
+        c.logInfo(&quot;Connection accepted&quot;)
 
-    err := c.writeLine(&quot;220&quot;)
-    if err != nil {
-        c.logError(err)
-        return
-    }
+        err := c.writeLine(&quot;220&quot;)
+        if err != nil {
+                c.logError(err)
+                return
+        }
 
         // TODO
 </code></pre>
@@ -185,24 +186,24 @@ a helper that reads until the next CRLF. We'll keep a buffer of unread
 bytes in case we accidentally get bytes past the next CRLF. We'll
 store that buffer in the connection object.</p>
 <pre><code class="hljs go">func (c *connection) readLine() (string, error) {
-    for {
-        b := make([]byte, 1024)
-        n, err := c.conn.Read(b)
-        if err != nil {
-            return &quot;&quot;, err
-        }
+        for {
+                b := make([]byte, 1024)
+                n, err := c.conn.Read(b)
+                if err != nil {
+                        return &quot;&quot;, err
+                }
 
-        c.buf = append(c.buf, b[:n]...)
-        for i, b := range c.buf {
-            // If end of line
-            if b == &#39;\n&#39; &amp;&amp; i &gt; 0 &amp;&amp; c.buf[i-1] == &#39;\r&#39; {
-                // i-1 because drop the CRLF, no one cares after this
-                line := string(c.buf[:i-1])
-                c.buf = c.buf[i+1:]
-                return line, nil
-            }
+                c.buf = append(c.buf, b[:n]...)
+                for i, b := range c.buf {
+                        // If end of line
+                        if b == &#39;\n&#39; &amp;&amp; i &gt; 0 &amp;&amp; c.buf[i-1] == &#39;\r&#39; {
+                                // i-1 because drop the CRLF, no one cares after this
+                                line := string(c.buf[:i-1])
+                                c.buf = c.buf[i+1:]
+                                return line, nil
+                        }
+                }
         }
-    }
 }
 </code></pre>
 <p>Now back in the <code>handle</code>-er we can read a line from the client. From
@@ -214,41 +215,41 @@ back a <code>250</code> with a space after it. We can ignore the rest of that
 response grammar since we don't have additional keywords we want to
 send to the client.</p>
 <pre><code>func (c *connection) handle() {
-    defer c.conn.Close()
-    c.logInfo("Connection accepted")
+        defer c.conn.Close()
+        c.logInfo("Connection accepted")
 
-    err := c.writeLine("220")
-    if err != nil {
-        c.logError(err)
-        return
-    }
+        err := c.writeLine("220")
+        if err != nil {
+                c.logError(err)
+                return
+        }
 
-    line, err := c.readLine()
-    if err != nil {
-        c.logError(err)
-        return
-    }
+        line, err := c.readLine()
+        if err != nil {
+                c.logError(err)
+                return
+        }
 
-    msg := message{
-        smtpHeaders: map[string]string{},
-        atmHeaders:  map[string]string{},
-    }
-    if strings.HasPrefix(line, "EHLO") {
-        c.logError(errors.New("Expected EHLO got: " + line))
-        return
-    }
+        msg := message{
+                smtpHeaders: map[string]string{},
+                atmHeaders:  map[string]string{},
+        }
+        if strings.HasPrefix(line, "EHLO") {
+                c.logError(errors.New("Expected EHLO got: " + line))
+                return
+        }
 
-    msg.clientDomain = line[len("EHLO "):]
+        msg.clientDomain = line[len("EHLO "):]
 
-    c.logInfo("Received EHLO")
+        c.logInfo("Received EHLO")
 
-    err = c.writeLine("250 ")
-    if err != nil {
-        c.logError(err)
-        return
-    }
+        err = c.writeLine("250 ")
+        if err != nil {
+                c.logError(err)
+                return
+        }
 
-    c.logInfo("Done EHLO")
+        c.logInfo("Done EHLO")
 
         // TODO
 </code></pre>
