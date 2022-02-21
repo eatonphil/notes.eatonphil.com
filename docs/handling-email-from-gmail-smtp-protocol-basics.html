@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>SMTP protocol basics from scratch in Go: receiving email from Gmail | notes.eatonphil.com</title>
+    <meta name="description" content="SMTP protocol basics from scratch in Go: receiving email from Gmail" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <div class="row">
+	    <a href="/" class="sm-link">
+              Home
+            </a>
+	    <a href="/rss.xml" class="sm-link">
+              RSS
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+
+          <h2>February 20, 2022</h2>
+          <h1>SMTP protocol basics from scratch in Go: receiving email from Gmail</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/golang.html" class="tag">golang</a><a href="/tags/smtp.html" class="tag">smtp</a><a href="/tags/networking.html" class="tag">networking</a></div>
+          </div>
+	</div>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="col-6">
+        <p>I've never run my own mail server before. Before today I had no clue
+how email worked under the hood other than the very few times I've set
+up mail clients.</p>
+<p>I've heard no few times how hard it is to <em>send</em> mail from a
+self-hosted server (because of spam filters). But how hard can it be
+to hook up DNS to my personal server and receive email to my domain
+sent from Gmail or another real-world client?</p>
+<p>I knew it would be simpler to just send local mail to a local mail
+server with a local mail client but that didn't seem as surely
+real. But if I could send email from my Gmail account and receive it
+in my server that would feel more rewarding.</p>
+<p>I spent the afternoon digging into this. All code is <a href="https://github.com/eatonphil/gomail">available on
+Github</a>. The "live stream" is in
+the <a href="https://discord.multiprocess.io">Multiprocess Discord</a>'s
+&#35;hacking-networks channel.</p>
+<h3 id="dns">DNS</h3><p>First I bought a domain. (I needed to be able to mess around with
+records without blowing up anything important.)</p>
+<p>I knew that MX records controlled where mail for a domain is sent. But
+I had to <a href="https://en.wikipedia.org/wiki/MX_record">look up the
+specifics</a>. You need to
+create an MX record that points to an A or AAAA record. So you need
+both an MX record and an A or AAAA record.</p>
+<p><img src="/dnsrecords.png" alt="MX and A record settings"></p>
+<p>Done.</p>
+<h3 id="firewall">Firewall</h3><p>The firewall on Fedora is aggressive. Gotta open up port 25.</p>
+<pre><code class="hljs bash">$ sudo firewall-cmd --zone=dmz --add-port=25/tcp --permanent
+$ sudo firewall-cmd --zone=public --add-port=25/tcp --permanent
+$ sudo firewall-cmd --reload
+</code></pre>
+<p>I don't understand what zones are here.</p>
+<h3 id="what-protocols?">What protocols?</h3><p>I knew that you send email with SMTP and you read it with POP3 or
+IMAP. But it hadn't clicked before that the mail server has to speak
+SMTP and if you only ever read on the server (which is of course
+impractical in the real world) you don't need POP3 or IMAP.</p>
+<p><img src="https://cdn.educba.com/academy/wp-content/uploads/2019/07/smtp-protocol.png" alt="SMTP vs POP3"></p>
+<p>So to meaningfully receive email from Gmail all I needed to do was implement SMTP.</p>
+<h3 id="smtp">SMTP</h3><p>First I found the <a href="https://datatracker.ietf.org/doc/html/rfc5321">RFC for
+SMTP</a> (or one of them
+anyway) and <a href="https://en.wikipedia.org/wiki/Simple_Mail_Transfer_Protocol">the wikipedia page for
+it</a>.</p>
+<p>First off I'd need to run a TCP server on port 25.</p>
+<pre><code class="hljs go">package main
+
+import (
+        &quot;errors&quot;
+        &quot;log&quot;
+        &quot;net&quot;
+        &quot;strconv&quot;
+        &quot;strings&quot;
+)
+
+func logError(err error) {
+        log.Printf(&quot;[ERROR] %s\n&quot;, err)
+}
+
+func logInfo(msg string) {
+        log.Printf(&quot;[INFO] %s\n&quot;, msg)
+}
+
+type message struct {
+        clientDomain string
+        smtpCommands  map[string]string
+        atmHeaders   map[string]string
+        body         string
+        from         string
+        date         string
+        subject      string
+        to           string
+}
+
+type connection struct {
+        conn net.Conn
+        id   int
+        buf  []byte
+}
+
+// TODO
+
+func (c *connection) handle() {
+        // TODO
+}
+
+func main() {
+        l, err := net.Listen(&quot;tcp&quot;, &quot;0.0.0.0:25&quot;)
+        if err != nil {
+                panic(err)
+        }
+        defer l.Close()
+
+        logInfo(&quot;Listening&quot;)
+
+        id := 0
+        for {
+                conn, err := l.Accept()
+                if err != nil {
+                        logError(err)
+                        continue
+                }
+
+                id += 1
+                c := connection{conn, id, nil}
+                go c.handle()
+        }
+}
+</code></pre>
+<p>Just a basic TCP server that passes off connections inside a
+goroutine.</p>
+<h3 id="greeting">Greeting</h3><p>After starting a connection, the server must send a greeting. The
+successful greeting response code is <code>220</code>. It can optionally be
+followed by additional text. Like most commands in SMTP it must be
+ended with CRLF (<code>\r\n</code>).</p>
+<p>So we'll add a helper function for writing lines that end in CRLF:</p>
+<pre><code class="hljs go">func (c *connection) writeLine(msg string) error {
+        msg += &quot;\r\n&quot;
+        for len(msg) &gt; 0 {
+                n, err := c.conn.Write([]byte(msg))
+                if err != nil {
+                        return err
+                }
+
+                msg = msg[n:]
+        }
+
+        return nil
+}
+</code></pre>
+<p>And then we'll send that <code>220</code> in the <code>handle</code> function.</p>
+<pre><code class="hljs go">func (c *connection) handle() {
+        defer c.conn.Close()
+        c.logInfo(&quot;Connection accepted&quot;)
+
+        err := c.writeLine(&quot;220&quot;)
+        if err != nil {
+                c.logError(err)
+                return
+        }
+
+        c.logInfo(&quot;Awaiting EHLO&quot;)
+
+        // TODO
+</code></pre>
+<h3 id="ehlo">EHLO</h3><p>Next we need to be able to read requests from the client. We'll write
+a helper that reads until the next CRLF. We'll keep a buffer of unread
+bytes in case we accidentally get bytes past the next CRLF. We'll
+store that buffer in the connection object.</p>
+<pre><code class="hljs go">func (c *connection) readLine() (string, error) {
+        for {
+                b := make([]byte, 1024)
+                n, err := c.conn.Read(b)
+                if err != nil {
+                        return &quot;&quot;, err
+                }
+
+                c.buf = append(c.buf, b[:n]...)
+                for i, b := range c.buf {
+                        // If end of line
+                        if b == &#39;\n&#39; &amp;&amp; i &gt; 0 &amp;&amp; c.buf[i-1] == &#39;\r&#39; {
+                                // i-1 because drop the CRLF, no one cares after this
+                                line := string(c.buf[:i-1])
+                                c.buf = c.buf[i+1:]
+                                return line, nil
+                        }
+                }
+        }
+}
+</code></pre>
+<p>Now back in the <code>handle</code>-er we can read a line from the client. From
+the RFC we can see it should be <code>HELO</code> or <code>EHLO</code>. Both sendmail locally
+and Gmail only send <code>EHLO</code> though so we'll just check for that.</p>
+<p><img src="/ehloresponse.png" alt="EHLO response format"></p>
+<p>So we'll validate the message sent is an <code>EHLO</code> and then we'll send
+back a <code>250</code> with a space after it. We can ignore the rest of that
+response grammar since we don't have additional keywords we want to
+send to the client.</p>
+<pre><code>        ...
+
+        c.logInfo("Awaiting EHLO")
+
+    line, err := c.readLine()
+    if err != nil {
+        c.logError(err)
+        return
+    }
+
+    if !strings.HasPrefix(line, "EHLO") {
+        c.logError(errors.New("Expected EHLO got: " + line))
+        return
+    }
+
+    msg := message{
+        smtpCommands: map[string]string{},
+        atmHeaders:  map[string]string{},
+    }
+    msg.clientDomain = line[len("EHLO "):]
+
+        c.logInfo("Received EHLO")
+
+        err = c.writeLine("250 ")
+        if err != nil {
+                c.logError(err)
+                return
+        }
+
+        c.logInfo("Done EHLO")
+
+        // TODO
+</code></pre>
+<h3 id="additional-commands">Additional commands</h3><p>Next up there are a few commands we need to read before we get to the
+message body. These include the recipient and the sender
+address. These are formatted vaguely similar to HTTP headers. They
+have a key on the left side of a colon and a value on the right. They
+may have a required order too, I'm not sure.</p>
+<p>In response to the commands we'll send a <code>250 OK</code>, although I'm not
+sure where in the RFC that is suggested.</p>
+<p>In our code we'll just keep looking for these commands until we find
+the <code>DATA</code> command. This indicates the body is to follow. And to this
+command we respond with a <code>354</code> instead of a <code>250 OK</code>.</p>
+<p><img src="/dataresponse.png" alt="DATA response"></p>
+<p>In code:</p>
+<pre><code class="hljs go">        ...
+
+    c.logInfo(&quot;Done EHLO&quot;)
+
+    for line != &quot;&quot; {
+        line, err = c.readLine()
+        if err != nil {
+            c.logError(err)
+            return
+        }
+
+        pieces := strings.SplitN(line, &quot;:&quot;, 2)
+        smtpCommand := strings.ToUpper(pieces[0])
+
+        // Special command without a value
+        if smtpCommand == &quot;DATA&quot; {
+            err = c.writeLine(&quot;354&quot;)
+            if err != nil {
+                c.logError(err)
+                return
+            }
+
+            break
+        }
+
+        smtpValue := pieces[1]
+        msg.smtpCommands[smtpCommand] = smtpValue
+
+        c.logInfo(&quot;Got command: &quot; + line)
+
+        err = c.writeLine(&quot;250 OK&quot;)
+        if err != nil {
+            c.logError(err)
+            return
+        }
+    }
+
+    c.logInfo(&quot;Done SMTP commands, reading ARPA text message headers&quot;)
+
+        // TODO
+</code></pre>
+<h3 id="message-body,-headers">Message body, headers</h3><p>Now that we've seen the <code>DATA</code> command we are within <em>a</em> message
+body. Within this body we still have to read some additional headers.</p>
+<p>Through trial-and-error I know to look for some headers like
+<code>Subject</code>. By searching the RFC I noticed a reference to <a href="https://datatracker.ietf.org/doc/html/rfc822">RFC
+822</a> where these headers
+are defined.</p>
+<p><img src="/response.png" alt="ARPA text message headers"></p>
+<p>These are ARPA internet text message headers apparantly. They also
+look like HTTP headers but unlike HTTP headers they can span multiple
+lines. This stumped me for a bit.</p>
+<p><img src="/longheaders.png" alt="Multi-line headers"></p>
+<p>I decided to write a new <code>readLine</code> function that would specifically
+look for these possibly multi-line headers where a CRLF followed by
+whitespace isn't a line delimiter.</p>
+<pre><code class="hljs go">func (c *connection) readMultiLine() (string, error) {
+    for {
+        noMoreReads := false
+        for i, b := range c.buf {
+            if i &gt; 1 &amp;&amp;
+                b != &#39; &#39; &amp;&amp;
+                b != &#39;\t&#39; &amp;&amp;
+                c.buf[i-2] == &#39;\r&#39; &amp;&amp;
+                c.buf[i-1] == &#39;\n&#39; {
+                // i-2 because drop the CRLF, no one cares after this
+                line := string(c.buf[:i-2])
+                c.buf = c.buf[i:]
+                return line, nil
+            }
+
+            noMoreReads = c.isBodyClose(i)
+        }
+
+        if !noMoreReads {
+            b := make([]byte, 1024)
+            n, err := c.conn.Read(b)
+            if err != nil {
+                return &quot;&quot;, err
+            }
+
+            c.buf = append(c.buf, b[:n]...)
+
+            // If this gets here more than once it&#39;s going to be an infinite loop
+        }
+    }
+}
+
+func (c *connection) isBodyClose(i int) bool {
+    return i &gt; 4 &amp;&amp;
+        c.buf[i-4] == &#39;\r&#39; &amp;&amp;
+        c.buf[i-3] == &#39;\n&#39; &amp;&amp;
+        c.buf[i-2] == &#39;.&#39; &amp;&amp;
+        c.buf[i-1] == &#39;\r&#39; &amp;&amp;
+        c.buf[i-0] == &#39;\n&#39;
+}
+</code></pre>
+<p>Now back in the <code>handle</code> function we can read through all of these
+headers. According to RFC 822, we're done when we see a double CRLF,
+which in our code will show up as an empty line.</p>
+<pre><code class="hljs go">        ...
+
+    c.logInfo(&quot;Done SMTP headers, reading ARPA text message headers&quot;)
+
+    for {
+        line, err = c.readMultiLine()
+        if err != nil {
+            c.logError(err)
+            return
+        }
+
+        if strings.TrimSpace(line) == &quot;&quot; {
+            break
+        }
+
+        pieces := strings.SplitN(line, &quot;: &quot;, 2)
+        atmHeader := strings.ToUpper(pieces[0])
+        atmValue := pieces[1]
+        msg.atmHeaders[atmHeader] = atmValue
+
+        if atmHeader == &quot;SUBJECT&quot; {
+            msg.subject = atmValue
+        }
+        if atmHeader == &quot;TO&quot; {
+            msg.to = atmValue
+        }
+        if atmHeader == &quot;FROM&quot; {
+            msg.from = atmValue
+        }
+        if atmHeader == &quot;DATE&quot; {
+            msg.date = atmValue
+        }
+    }
+
+    c.logInfo(&quot;Done ARPA text message headers, reading body&quot;)
+
+        // TODO
+</code></pre>
+<h3 id="body,-for-real">Body, for real</h3><p>We're finally at the email body as the user typed it. According to the
+SMTP RFC the body ends with a CRLF followed by a dot (period) followed
+by a CRLF.</p>
+<p>So we'll write another helper to read until this marker.</p>
+<pre><code class="hljs go">func (c *connection) readToEndOfBody() (string, error) {
+    for {
+        for i := range c.buf {
+            if c.isBodyClose(i) {
+                return string(c.buf[:i-4]), nil
+            }
+        }
+
+        b := make([]byte, 1024)
+        n, err := c.conn.Read(b)
+        if err != nil {
+            return &quot;&quot;, err
+        }
+
+        c.buf = append(c.buf, b[:n]...)
+    }
+}
+</code></pre>
+<p>And we can finish up the <code>handle</code> function.</p>
+<pre><code class="hljs go">    c.logInfo(&quot;Done ARPA text message headers, reading body&quot;)
+
+    msg.body, err = c.readToEndOfBody()
+    if err != nil {
+        c.logError(err)
+        return
+    }
+
+    c.logInfo(&quot;Got body (%d bytes)&quot;, len(msg.body))
+
+    err = c.writeLine(&quot;250 OK&quot;)
+    if err != nil {
+        c.logError(err)
+        return
+    }
+
+    c.logInfo(&quot;Message:\n%s\n&quot;, msg.body)
+
+    c.logInfo(&quot;Connection closed&quot;)
+}
+</code></pre>
+<h3 id="compile,-setcap,-run,-and-send">Compile, setcap, run, and send</h3><pre><code class="hljs bash">$ go build
+$ sudo setcap &#39;cap_net_bind_service=+ep&#39; ./gomail
+$ ./gomail
+</code></pre>
+<p>And send an email in Gmail! It can be to any user since we haven't
+implemented anything regarding users. I'll send <code>What hath god
+wrought</code> as the subject and message to <code>morse@binutils.org</code>.</p>
+<p>And I see:</p>
+<pre><code class="hljs bash">2022/02/21 02:17:19 [INFO] Listening
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Connection accepted
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Awaiting EHLO
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Received EHLO
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Done EHLO
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Got header: MAIL FROM:&lt;philneaton95@gmail.com&gt;
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Got header: RCPT TO:&lt;morse@binutils.org&gt;
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Done SMTP headers, reading ARPA text message headers
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Done ARPA text message headers, reading body
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Got body (256 bytes)
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Message:
+--000000000000c4758905d87ddb81
+Content-Type: text/plain; charset=&quot;UTF-8&quot;
+
+What hath god wrought
+
+--000000000000c4758905d87ddb81
+Content-Type: text/html; charset=&quot;UTF-8&quot;
+
+&lt;div dir=&quot;ltr&quot;&gt;What hath god wrought&lt;/div&gt;
+
+--000000000000c4758905d87ddb81--
+
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Connection closed
+</code></pre>
+<p>Which is pretty sweet!</p>
+<h3 id="multipart-wut">Multipart wut</h3><p>Ok this body still clearly has some format. And if we dump the ARPA
+text message headers we notice that Gmail 1) sets a Content-Type
+header and 2) it's value is <code>multipart/alternative</code>. I don't know
+where Content-Type as a valid header is defined because it's not in
+RFC 822. Maybe it's some "new-fangled" adhoc standard or maybe it's
+just an in extension RFC.</p>
+<p>In any case this looks like multipart bodies in HTTP. I don't want to
+deal with that so I'm just going to stop here.</p>
+<p>But I <em>am</em> curious about text-only email systems. So I <code>sudo dnf
+install php sendmail</code> and write a quick PHP script (thanks to @Josh on
+Discord for the suggestion):</p>
+<pre><code class="hljs php">&lt;?php
+  mail(&quot;morse@binutils.org&quot;, &quot;What hath god wrought&quot;, &quot;What hath god wrought&quot;, &quot;&quot;);
+?&gt;
+</code></pre>
+<p>And run it:</p>
+<pre><code>$ php test.php
+</code></pre>
+<p>And in my <code>gomail</code> window I see:</p>
+<pre><code>2022/02/21 02:24:17 [INFO] Listening
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Connection accepted
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Awaiting EHLO
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Received EHLO
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Done EHLO
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Got header: MAIL From:&lt;phil@dev1.eatonphil.com&gt;
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Got header: RCPT To:&lt;morse@binutils.org&gt;
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Done SMTP headers, reading ARPA text message headers
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Done ARPA text message headers, reading body
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Got body (21 bytes)
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Message:
+What hath god wrought
+
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Connection closed
+</code></pre>
+<p>And I'm happy to call it a night.</p>
+<style>.feedback{display:initial;}</style>
+	<div class="feedback">
+	  <h4>Feedback</h4>
+	  As always,
+	  please <a href="mailto:phil@eatonphil.com">email</a>
+	  or <a href="https://twitter.com/phil_eaton">tweet me</a>
+	  with questions, corrections, or ideas!
+	</div>
+      </div>
+    </div>
+
+    <footer>
+      <div class="container">
+	<div>
+	  <div class="row">
+	    <a href="/" class="sm-link">
+              Home
+            </a>
+	    <a href="/rss.xml" class="sm-link">
+              RSS
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+	  <div class="feedback">
+	    <p>Frequent Topics</p>
+	    <div class="tags"><a href="/tags/javascript.html" class="tag">javascript (21)</a><a href="/tags/parsing.html" class="tag">parsing (13)</a><a href="/tags/compilers.html" class="tag">compilers (13)</a><a href="/tags/golang.html" class="tag">golang (11)</a><a href="/tags/postgres.html" class="tag">postgres (9)</a><a href="/tags/management.html" class="tag">management (8)</a><a href="/tags/lisp.html" class="tag">lisp (8)</a><a href="/tags/interpreters.html" class="tag">interpreters (8)</a><a href="/tags/sql.html" class="tag">sql (7)</a><a href="/tags/databases.html" class="tag">databases (7)</a><a href="/tags/python.html" class="tag">python (6)</a><a href="/tags/books.html" class="tag">books (6)</a><a href="/tags/x86-amd64.html" class="tag">x86/amd64 (5)</a><a href="/tags/typescript.html" class="tag">typescript (5)</a><a href="/tags/linux.html" class="tag">linux (5)</a><a href="/tags/json.html" class="tag">json (5)</a><a href="/tags/communication.html" class="tag">communication (5)</a><a href="/tags/scheme.html" class="tag">scheme (4)</a><a href="/tags/learning.html" class="tag">learning (4)</a><a href="/tags/leadership.html" class="tag">leadership (4)</a></div>
+	  </div>
+	</div>
+      </div>
+    </footer>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>
