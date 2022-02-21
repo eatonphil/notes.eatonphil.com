@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 21 Feb 2022 02:29:04 +0000</lastBuildDate><item><title>SMTP protocol basics from scratch in Go: receiving email from Gmail</title><link>http://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</link><description>&lt;p&gt;I've never run my own mail server before. Before today I had no clue
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 21 Feb 2022 02:46:12 +0000</lastBuildDate><item><title>SMTP protocol basics from scratch in Go: receiving email from Gmail</title><link>http://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</link><description>&lt;p&gt;I've never run my own mail server before. Before today I had no clue
 how email worked under the hood other than the very few times I've set
 up mail clients.&lt;/p&gt;
 &lt;p&gt;I've heard no few times how hard it is to &lt;em&gt;send&lt;/em&gt; mail from a
@@ -468,6 +468,9 @@ What hath god wrought
 2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Connection closed
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;And I'm happy to call it a night.&lt;/p&gt;
+&lt;p&gt;p.s. if you want to see more networking software/hardware internals
+check out
+&lt;a href="https://reddit.com/r/networkdevelopment"&gt;/r/NetworkDevelopment&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;I wrote a new blog post on building an SMTP server from scratch in Go that is correctly enough hooked up you can receive emails sent from Gmail to it!&lt;br&gt;&lt;br&gt;Good fun and some learning too.&lt;a href="https://t.co/8pYkkAbFnI"&gt;https://t.co/8pYkkAbFnI&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1495586245896028160?ref_src=twsrc%5Etfw"&gt;February 21, 2022&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</guid><pubDate>Sun, 20 Feb 2022 00:00:00 +0000</pubDate></item><item><title>How to recommend books, or, stop recommending SICP</title><link>http://notes.eatonphil.com/recommending-a-book.html</link><description>&lt;p&gt;Many "must-read" books are not well-written. I &lt;a href="https://www.goodreads.com/user/show/50930981-phil-eaton"&gt;try to read a
 lot&lt;/a&gt;, but I
