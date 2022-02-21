@@ -166,7 +166,7 @@ def main():
 
             all_tags[tag].append((out_file, title[1], title[2]))
 
-    frequent_tags_data = sorted(tags_with_counts.items(), key=lambda x: x[1], reverse=True)
+    frequent_tags_data = sorted(tags_with_counts.items(), key=lambda x: (x[1], x[0]), reverse=True)
     frequent_tags = []
     for tag, count in [t for t in frequent_tags_data if t[0] != 'external'][:20]:
         frequent_tags.append(f'<a href="/tags/{tag.replace(" ", "-").replace("/", "-")}.html" class="tag">{tag} ({count})</a>')
