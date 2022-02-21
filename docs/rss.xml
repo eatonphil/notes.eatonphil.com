@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 21 Feb 2022 01:53:16 +0000</lastBuildDate><item><title>hacking-networks channel.</title><link>http://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</link><description>&lt;p&gt;I've never run my own mail server before. Before today I had no clue
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 21 Feb 2022 02:26:15 +0000</lastBuildDate><item><title>SMTP protocol basics from scratch in Go: receiving email from Gmail</title><link>http://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</link><description>&lt;p&gt;I've never run my own mail server before. Before today I had no clue
 how email worked under the hood other than the very few times I've set
 up mail clients.&lt;/p&gt;
 &lt;p&gt;I've heard no few times how hard it is to &lt;em&gt;send&lt;/em&gt; mail from a
@@ -12,7 +12,8 @@ real. But if I could send email from my Gmail account and receive it
 in my server that would feel more rewarding.&lt;/p&gt;
 &lt;p&gt;I spent the afternoon digging into this. All code is &lt;a href="https://github.com/eatonphil/gomail"&gt;available on
 Github&lt;/a&gt;. The "live stream" is in
-the &lt;a href="https://discord.multiprocess.io"&gt;Multiprocess Discord&lt;/a&gt;'s&lt;/p&gt;
+the &lt;a href="https://discord.multiprocess.io"&gt;Multiprocess Discord&lt;/a&gt;'s
+&amp;#35;hacking-networks channel.&lt;/p&gt;
 &lt;h3 id="dns"&gt;DNS&lt;/h3&gt;&lt;p&gt;First I bought a domain. (I needed to be able to mess around with
 records without blowing up anything important.)&lt;/p&gt;
 &lt;p&gt;I knew that MX records controlled where mail for a domain is sent. But
@@ -59,7 +60,7 @@ func logInfo(msg string) {
 
 type message struct {
         clientDomain string
-        smtpHeaders  map[string]string
+        smtpCommands  map[string]string
         atmHeaders   map[string]string
         body         string
         from         string
@@ -135,6 +136,8 @@ ended with CRLF (&lt;code&gt;\r\n&lt;/code&gt;).&lt;/p&gt;
                 return
         }
 
+        c.logInfo(&amp;quot;Awaiting EHLO&amp;quot;)
+
         // TODO
 &lt;/code&gt;&lt;/pre&gt;
 &lt;h3 id="ehlo"&gt;EHLO&lt;/h3&gt;&lt;p&gt;Next we need to be able to read requests from the client. We'll write
@@ -170,32 +173,26 @@ and Gmail only send &lt;code&gt;EHLO&lt;/code&gt; though so we'll just check for
 back a &lt;code&gt;250&lt;/code&gt; with a space after it. We can ignore the rest of that
 response grammar since we don't have additional keywords we want to
 send to the client.&lt;/p&gt;
-&lt;pre&gt;&lt;code&gt;func (c *connection) handle() {
-        defer c.conn.Close()
-        c.logInfo("Connection accepted")
+&lt;pre&gt;&lt;code&gt;        ...
 
-        err := c.writeLine("220")
-        if err != nil {
-                c.logError(err)
-                return
-        }
+        c.logInfo("Awaiting EHLO")
 
-        line, err := c.readLine()
-        if err != nil {
-                c.logError(err)
-                return
-        }
+    line, err := c.readLine()
+    if err != nil {
+        c.logError(err)
+        return
+    }
 
-        msg := message{
-                smtpHeaders: map[string]string{},
-                atmHeaders:  map[string]string{},
-        }
-        if strings.HasPrefix(line, "EHLO") {
-                c.logError(errors.New("Expected EHLO got: " + line))
-                return
-        }
+    if !strings.HasPrefix(line, "EHLO") {
+        c.logError(errors.New("Expected EHLO got: " + line))
+        return
+    }
 
-        msg.clientDomain = line[len("EHLO "):]
+    msg := message{
+        smtpCommands: map[string]string{},
+        atmHeaders:  map[string]string{},
+    }
+    msg.clientDomain = line[len("EHLO "):]
 
         c.logInfo("Received EHLO")
 
@@ -209,6 +206,268 @@ send to the client.&lt;/p&gt;
 
         // TODO
 &lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id="additional-commands"&gt;Additional commands&lt;/h3&gt;&lt;p&gt;Next up there are a few commands we need to read before we get to the
+message body. These include the recipient and the sender
+address. These are formatted vaguely similar to HTTP headers. They
+have a key on the left side of a colon and a value on the right. They
+may have a required order too, I'm not sure.&lt;/p&gt;
+&lt;p&gt;In response to the commands we'll send a &lt;code&gt;250 OK&lt;/code&gt;, although I'm not
+sure where in the RFC that is suggested.&lt;/p&gt;
+&lt;p&gt;In our code we'll just keep looking for these commands until we find
+the &lt;code&gt;DATA&lt;/code&gt; command. This indicates the body is to follow. And to this
+command we respond with a &lt;code&gt;354&lt;/code&gt; instead of a &lt;code&gt;250 OK&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;img src="/dataresponse.png" alt="DATA response"&gt;&lt;/p&gt;
+&lt;p&gt;In code:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;        ...
+
+    c.logInfo(&amp;quot;Done EHLO&amp;quot;)
+
+    for line != &amp;quot;&amp;quot; {
+        line, err = c.readLine()
+        if err != nil {
+            c.logError(err)
+            return
+        }
+
+        pieces := strings.SplitN(line, &amp;quot;:&amp;quot;, 2)
+        smtpCommand := strings.ToUpper(pieces[0])
+
+        // Special command without a value
+        if smtpCommand == &amp;quot;DATA&amp;quot; {
+            err = c.writeLine(&amp;quot;354&amp;quot;)
+            if err != nil {
+                c.logError(err)
+                return
+            }
+
+            break
+        }
+
+        smtpValue := pieces[1]
+        msg.smtpCommands[smtpCommand] = smtpValue
+
+        c.logInfo(&amp;quot;Got command: &amp;quot; + line)
+
+        err = c.writeLine(&amp;quot;250 OK&amp;quot;)
+        if err != nil {
+            c.logError(err)
+            return
+        }
+    }
+
+    c.logInfo(&amp;quot;Done SMTP commands, reading ARPA text message headers&amp;quot;)
+
+        // TODO
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id="message-body,-headers"&gt;Message body, headers&lt;/h3&gt;&lt;p&gt;Now that we've seen the &lt;code&gt;DATA&lt;/code&gt; command we are within &lt;em&gt;a&lt;/em&gt; message
+body. Within this body we still have to read some additional headers.&lt;/p&gt;
+&lt;p&gt;Through trial-and-error I know to look for some headers like
+&lt;code&gt;Subject&lt;/code&gt;. By searching the RFC I noticed a reference to &lt;a href="https://datatracker.ietf.org/doc/html/rfc822"&gt;RFC
+822&lt;/a&gt; where these headers
+are defined.&lt;/p&gt;
+&lt;p&gt;&lt;img src="/response.png" alt="ARPA text message headers"&gt;&lt;/p&gt;
+&lt;p&gt;These are ARPA internet text message headers apparantly. They also
+look like HTTP headers but unlike HTTP headers they can span multiple
+lines. This stumped me for a bit.&lt;/p&gt;
+&lt;p&gt;&lt;img src="/longheaders.png" alt="Multi-line headers"&gt;&lt;/p&gt;
+&lt;p&gt;I decided to write a new &lt;code&gt;readLine&lt;/code&gt; function that would specifically
+look for these possibly multi-line headers where a CRLF followed by
+whitespace isn't a line delimiter.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;func (c *connection) readMultiLine() (string, error) {
+    for {
+        noMoreReads := false
+        for i, b := range c.buf {
+            if i &amp;gt; 1 &amp;amp;&amp;amp;
+                b != &amp;#39; &amp;#39; &amp;amp;&amp;amp;
+                b != &amp;#39;\t&amp;#39; &amp;amp;&amp;amp;
+                c.buf[i-2] == &amp;#39;\r&amp;#39; &amp;amp;&amp;amp;
+                c.buf[i-1] == &amp;#39;\n&amp;#39; {
+                // i-2 because drop the CRLF, no one cares after this
+                line := string(c.buf[:i-2])
+                c.buf = c.buf[i:]
+                return line, nil
+            }
+
+            noMoreReads = c.isBodyClose(i)
+        }
+
+        if !noMoreReads {
+            b := make([]byte, 1024)
+            n, err := c.conn.Read(b)
+            if err != nil {
+                return &amp;quot;&amp;quot;, err
+            }
+
+            c.buf = append(c.buf, b[:n]...)
+
+            // If this gets here more than once it&amp;#39;s going to be an infinite loop
+        }
+    }
+}
+
+func (c *connection) isBodyClose(i int) bool {
+    return i &amp;gt; 4 &amp;amp;&amp;amp;
+        c.buf[i-4] == &amp;#39;\r&amp;#39; &amp;amp;&amp;amp;
+        c.buf[i-3] == &amp;#39;\n&amp;#39; &amp;amp;&amp;amp;
+        c.buf[i-2] == &amp;#39;.&amp;#39; &amp;amp;&amp;amp;
+        c.buf[i-1] == &amp;#39;\r&amp;#39; &amp;amp;&amp;amp;
+        c.buf[i-0] == &amp;#39;\n&amp;#39;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now back in the &lt;code&gt;handle&lt;/code&gt; function we can read through all of these
+headers. According to RFC 822, we're done when we see a double CRLF,
+which in our code will show up as an empty line.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;        ...
+
+    c.logInfo(&amp;quot;Done SMTP headers, reading ARPA text message headers&amp;quot;)
+
+    for {
+        line, err = c.readMultiLine()
+        if err != nil {
+            c.logError(err)
+            return
+        }
+
+        if strings.TrimSpace(line) == &amp;quot;&amp;quot; {
+            break
+        }
+
+        pieces := strings.SplitN(line, &amp;quot;: &amp;quot;, 2)
+        atmHeader := strings.ToUpper(pieces[0])
+        atmValue := pieces[1]
+        msg.atmHeaders[atmHeader] = atmValue
+
+        if atmHeader == &amp;quot;SUBJECT&amp;quot; {
+            msg.subject = atmValue
+        }
+        if atmHeader == &amp;quot;TO&amp;quot; {
+            msg.to = atmValue
+        }
+        if atmHeader == &amp;quot;FROM&amp;quot; {
+            msg.from = atmValue
+        }
+        if atmHeader == &amp;quot;DATE&amp;quot; {
+            msg.date = atmValue
+        }
+    }
+
+    c.logInfo(&amp;quot;Done ARPA text message headers, reading body&amp;quot;)
+
+        // TODO
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id="body,-for-real"&gt;Body, for real&lt;/h3&gt;&lt;p&gt;We're finally at the email body as the user typed it. According to the
+SMTP RFC the body ends with a CRLF followed by a dot (period) followed
+by a CRLF.&lt;/p&gt;
+&lt;p&gt;So we'll write another helper to read until this marker.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;func (c *connection) readToEndOfBody() (string, error) {
+    for {
+        for i := range c.buf {
+            if c.isBodyClose(i) {
+                return string(c.buf[:i-4]), nil
+            }
+        }
+
+        b := make([]byte, 1024)
+        n, err := c.conn.Read(b)
+        if err != nil {
+            return &amp;quot;&amp;quot;, err
+        }
+
+        c.buf = append(c.buf, b[:n]...)
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And we can finish up the &lt;code&gt;handle&lt;/code&gt; function.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;    c.logInfo(&amp;quot;Done ARPA text message headers, reading body&amp;quot;)
+
+    msg.body, err = c.readToEndOfBody()
+    if err != nil {
+        c.logError(err)
+        return
+    }
+
+    c.logInfo(&amp;quot;Got body (%d bytes)&amp;quot;, len(msg.body))
+
+    err = c.writeLine(&amp;quot;250 OK&amp;quot;)
+    if err != nil {
+        c.logError(err)
+        return
+    }
+
+    c.logInfo(&amp;quot;Message:\n%s\n&amp;quot;, msg.body)
+
+    c.logInfo(&amp;quot;Connection closed&amp;quot;)
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id="compile,-setcap,-run,-and-send"&gt;Compile, setcap, run, and send&lt;/h3&gt;&lt;pre&gt;&lt;code class="hljs bash"&gt;$ go build
+$ sudo setcap &amp;#39;cap_net_bind_service=+ep&amp;#39; ./gomail
+$ ./gomail
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And send an email in Gmail! It can be to any user since we haven't
+implemented anything regarding users. I'll send &lt;code&gt;What hath god
+wrought&lt;/code&gt; as the subject and message to &lt;code&gt;morse@binutils.org&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;And I see:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;2022/02/21 02:17:19 [INFO] Listening
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Connection accepted
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Awaiting EHLO
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Received EHLO
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Done EHLO
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Got header: MAIL FROM:&amp;lt;philneaton95@gmail.com&amp;gt;
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Got header: RCPT TO:&amp;lt;morse@binutils.org&amp;gt;
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Done SMTP headers, reading ARPA text message headers
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Done ARPA text message headers, reading body
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Got body (256 bytes)
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Message:
+--000000000000c4758905d87ddb81
+Content-Type: text/plain; charset=&amp;quot;UTF-8&amp;quot;
+
+What hath god wrought
+
+--000000000000c4758905d87ddb81
+Content-Type: text/html; charset=&amp;quot;UTF-8&amp;quot;
+
+&amp;lt;div dir=&amp;quot;ltr&amp;quot;&amp;gt;What hath god wrought&amp;lt;/div&amp;gt;
+
+--000000000000c4758905d87ddb81--
+
+2022/02/21 02:19:13 [INFO] [1: 209.85.222.47:40695] Connection closed
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Which is pretty sweet!&lt;/p&gt;
+&lt;h3 id="multipart-wut"&gt;Multipart wut&lt;/h3&gt;&lt;p&gt;Ok this body still clearly has some format. And if we dump the ARPA
+text message headers we notice that Gmail 1) sets a Content-Type
+header and 2) it's value is &lt;code&gt;multipart/alternative&lt;/code&gt;. I don't know
+where Content-Type as a valid header is defined because it's not in
+RFC 822. Maybe it's some "new-fangled" adhoc standard or maybe it's
+just an in extension RFC.&lt;/p&gt;
+&lt;p&gt;In any case this looks like multipart bodies in HTTP. I don't want to
+deal with that so I'm just going to stop here.&lt;/p&gt;
+&lt;p&gt;But I &lt;em&gt;am&lt;/em&gt; curious about text-only email systems. So I &lt;code&gt;sudo dnf
+install php sendmail&lt;/code&gt; and write a quick PHP script (thanks to @Josh on
+Discord for the suggestion):&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs php"&gt;&amp;lt;?php
+  mail(&amp;quot;morse@binutils.org&amp;quot;, &amp;quot;What hath god wrought&amp;quot;, &amp;quot;What hath god wrought&amp;quot;, &amp;quot;&amp;quot;);
+?&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And run it:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ php test.php
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And in my &lt;code&gt;gomail&lt;/code&gt; window I see:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;2022/02/21 02:24:17 [INFO] Listening
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Connection accepted
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Awaiting EHLO
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Received EHLO
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Done EHLO
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Got header: MAIL From:&amp;lt;phil@dev1.eatonphil.com&amp;gt;
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Got header: RCPT To:&amp;lt;morse@binutils.org&amp;gt;
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Done SMTP headers, reading ARPA text message headers
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Done ARPA text message headers, reading body
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Got body (21 bytes)
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Message:
+What hath god wrought
+
+2022/02/21 02:24:18 [INFO] [1: 127.0.0.1:45102] Connection closed
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And I'm happy to call it a night.&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</guid><pubDate>Sun, 20 Feb 2022 00:00:00 +0000</pubDate></item><item><title>How to recommend books, or, stop recommending SICP</title><link>http://notes.eatonphil.com/recommending-a-book.html</link><description>&lt;p&gt;Many "must-read" books are not well-written. I &lt;a href="https://www.goodreads.com/user/show/50930981-phil-eaton"&gt;try to read a
 lot&lt;/a&gt;, but I
 still have a low tolerance for bad writing and bad editing. I write
