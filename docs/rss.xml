@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 21 Feb 2022 13:16:52 +0000</lastBuildDate><item><title>SMTP protocol basics from scratch in Go: receiving email from Gmail</title><link>http://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</link><description>&lt;p&gt;I've never run my own mail server before. Before today I had no clue
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 22 Feb 2022 16:54:21 +0000</lastBuildDate><item><title>SMTP protocol basics from scratch in Go: receiving email from Gmail</title><link>http://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</link><description>&lt;p&gt;I've never run my own mail server before. Before today I had no clue
 how email worked under the hood other than the very few times I've set
 up mail clients.&lt;/p&gt;
 &lt;p&gt;I've heard no few times how hard it is to &lt;em&gt;send&lt;/em&gt; mail from a
@@ -472,7 +472,12 @@ What hath god wrought
 &lt;p&gt;p.s. if you want to see more networking software/hardware internals
 check out
 &lt;a href="https://reddit.com/r/networkdevelopment"&gt;/r/NetworkDevelopment&lt;/a&gt;.&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</guid><pubDate>Sun, 20 Feb 2022 00:00:00 +0000</pubDate></item><item><title>How to recommend books, or, stop recommending SICP</title><link>http://notes.eatonphil.com/recommending-a-book.html</link><description>&lt;p&gt;Many "must-read" books are not well-written. I &lt;a href="https://www.goodreads.com/user/show/50930981-phil-eaton"&gt;try to read a
+</description><guid isPermaLink="false">http://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</guid><pubDate>Sun, 20 Feb 2022 00:00:00 +0000</pubDate></item><item><title>The world of PostgreSQL wire compatibility</title><link>http://notes.eatonphil.com/the-world-of-postgresql-wire-compatibility.html</link><description>&lt;head&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2022-02-08-the-world-of-postgresql-wire-compatibility.html'" /&gt;
+&lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
+&lt;a href="https://datastation.multiprocess.io/blog/2022-02-08-the-world-of-postgresql-wire-compatibility.html"&gt;here&lt;/a&gt;
+if you are not redirected.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/the-world-of-postgresql-wire-compatibility.html</guid><pubDate>Tue, 08 Feb 2022 00:00:00 +0000</pubDate></item><item><title>How to recommend books, or, stop recommending SICP</title><link>http://notes.eatonphil.com/recommending-a-book.html</link><description>&lt;p&gt;Many "must-read" books are not well-written. I &lt;a href="https://www.goodreads.com/user/show/50930981-phil-eaton"&gt;try to read a
 lot&lt;/a&gt;, but I
 still have a low tolerance for bad writing and bad editing. I write
 this post both to discourage thoughtless recommendations and to
@@ -1088,7 +1093,17 @@ $ qemu-system-x86_64 -fda editor.bin
 &lt;p&gt;&lt;img src="bootloader-basics-editor.gif" alt="Recording of a bad editor"&gt;&lt;/p&gt;
 &lt;p&gt;Tedious and buggy! But I learned something, I think.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;I wrote a new post on my first time exploring bootloader basics! Neat to discover the BIOS APIs and spend some time actually coding in assembly versus just generating or emulating it.&lt;a href="https://t.co/7iP6Nib620"&gt;https://t.co/7iP6Nib620&lt;/a&gt; &lt;a href="https://t.co/xSyG1IXgEB"&gt;pic.twitter.com/xSyG1IXgEB&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1485398216124346371?ref_src=twsrc%5Etfw"&gt;January 23, 2022&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/bootloader-basics.html</guid><pubDate>Sun, 23 Jan 2022 00:00:00 +0000</pubDate></item><item><title>The year in books: 11 to recommend in 2021</title><link>http://notes.eatonphil.com/year-in-books-2021.html</link><description>&lt;p&gt;Last year (2021) I finished 17 books, a five year low. But that's ok!
+</description><guid isPermaLink="false">http://notes.eatonphil.com/bootloader-basics.html</guid><pubDate>Sun, 23 Jan 2022 00:00:00 +0000</pubDate></item><item><title>dsq: Commandline tool for running SQL queries against JSON, CSV, Excel, Parquet, and more.</title><link>http://notes.eatonphil.com/dsq.html</link><description>&lt;head&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2022-01-11-dsq.html" /&gt;
+&lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
+&lt;a href="https://datastation.multiprocess.io/blog/2022-01-11-dsq.html"&gt;here&lt;/a&gt;
+if you are not redirected.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/dsq.html</guid><pubDate>Tue, 11 Jan 2022 00:00:00 +0000</pubDate></item><item><title>Analyzing large JSON files via partial JSON parsing</title><link>http://notes.eatonphil.com/analyzing-large-json-files-via-partial-json-parsing.html</link><description>&lt;head&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2022-01-06-analyzing-large-json-files-via-partial-json-parsing.html'" /&gt;
+&lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
+&lt;a href="https://datastation.multiprocess.io/blog/2022-01-06-analyzing-large-json-files-via-partial-json-parsing.html"&gt;here&lt;/a&gt;
+if you are not redirected.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/analyzing-large-json-files-via-partial-json-parsing.html</guid><pubDate>Thu, 06 Jan 2022 00:00:00 +0000</pubDate></item><item><title>The year in books: 11 to recommend in 2021</title><link>http://notes.eatonphil.com/year-in-books-2021.html</link><description>&lt;p&gt;Last year (2021) I finished 17 books, a five year low. But that's ok!
 4 fiction and 13 non-fiction. Another 30 started but not finished.&lt;/p&gt;
 &lt;h3 id="non-fiction"&gt;Non-fiction&lt;/h3&gt;&lt;p&gt;It seems I was pretty focused on business history books and history of
 tech. The 8 non-fiction books I liked the most:&lt;/p&gt;

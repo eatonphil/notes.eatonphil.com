@@ -313,12 +313,24 @@
     <lastmod>2022-01-05</lastmod>
  </url>
   <url>
+    <loc>https://notes.eatonphil.com/analyzing-large-json-files-via-partial-json-parsing.html</loc>
+    <lastmod>2022-01-06</lastmod>
+ </url>
+  <url>
+    <loc>https://notes.eatonphil.com/dsq.html</loc>
+    <lastmod>2022-01-11</lastmod>
+ </url>
+  <url>
     <loc>https://notes.eatonphil.com/bootloader-basics.html</loc>
     <lastmod>2022-01-23</lastmod>
  </url>
   <url>
     <loc>https://notes.eatonphil.com/recommending-a-book.html</loc>
     <lastmod>2022-01-31</lastmod>
+ </url>
+  <url>
+    <loc>https://notes.eatonphil.com/the-world-of-postgresql-wire-compatibility.html</loc>
+    <lastmod>2022-02-08</lastmod>
  </url>
   <url>
     <loc>https://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</loc>
