@@ -26,31 +26,44 @@ TAG_PAGE = """
 """
 HOME_PAGE = """
 <div class="fp-section fp-section--about">
-  <h2 class="fp-h2"></h2>
+  <h2 class="fp-h2">Welcome!</h2>
   <p>
-    Hey! I'm Phil. I run <a
+    Hey! I'm Phil. I've been a developer or manager for the last 10
+    years, at startups and Oracle. Today, I run <a
     href="https://multiprocess.io">Multiprocess Labs</a> (just me)
     where I build <a
     href="https://github.com/multiprocessio">open-source data
     tools</a> like <a
-    href="https://datastation.multiprocess.io">DataStation</a>, an
-    open-source data IDE for developers. Aside from the open-source
-    tools I do contract development (see below).
+    href="https://datastation.multiprocess.io">DataStation (1.2k+
+    stars)</a>, an open-source data IDE for developers, and <a
+    href="https://github.com/multiprocessio/dsq">dsq (1.5k+
+    stars)</a>, a commandline tool for running SQL queries against
+    JSON, CSV, Parquet, Excel and more.
   </p>
   <h3 class="fp-h3">Hang out</h3>
   <p>
-    If you're looking for a developer community along the lines of
-    this blog, check out Multiprocess's <a
-    href="https://discord.multiprocess.io">hacker Discord</a> and the
-    Multiprocess virtual meetup, <a
-    href="https://multiprocess.io/hackernights">Hacker Nights</a>.
+    I host a <a href="https://discord.multiprocess.io">hacker Discord
+    (450+ members)</a> and a monthly virtual Meetup, <a
+    href="https://www.meetup.com/hackernights/">Hacker Nights (100+
+    members)</a>, that has featured talks by the founder of <a
+    href="bit.io">bit.io</a>, the creator of <a
+    href="https://github.com/rqlite/rqlite">rqlite</a>, the author of
+    <a href="https://sirupsen.com/napkin">Napkin Math</a> and many
+    hobbyists hacking on cool tech for fun. Both the Meetup and the
+    Discord are designed to expose devs (and myself) to the internals
+    of databases, compilers, operating systems, browsers, emulators,
+    etc. And to provide a community around this kind of
+    exploration. You are very welcome to join either!
   </p>
   <h3 class="fp-h3">Contract Development</h3>
   <p>
-    I've been a developer and manager for the last 10 years; leading
-    frontend, fullstack and backend teams at startups and Oracle. As a
-    contractor I help small companies build web-related software
-    faster. If I can help you out, <a
+    With 10 years of experience, I've led frontend, backend and
+    fullstack teams. Particularly focused on Go, Python, Node/JS/TS,
+    React; and PostgreSQL or SQLite. Although my work with DataStation
+    has meant getting familiar with just about every database out
+    there. Over the last year I've also gotten exposed to Electron
+    while building DataStation. I'm always looking for new
+    opportunities. If I can help you out, <a
     href="mailto:phil@multiprocess.io">please get in touch</a>!
   </p>
   <h3 class="fp-h3">Elsewhere</h3>
