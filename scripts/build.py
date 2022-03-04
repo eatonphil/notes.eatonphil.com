@@ -29,7 +29,7 @@ HOME_PAGE = """
   <h2 class="fp-h2">Welcome!</h2>
   <p>
     Hey! I'm Phil. I've been a developer or manager for the last 10
-    years, at startups and Oracle. Today, I run <a
+    years, at startups and Oracle. I quit my job at Oracle in 2021 to start <a
     href="https://multiprocess.io">Multiprocess Labs</a> (just me)
     where I build <a
     href="https://github.com/multiprocessio">open-source data
@@ -39,6 +39,10 @@ HOME_PAGE = """
     href="https://github.com/multiprocessio/dsq">dsq (1.5k+
     stars)</a>, a commandline tool for running SQL queries against
     JSON, CSV, Parquet, Excel and more.
+  </p>
+  <h3 class="fp-h3">❤️  Sponsor this blog</h3>
+  <p>
+    If you love this blog, consider <a href="https://github.com/sponsors/eatonphil">sponsoring me on Github</a>!
   </p>
   <h3 class="fp-h3">Hang out</h3>
   <p>
