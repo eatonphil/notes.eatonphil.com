@@ -40,10 +40,6 @@ HOME_PAGE = """
     stars)</a>, a commandline tool for running SQL queries against
     JSON, CSV, Parquet, Excel and more.
   </p>
-  <h3 class="fp-h3">❤️  Sponsor this blog</h3>
-  <p>
-    If you love this blog, consider <a href="https://github.com/sponsors/eatonphil">sponsoring me on Github</a>!
-  </p>
   <h3 class="fp-h3">Hang out</h3>
   <p>
     I host a <a href="https://discord.multiprocess.io">hacker Discord
