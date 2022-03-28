@@ -9,6 +9,7 @@ following interactions, inspired by Elasticsearch:
 ```bash
 $ curl -X POST -H 'Content-Type: application/json' -d '{"name": "Kevin", "age": "45"}' http://localhost:8080/docs
 {"body":{"id":"5ac64e74-58f9-4ba4-909e-1d5bf4ddcaa1"},"status":"ok"}
+
 $ curl --get http://localhost:8080/docs --data-urlencode 'q=name:"Kevin"' | jq
 {
   "body": {
@@ -25,6 +26,7 @@ $ curl --get http://localhost:8080/docs --data-urlencode 'q=name:"Kevin"' | jq
   },
   "status": "ok"
 }
+
 $ curl --get http://localhost:8080/docs --data-urlencode 'q=age:<50' | jq
 {
   "body": {
@@ -292,6 +294,7 @@ Now, in another terminal, insert a document:
 ```bash
 $ curl -X POST -H 'Content-Type: application/json' -d '{"name": "Kevin", "age": "45"}' http://localhost:8080/docs
 {"body":{"id":"c458a3ce-9faf-4431-a058-d9ae2a1651e1"},"status":"ok"}
+
 $ curl http://localhost:8080/docs/c458a3ce-9faf-4431-a058-d9ae2a1651e1
 {"body":{"document":{"age":"45","name":"Kevin"}},"status":"ok"}
 ```
@@ -382,9 +385,11 @@ func lexString(input []rune, index int) (string, int, error) {
 }
 ```
 
-This is not something you get right without unit tests. I wrote unit
-tests for it while building this project. Always unit test tricky code
-where you're likely to have off-by-one errors! I had a bunch.
+<p class="note">
+  This is not something you get right without unit tests. I wrote unit
+  tests for it while building this project. Always unit test tricky code
+  where you're likely to have off-by-one errors! I had a bunch.
+</p>
 
 ### Query parser
 
@@ -451,9 +456,9 @@ func parseQuery(q string) (*query, error) {
 }
 ```
 
-Now there is some better lexing we could do when it comes to the JSON
-path parts where we just use `strings.Split(key, ".")`. But it isn't a
-huge deal at this stage. So we keep it simple.
+Since we're already writing a real lexer we could do better than
+`strings.Split(key, ".")` when it comes to find key path parts. But it
+isn't a huge deal at this stage. So we keep it simple.
 
 ### Query matching
 
@@ -542,8 +547,10 @@ func (q query) match(doc map[string]any) bool {
 }
 ```
 
-Thank goodness Go is so convenient to program in! That could have been
-really verbose.
+<p class="note">
+  This bit of Go that requires separate case statements for every
+  possible numeric so I can convert it to float is really annoying.
+</p>
 
 The only additional part to call out in there is `getPath`. We need to
 be able to grab any path within an object since the user could have
@@ -586,7 +593,7 @@ func (s server) searchDocuments(w http.ResponseWriter, r *http.Request, ps httpr
         return
     }
         
-        var documents []map[string]any
+    var documents []map[string]any
 
     iter := s.db.NewIter(nil)
     defer iter.Close()
@@ -649,6 +656,7 @@ $ curl --get http://localhost:8080/docs --data-urlencode 'q=name:Mel' | jq
   },
   "status": "ok"
 }
+
 $ curl --get http://localhost:8080/docs --data-urlencode 'q=name:Kevin' | jq
 {
   "body": {
@@ -678,6 +686,7 @@ $ curl --get http://localhost:8080/docs --data-urlencode 'q=age:<12' | jq
   },
   "status": "ok"
 }
+
 $ curl --get http://localhost:8080/docs --data-urlencode 'q=age:<200' | jq
 {
   "body": {
@@ -748,9 +757,9 @@ curl -s --get http://localhost:8080/docs --data-urlencode 'q="year":1918'  0.00s
 ```
 
 And you think: although there are hundreds of thousands of documents,
-if I'm just asking for documents with a certain value such that ther
+if I'm just asking for documents with a certain value such that there
 are only 1000 documents that match that value, shouldn't it be
-possible to grab them more quickly than in one whole second? Or better
+possible to grab them more quickly than in one whole second? Or, better
 than a time that grows with the number of documents in the database?
 
 Yes. Yes it is possible.
@@ -932,7 +941,7 @@ func main() {
 
 ### Using the index
 
-When there is ever an equality filter we can look the equality filter
+When there is an equality filter we can look the equality filter
 up in the index database. Our filter language only supports AND-ed
 arugments. So the results matching the overall filter must be the set
 intersection of ids that match each individual equality
@@ -940,7 +949,7 @@ filter. Greater than and less than filters will be filtered out after
 fetching all possible ids that match equality filters.
 
 If no ids are found in the index database meeting all equality filters
-then fall back to the full table scan we already have.
+then we'll fall back to the full table scan we already have.
 
 ```go
 func (s server) searchDocuments(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -1059,7 +1068,7 @@ $ ./docdb
 Once the server is ready we can run:
 
 ```
-time curl -s --get http://localhost:8080/docs --data-urlencode 'q="year":1918' | jq '.body.count'
+$ time curl -s --get http://localhost:8080/docs --data-urlencode 'q="year":1918' | jq '.body.count'
 1280
 curl -s --get http://localhost:8080/docs --data-urlencode 'q="year":1918'  0.01s user 0.00s system 29% cpu 0.029 total
 ```

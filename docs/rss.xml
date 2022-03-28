@@ -1,9 +1,10 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 28 Mar 2022 20:37:12 +0000</lastBuildDate><item><title>Writing a document database from scratch in Go: Lucene-like filters and indexes</title><link>http://notes.eatonphil.com/documentdb.html</link><description>&lt;p&gt;In this post we'll write a rudimentary document database from scratch
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 28 Mar 2022 20:43:39 +0000</lastBuildDate><item><title>Writing a document database from scratch in Go: Lucene-like filters and indexes</title><link>http://notes.eatonphil.com/documentdb.html</link><description>&lt;p&gt;In this post we'll write a rudimentary document database from scratch
 in Go. In less than 500 lines of code we'll be able to support the
 following interactions, inspired by Elasticsearch:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ curl -X POST -H &amp;#39;Content-Type: application/json&amp;#39; -d &amp;#39;{&amp;quot;name&amp;quot;: &amp;quot;Kevin&amp;quot;, &amp;quot;age&amp;quot;: &amp;quot;45&amp;quot;}&amp;#39; http://localhost:8080/docs
 {&amp;quot;body&amp;quot;:{&amp;quot;id&amp;quot;:&amp;quot;5ac64e74-58f9-4ba4-909e-1d5bf4ddcaa1&amp;quot;},&amp;quot;status&amp;quot;:&amp;quot;ok&amp;quot;}
+
 $ curl --get http://localhost:8080/docs --data-urlencode &amp;#39;q=name:&amp;quot;Kevin&amp;quot;&amp;#39; | jq
 {
   &amp;quot;body&amp;quot;: {
@@ -20,6 +21,7 @@ $ curl --get http://localhost:8080/docs --data-urlencode &amp;#39;q=name:&amp;qu
   },
   &amp;quot;status&amp;quot;: &amp;quot;ok&amp;quot;
 }
+
 $ curl --get http://localhost:8080/docs --data-urlencode &amp;#39;q=age:&amp;lt;50&amp;#39; | jq
 {
   &amp;quot;body&amp;quot;: {
@@ -239,6 +241,7 @@ $ ./docdb
 &lt;p&gt;Now, in another terminal, insert a document:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ curl -X POST -H &amp;#39;Content-Type: application/json&amp;#39; -d &amp;#39;{&amp;quot;name&amp;quot;: &amp;quot;Kevin&amp;quot;, &amp;quot;age&amp;quot;: &amp;quot;45&amp;quot;}&amp;#39; http://localhost:8080/docs
 {&amp;quot;body&amp;quot;:{&amp;quot;id&amp;quot;:&amp;quot;c458a3ce-9faf-4431-a058-d9ae2a1651e1&amp;quot;},&amp;quot;status&amp;quot;:&amp;quot;ok&amp;quot;}
+
 $ curl http://localhost:8080/docs/c458a3ce-9faf-4431-a058-d9ae2a1651e1
 {&amp;quot;body&amp;quot;:{&amp;quot;document&amp;quot;:{&amp;quot;age&amp;quot;:&amp;quot;45&amp;quot;,&amp;quot;name&amp;quot;:&amp;quot;Kevin&amp;quot;}},&amp;quot;status&amp;quot;:&amp;quot;ok&amp;quot;}
 &lt;/code&gt;&lt;/pre&gt;
@@ -316,10 +319,11 @@ func lexString(input []rune, index int) (string, int, error) {
     return string(s), index, nil
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;This is not something you get right without unit tests. I wrote unit
-tests for it while building this project. Always unit test tricky code
-where you're likely to have off-by-one errors! I had a bunch.&lt;/p&gt;
-&lt;h3 id="query-parser"&gt;Query parser&lt;/h3&gt;&lt;p&gt;Now we can write the query parser. It first lexes a string for the
+&lt;p class="note"&gt;
+  This is not something you get right without unit tests. I wrote unit
+  tests for it while building this project. Always unit test tricky code
+  where you're likely to have off-by-one errors! I had a bunch.
+&lt;/p&gt;&lt;h3 id="query-parser"&gt;Query parser&lt;/h3&gt;&lt;p&gt;Now we can write the query parser. It first lexes a string for the
 key. Then it looks for the operator which can be one of &lt;code&gt;:&lt;/code&gt; (meaning
 equality), &lt;code&gt;:&amp;gt;&lt;/code&gt; (meaning greater than), or &lt;code&gt;:&amp;lt;&lt;/code&gt; (meaning less
 than). It accumulates each key-value pair into an overall list of
@@ -379,9 +383,9 @@ func parseQuery(q string) (*query, error) {
     return &amp;amp;parsed, nil
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;Now there is some better lexing we could do when it comes to the JSON
-path parts where we just use &lt;code&gt;strings.Split(key, ".")&lt;/code&gt;. But it isn't a
-huge deal at this stage. So we keep it simple.&lt;/p&gt;
+&lt;p&gt;Since we're already writing a real lexer we could do better than
+&lt;code&gt;strings.Split(key, ".")&lt;/code&gt; when it comes to find key path parts. But it
+isn't a huge deal at this stage. So we keep it simple.&lt;/p&gt;
 &lt;h3 id="query-matching"&gt;Query matching&lt;/h3&gt;&lt;p&gt;Now that we've got the query parser we need to implement an evaluator
 for the search endpoint. We need to be able to check that given a
 document, it meets the filter or not.&lt;/p&gt;
@@ -463,9 +467,10 @@ arguments and didn't return, there was a match!&lt;/p&gt;
     return true
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;Thank goodness Go is so convenient to program in! That could have been
-really verbose.&lt;/p&gt;
-&lt;p&gt;The only additional part to call out in there is &lt;code&gt;getPath&lt;/code&gt;. We need to
+&lt;p class="note"&gt;
+  This bit of Go that requires separate case statements for every
+  possible numeric so I can convert it to float is really annoying.
+&lt;/p&gt;&lt;p&gt;The only additional part to call out in there is &lt;code&gt;getPath&lt;/code&gt;. We need to
 be able to grab any path within an object since the user could have
 made a filter like &lt;code&gt;a.b:12&lt;/code&gt;. So let's keep things simple (but less
 safe) and implement &lt;code&gt;getPath&lt;/code&gt; recursively.&lt;/p&gt;
@@ -498,7 +503,7 @@ return all documents that match the filter.&lt;/p&gt;
         return
     }
 
-        var documents []map[string]any
+    var documents []map[string]any
 
     iter := s.db.NewIter(nil)
     defer iter.Close()
@@ -552,6 +557,7 @@ $ ./docdb
   },
   &amp;quot;status&amp;quot;: &amp;quot;ok&amp;quot;
 }
+
 $ curl --get http://localhost:8080/docs --data-urlencode &amp;#39;q=name:Kevin&amp;#39; | jq
 {
   &amp;quot;body&amp;quot;: {
@@ -578,6 +584,7 @@ $ curl --get http://localhost:8080/docs --data-urlencode &amp;#39;q=name:Kevin&a
   },
   "status": "ok"
 }
+
 $ curl --get http://localhost:8080/docs --data-urlencode 'q=age:&amp;lt;200' | jq
 {
   "body": {
@@ -631,9 +638,9 @@ exact equality queries start to take longer:&lt;/p&gt;
 curl -s --get http://localhost:8080/docs --data-urlencode 'q="year":1918'  0.00s user 0.00s system 0% cpu 0.992 total
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;And you think: although there are hundreds of thousands of documents,
-if I'm just asking for documents with a certain value such that ther
+if I'm just asking for documents with a certain value such that there
 are only 1000 documents that match that value, shouldn't it be
-possible to grab them more quickly than in one whole second? Or better
+possible to grab them more quickly than in one whole second? Or, better
 than a time that grows with the number of documents in the database?&lt;/p&gt;
 &lt;p&gt;Yes. Yes it is possible.&lt;/p&gt;
 &lt;h3 id="indexes"&gt;Indexes&lt;/h3&gt;&lt;p&gt;Document databases often index everything. We're going to do that. For
@@ -792,14 +799,14 @@ func main() {
         log.Fatal(http.ListenAndServe(&amp;quot;:&amp;quot;+s.port, router))
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;h3 id="using-the-index"&gt;Using the index&lt;/h3&gt;&lt;p&gt;When there is ever an equality filter we can look the equality filter
+&lt;h3 id="using-the-index"&gt;Using the index&lt;/h3&gt;&lt;p&gt;When there is an equality filter we can look the equality filter
 up in the index database. Our filter language only supports AND-ed
 arugments. So the results matching the overall filter must be the set
 intersection of ids that match each individual equality
 filter. Greater than and less than filters will be filtered out after
 fetching all possible ids that match equality filters.&lt;/p&gt;
 &lt;p&gt;If no ids are found in the index database meeting all equality filters
-then fall back to the full table scan we already have.&lt;/p&gt;
+then we'll fall back to the full table scan we already have.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs go"&gt;func (s server) searchDocuments(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
         q, err := parseQuery(r.URL.Query().Get(&amp;quot;q&amp;quot;))
         if err != nil {
@@ -906,7 +913,7 @@ $ ./docdb
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;(This is going to take a while; to reindex.)&lt;/p&gt;
 &lt;p&gt;Once the server is ready we can run:&lt;/p&gt;
-&lt;pre&gt;&lt;code&gt;time curl -s --get http://localhost:8080/docs --data-urlencode 'q="year":1918' | jq '.body.count'
+&lt;pre&gt;&lt;code&gt;$ time curl -s --get http://localhost:8080/docs --data-urlencode 'q="year":1918' | jq '.body.count'
 1280
 curl -s --get http://localhost:8080/docs --data-urlencode 'q="year":1918'  0.01s user 0.00s system 29% cpu 0.029 total
 &lt;/code&gt;&lt;/pre&gt;
