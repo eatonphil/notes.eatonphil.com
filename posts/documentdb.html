@@ -1,0 +1,1076 @@
+# Writing a document database from scratch in Go: Lucene-like filters and indexes
+## March 28, 2022
+###### databases,golang,parsing,elasticsearch
+
+In this post we'll write a rudimentary document database from scratch
+in Go. In less than 500 lines of code we'll be able to support the
+following interactions, inspired by Elasticsearch:
+
+```bash
+$ curl -X POST -H 'Content-Type: application/json' -d '{"name": "Kevin", "age": "45"}' http://localhost:8080/docs
+{"body":{"id":"5ac64e74-58f9-4ba4-909e-1d5bf4ddcaa1"},"status":"ok"}
+
+$ curl --get http://localhost:8080/docs --data-urlencode 'q=name:"Kevin"' | jq
+{
+  "body": {
+    "count": 1,
+    "documents": [
+      {
+        "body": {
+          "age": "45",
+          "name": "Kevin"
+        },
+        "id": "5ac64e74-58f9-4ba4-909e-1d5bf4ddcaa1"
+      }
+    ]
+  },
+  "status": "ok"
+}
+
+$ curl --get http://localhost:8080/docs --data-urlencode 'q=age:<50' | jq
+{
+  "body": {
+    "count": 1,
+    "documents": [
+      {
+        "body": {
+          "age": "45",
+          "name": "Kevin"
+        },
+        "id": "5ac64e74-58f9-4ba4-909e-1d5bf4ddcaa1"
+      }
+    ]
+  },
+  "status": "ok"
+}
+```
+
+The latter query, being a range query, will do a full table scan. But
+the first query, an exact match, will use an index and be much
+faster.
+
+<p class="note">
+  Document databases in general may be able to support indexes on
+  ranges but our rudimentary one won't.
+  <br />
+  <br />
+  Furthermore, this post will not implement full text search.
+</p>
+
+All code for this project is [available on
+Github](https://github.com/eatonphil/docdb). Let's get started.
+
+### Server basics
+
+Run `go mod init` and set up `main.go` with [Julien Schmidt's
+httprouter](https://github.com/julienschmidt/httprouter). We'll create
+three routes: one for inserting a document, one for retrieving a
+document by its id, and one for searching for documents.
+
+```go
+package main
+
+import (
+    "encoding/json"
+    "log"
+    "net/http"
+
+    "github.com/julienschmidt/httprouter"
+)
+
+type server struct {
+    port string
+}
+
+func main() {
+    s server{"8080"}
+    router := httprouter.New()
+    router.POST("/docs", s.addDocument)
+    router.GET("/docs", s.searchDocuments)
+    router.GET("/docs/:id", s.getDocument)
+
+    log.Println("Listening on " + s.port)
+    log.Fatal(http.ListenAndServe(":"+s.port, router))
+}
+```
+
+Now add the routes:
+
+```go
+func (s server) addDocument(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+    panic("Unimplemented")
+}
+
+func (s server) searchDocuments(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+    panic("Unimplemented")
+}
+
+func (s server) getDocument(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+    panic("Unimplemented")
+}
+```
+
+That's good enough for now! Let's think about storage.
+
+### Storage
+
+If you wanted to do this project fully from scratch you could handle
+storage by just writing JSON blobs to disk. Nothing in this project
+will be much more complex than just writing JSON to disk and the
+equivalent of using `ls` on the filesystem. I mention this because I
+said this project is "from scratch" but I'm going to bring in a
+storage engine. My point is that you could easily follow this post and
+just read/write directly to disk if you felt strongly.
+
+Any storage engine would be fine: direct read/write, SQLite,
+PostgreSQL. But we're going to grab a key-value storage engine. I've
+used Badger before so I'm going to try out [Cockroach Lab's
+Pebble](https://github.com/cockroachdb/pebble) this time instead.
+
+Add `"github.com/cockroachdb/pebble"` to the list of imports. Then
+upgrade the `server` struct to store an instance of a Pebble database.
+
+```go
+type server struct {
+    db      *pebble.DB
+    port    string
+}
+
+func newServer(database string, port string) (*server, error) {
+    s := server{db: nil, port: port}
+    var err error
+    s.db, err = pebble.Open(database, &pebble.Options{})
+    return &s, err
+}
+```
+
+And upgrade main:
+
+```go
+func main() {
+    s, err := newServer("docdb.data", "8080")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer s.db.Close()
+
+    router := httprouter.New()
+    router.POST("/docs", s.addDocument)
+    router.GET("/docs", s.searchDocuments)
+    router.GET("/docs/:id", s.getDocument)
+
+    log.Println("Listening on " + s.port)
+    log.Fatal(http.ListenAndServe(":"+s.port, router))
+}
+```
+
+In the future these server settings could be user-configurable. For
+now they're hard-coded.
+
+#### Storing data
+
+When the user sends a JSON document we need to give it a unique ID and
+store the ID and document in the database. Since we're using a
+key-value storage engine we'll just use the ID as the key and the JSON
+document as the value.
+
+To generate the ID we'll use [Google's UUID
+package](https://github.com/google/uuid). So make sure to import
+`"github.com/google/uuid"`.
+
+```go
+func (s server) addDocument(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+    dec := json.NewDecoder(r.Body)
+    var document map[string]any
+    err := dec.Decode(&document)
+    if err != nil {
+        jsonResponse(w, nil, err)
+        return
+    }
+
+    // New unique id for the document
+    id := uuid.New().String()
+
+    bs, err := json.Marshal(document)
+    if err != nil {
+        jsonResponse(w, nil, err)
+        return
+    }
+    err = s.db.Set([]byte(id), bs, pebble.Sync)
+    if err != nil {
+        jsonResponse(w, nil, err)
+        return
+    }
+
+    jsonResponse(w, map[string]any{
+        "id": id,
+    }, nil)
+}
+```
+
+Nothing special: just accept a JSON POST body and store it in the
+database, return the generated document id.
+
+<p class="note">
+  I'm not sure that using UUIDs here is a good idea but it is easier
+  than keeping track of the number of rows in the database.
+</p>
+
+The `jsonResponse` helper can be defined as:
+
+```go
+func jsonResponse(w http.ResponseWriter, body map[string]any, err error) {
+    data := map[string]any{
+        "body":   body,
+        "status": "ok",
+    }
+
+    if err == nil {
+        w.WriteHeader(http.StatusOK)
+    } else {
+        data["status"] = "error"
+        data["error"] = err.Error()
+        w.WriteHeader(http.StatusBadRequest)
+    }
+    w.Header().Set("Content-Type", "application/json")
+
+    enc := json.NewEncoder(w)
+    err = enc.Encode(data)
+    if err != nil {
+        // TODO: set up panic handler?
+        panic(err)
+    }
+}
+```
+
+It's a basic wrapper so that all responses are structured JSON.
+
+#### Retrieving by ID
+
+Before we try to test out inserts, let's get retrieval hooked
+up. Inserts return an ID in the HTTP reponse. GETs will grab a
+document by ID.
+
+```go
+func (s server) getDocumentById(id []byte) (map[string]any, error) {
+    valBytes, closer, err := s.db.Get(id)
+    if err != nil {
+        return nil, err
+    }
+    defer closer.Close()
+
+    var document map[string]any
+    err = json.Unmarshal(valBytes, &document)
+    return document, err
+}
+
+func (s server) getDocument(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+    id := ps.ByName("id")
+
+    document, err := s.getDocumentById([]byte(id))
+    if err != nil {
+        jsonResponse(w, nil, err)
+        return
+    }
+
+    jsonResponse(w, map[string]any{
+        "document": document,
+    }, nil)
+}
+```
+
+We've now got enough in place to test out these basics!
+
+```bash
+$ go mod init docdb
+$ go mod tidy
+$ go build
+$ ./docdb
+2022/03/28 19:28:19 Listening on 8080
+```
+
+Now, in another terminal, insert a document:
+
+```bash
+$ curl -X POST -H 'Content-Type: application/json' -d '{"name": "Kevin", "age": "45"}' http://localhost:8080/docs
+{"body":{"id":"c458a3ce-9faf-4431-a058-d9ae2a1651e1"},"status":"ok"}
+
+$ curl http://localhost:8080/docs/c458a3ce-9faf-4431-a058-d9ae2a1651e1
+{"body":{"document":{"age":"45","name":"Kevin"}},"status":"ok"}
+```
+
+Perfect! Now let's implement search.
+
+### A filter language
+
+First off we need to pick a filter language. Using a JSON data
+structure would be fine. We could require the user POSTs against a
+search endpoint so that the POST body contains the JSON filter.
+
+But [Lucene](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) is a pretty simple language and we can implement enough
+parts of it easily. The result is more fun.
+
+In our simplification of Lucene there will only be key-value
+matches. Field names and field values can be quoted. They must be
+quoted if they contain spaces or colons, among other things. Key-value
+matches are separated by whitespace. They can only be AND-ed together
+and that is done implicity.
+
+The following are some valid filters in our implementation:
+
+* `a:1`
+* `b:fifteen a:<3`
+* `a.b:12`
+* `title:"Which way?"`
+* `" a key 2":tenant`
+* `" flubber ":"blubber "`
+
+Nested paths are specified using JSON path syntax (i.e. `a.b` would
+retrieve `4` in `{"a": {"b": 4, "d": 100}, "c": 8}`).
+
+### Lexing strings
+
+Both keys and values are lexed as strings. If they start with a quote,
+we keep on accumulating all characters until the ending
+quote. Otherwise we accumulate until we stop seeing a digit, letter,
+or period.
+
+```go
+// Handles either quoted strings or unquoted strings of only contiguous digits and letters
+func lexString(input []rune, index int) (string, int, error) {
+    if index >= len(input) {
+        return "", index, nil
+    }
+    if input[index] == '"' {
+        index++
+        foundEnd := false
+
+        var s []rune
+        // TODO: handle nested quotes
+        for index < len(input) {
+            if input[index] == '"' {
+                foundEnd = true
+                break
+            }
+
+            s = append(s, input[index])
+            index++
+        }
+
+        if !foundEnd {
+            return "", index, fmt.Errorf("Expected end of quoted string")
+        }
+
+        return string(s), index + 1, nil
+    }
+
+    // If unquoted, read as much contiguous digits/letters as there are
+    var s []rune
+    var c rune
+    // TODO: someone needs to validate there's not ...
+    for index < len(input) {
+        c = input[index]
+        if !(unicode.IsLetter(c) || unicode.IsDigit(c) || c == '.') {
+            break
+        }
+        s = append(s, c)
+        index++
+    }
+
+    if len(s) == 0 {
+        return "", index, fmt.Errorf("No string found")
+    }
+
+    return string(s), index, nil
+}
+```
+
+<p class="note">
+  This is not something you get right without unit tests. I wrote unit
+  tests for it while building this project. Always unit test tricky code
+  where you're likely to have off-by-one errors! I had a bunch.
+</p>
+
+### Query parser
+
+Now we can write the query parser. It first lexes a string for the
+key. Then it looks for the operator which can be one of `:` (meaning
+equality), `:>` (meaning greater than), or `:<` (meaning less
+than). It accumulates each key-value pair into an overall list of
+AND-ed arguments that make up the query.
+
+```
+type queryComparison struct {
+    key   []string
+    value string
+    op    string
+}
+
+type query struct {
+    ands []queryComparison
+}
+
+// E.g. q=a.b:12
+func parseQuery(q string) (*query, error) {
+    if q == "" {
+        return &query{}, nil
+    }
+
+    i := 0
+    var parsed query
+    var qRune = []rune(q)
+    for i < len(qRune) {
+        // Eat whitespace
+        for unicode.IsSpace(qRune[i]) {
+            i++
+        }
+
+        key, nextIndex, err := lexString(qRune, i)
+        if err != nil {
+            return nil, fmt.Errorf("Expected valid key, got [%s]: `%s`", err, q[nextIndex:])
+        }
+
+        // Expect some operator
+        if q[nextIndex] != ':' {
+            return nil, fmt.Errorf("Expected colon at %d, got: `%s`", nextIndex, q[nextIndex:])
+        }
+        i = nextIndex + 1
+
+        op := "="
+        if q[i] == '>' || q[i] == '<' {
+            i++
+            op = string(q[i])
+        }
+
+        value, nextIndex, err := lexString(qRune, i)
+        if err != nil {
+            return nil, fmt.Errorf("Expected valid value, got [%s]: `%s`", err, q[nextIndex:])
+        }
+        i = nextIndex
+
+        argument := queryComparison{key: strings.Split(key, "."), value: value, op: op}
+        parsed.ands = append(parsed.ands, argument)
+    }
+
+    return &parsed, nil
+}
+```
+
+Since we're already writing a real lexer we could do better than
+`strings.Split(key, ".")` when it comes to find key path parts. But it
+isn't a huge deal at this stage. So we keep it simple.
+
+### Query matching
+
+Now that we've got the query parser we need to implement an evaluator
+for the search endpoint. We need to be able to check that given a
+document, it meets the filter or not.
+
+So we iterate over each argument and do the indicated comparison:
+equality, greater than or less than. If at any point the comparison
+fails, return false immediately. Otherwise if we got through all
+arguments and didn't return, there was a match!
+
+```go
+func (q query) match(doc map[string]any) bool {
+    for _, argument := range q.ands {
+        value, ok := getPath(doc, argument.key)
+        if !ok {
+            return false
+        }
+
+        // Handle equality
+        if argument.op == "=" {
+            match := fmt.Sprintf("%v", value) == argument.value
+            if !match {
+                return false
+            }
+
+            continue
+        }
+
+        // Handle <, >
+        right, err := strconv.ParseFloat(argument.value, 64)
+        if err != nil {
+            return false
+        }
+
+        var left float64
+        switch t := value.(type) {
+        case float64:
+            left = t
+        case float32:
+            left = float64(t)
+        case uint:
+            left = float64(t)
+        case uint8:
+            left = float64(t)
+        case uint16:
+            left = float64(t)
+        case uint32:
+            left = float64(t)
+        case uint64:
+            left = float64(t)
+        case int:
+            left = float64(t)
+        case int8:
+            left = float64(t)
+        case int16:
+            left = float64(t)
+        case int32:
+            left = float64(t)
+        case int64:
+            left = float64(t)
+        case string:
+            left, err = strconv.ParseFloat(t, 64)
+            if err != nil {
+                return false
+            }
+        default:
+            return false
+        }
+
+        if argument.op == ">" {
+            if left <= right {
+                return false
+            }
+
+            continue
+        }
+
+        if left >= right {
+            return false
+        }
+    }
+
+    return true
+}
+```
+
+<p class="note">
+  This bit of Go that requires separate case statements for every
+  possible numeric so I can convert it to float is really annoying.
+</p>
+
+The only additional part to call out in there is `getPath`. We need to
+be able to grab any path within an object since the user could have
+made a filter like `a.b:12`. So let's keep things simple (but less
+safe) and implement `getPath` recursively.
+
+```go
+func getPath(doc map[string]any, parts []string) (any, bool) {
+        var docSegment any = doc
+        for _, part := range parts {
+                m, ok := docSegment.(map[string]any)
+                if !ok {
+                        return nil, false
+                }
+
+                if docSegment, ok = m[part]; !ok {
+                        return nil, false
+                }
+        }
+
+        return docSegment, true
+}
+```
+
+A critical thing to point out is that filtering on arrays is not
+supported. Any filter that tries to enter an array will fail or return
+no results.
+
+### Search
+
+Now that we've got all the tools in place we can implement the search
+endpoint. We'll just iterate over all documents in the database and
+return all documents that match the filter.
+
+```go
+func (s server) searchDocuments(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+    q, err := parseQuery(r.URL.Query().Get("q"))
+    if err != nil {
+        jsonResponse(w, nil, err)
+        return
+    }
+        
+    var documents []map[string]any
+
+    iter := s.db.NewIter(nil)
+    defer iter.Close()
+    for iter.First(); iter.Valid(); iter.Next() {
+        var document map[string]any
+        err = json.Unmarshal(iter.Value(), &document)
+        if err != nil {
+            jsonResponse(w, nil, err)
+            return
+        }
+
+        if q.match(document) {
+            documents = append(documents, map[string]any{
+                "id":   string(iter.Key()),
+                "body": document,
+            })
+        }
+    }
+
+    jsonResponse(w, map[string]any{"documents": documents, "count": len(documents)}, nil)
+}
+```
+
+Not bad! Let's try it out:
+
+```bash
+$ go build
+$ ./docdb
+```
+
+And in another terminal, try out the search endpoint with no filter:
+
+```bash
+$ curl http://localhost:8080/docs | jq
+{
+  "body": {
+    "count": 1,
+    "documents": [
+      {
+        "body": {
+          "age": "45",
+          "name": "Kevin"
+        },
+        "id": "c458a3ce-9faf-4431-a058-d9ae2a1651e1"
+      }
+    ]
+  },
+  "status": "ok"
+}
+```
+
+With an equality filter:
+
+```bash
+$ curl --get http://localhost:8080/docs --data-urlencode 'q=name:Mel' | jq
+{
+  "body": {
+    "count": 0,
+    "documents": null
+  },
+  "status": "ok"
+}
+
+$ curl --get http://localhost:8080/docs --data-urlencode 'q=name:Kevin' | jq
+{
+  "body": {
+    "count": 1,
+    "documents": [
+      {
+        "body": {
+          "age": "45",
+          "name": "Kevin"
+        },
+        "id": "c458a3ce-9faf-4431-a058-d9ae2a1651e1"
+      }
+    ]
+  },
+  "status": "ok"
+}
+```
+
+And with greater than/less than filters:
+
+```
+$ curl --get http://localhost:8080/docs --data-urlencode 'q=age:<12' | jq
+{
+  "body": {
+    "count": 0,
+    "documents": null
+  },
+  "status": "ok"
+}
+
+$ curl --get http://localhost:8080/docs --data-urlencode 'q=age:<200' | jq
+{
+  "body": {
+    "count": 1,
+    "documents": [
+      {
+        "body": {
+          "age": "45",
+          "name": "Kevin"
+        },
+        "id": "c458a3ce-9faf-4431-a058-d9ae2a1651e1"
+      }
+    ]
+  },
+  "status": "ok"
+}
+```
+
+Sweet.
+
+### Benchmarking
+
+Now let's try inserting a few hundred thousand rows of real-world
+data. Grab `movies.json` from the [Wikipedia Movie Data
+repo](https://github.com/prust/wikipedia-movie-data). This dataset
+only has 28,000 rows. But we can insert it multiple times. If we
+filter by movie name and movie year we'll be looking at only a small
+subset of the data but enough that we can get a sense about
+performance.
+
+Here's a basic script to ingest that data a bunch of times once you've
+downloaded the file.
+
+```bash
+#!/usr/bin/env bash
+
+set -e
+
+count=50
+for run in {1..50}; do
+    jq -c '.[]' "$1" | while read data; do
+        curl -X POST -H 'Content-Type: application/json' -d "$data" http://localhost:8080/docs
+    done
+done
+```
+
+Start it up and wait as long as you can. :)
+
+```bash
+$ chmod +x scripts/load_array.sh
+$ ./scripts/load_array.sh movies.json
+```
+
+You can check how many items are in the database like so:
+
+```
+$ curl http://localhost:8080/docs | jq '.body.count'
+12649
+```
+
+Once you have a few hundred thousand documents you'll start to notice
+exact equality queries start to take longer:
+
+```
+$ time curl -s --get http://localhost:8080/docs --data-urlencode 'q="year":1918' | jq '.body.count'
+1152
+curl -s --get http://localhost:8080/docs --data-urlencode 'q="year":1918'  0.00s user 0.00s system 0% cpu 0.992 total
+```
+
+And you think: although there are hundreds of thousands of documents,
+if I'm just asking for documents with a certain value such that there
+are only 1000 documents that match that value, shouldn't it be
+possible to grab them more quickly than in one whole second? Or, better
+than a time that grows with the number of documents in the database?
+
+Yes. Yes it is possible.
+
+### Indexes
+
+Document databases often index everything. We're going to do that. For
+every path in a document (that isn't a path within an array) we're
+going to store the path and the value of the document at that path.
+
+First we'll open a second database that we'll use to store all of
+these path-value pairs.
+                                                                      
+```go
+type server struct {
+        db      *pebble.DB // Primary data
+        indexDb *pebble.DB // Index data
+        port    string
+}
+
+func newServer(database string, port string) (*server, error) {
+        s := server{db: nil, port: port}
+        var err error
+        s.db, err = pebble.Open(database, &pebble.Options{})
+        if err != nil {
+                return nil, err
+        }
+
+        s.indexDb, err = pebble.Open(database+".index", &pebble.Options{})
+        return &s, err
+}
+```
+
+Then when we insert, we'll call an `index` function to generate all
+path-value pairs and store them in this second database.
+
+The index database will store the path-value pair as keys. And values
+will be the comma separated list of document IDs that have that
+path-value pair.
+
+```go
+func (s server) index(id string, document map[string]any) {
+        pv := getPathValues(document, "")
+
+        for _, pathValue := range pv {
+                idsString, closer, err := s.indexDb.Get([]byte(pathValue))
+                if err != nil && err != pebble.ErrNotFound {
+                        log.Printf("Could not look up pathvalue [%#v]: %s", document, err)
+                }
+
+                if len(idsString) == 0 {
+                        idsString = []byte(id)
+                } else {
+                        ids := strings.Split(string(idsString), ",")
+
+                        found := false
+                        for _, existingId := range ids {
+                                if id == existingId {
+                                        found = true
+                                }
+                        }
+
+                        if !found {
+                                idsString = append(idsString, []byte(","+id)...)
+                        }
+                }
+
+                if closer != nil {
+                        err = closer.Close()
+                        if err != nil {
+                                log.Printf("Could not close: %s", err)
+                        }
+                }
+                err = s.indexDb.Set([]byte(pathValue), idsString, pebble.Sync)
+                if err != nil {
+                        log.Printf("Could not update index: %s", err)
+                }
+        }
+}
+```
+
+Keeping things simple we'll also implement this `getPathValues` helper
+recursively:
+
+```go
+func getPathValues(obj map[string]any, prefix string) []string {
+        var pvs []string
+        for key, val := range obj {
+                switch t := val.(type) {
+                case map[string]any:
+                        pvs = append(pvs, getPathValues(t, key)...)
+                        continue
+                case []interface{}:
+                        // Can't handle arrays
+                        continue
+                }
+
+                if prefix != "" {
+                        key = prefix + "." + key
+                }
+
+                pvs = append(pvs, fmt.Sprintf("%s=%v", key, val))
+        }
+
+        return pvs
+}
+```
+
+We'll update one line in `s.addDocument` to call this `index` function.
+
+```go
+func (s server) addDocument(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+        dec := json.NewDecoder(r.Body)
+        var document map[string]any
+        err := dec.Decode(&document)
+        if err != nil {
+                jsonResponse(w, nil, err)
+                return
+        }
+
+        // New unique id for the document
+        id := uuid.New().String()
+
+        s.index(id, document)
+
+        bs, err := json.Marshal(document)
+        if err != nil {
+                jsonResponse(w, nil, err)
+                return
+        }
+        err = s.db.Set([]byte(id), bs, pebble.Sync)
+        if err != nil {
+                jsonResponse(w, nil, err)
+                return
+        }
+
+        jsonResponse(w, map[string]any{
+                "id": id,
+        }, nil)
+}
+```
+
+And we'll add a `reindex` function to be called in `main` to handle
+any documents that were ingested and not indexed (i.e. all the ones we
+already inserted).
+
+```go
+func (s server) reindex() {
+        iter := s.db.NewIter(nil)
+        defer iter.Close()
+        for iter.First(); iter.Valid(); iter.Next() {
+                var document map[string]any
+                err := json.Unmarshal(iter.Value(), &document)
+                if err != nil {
+                        log.Printf("Unable to parse bad document, %s: %s", string(iter.Key()), err)
+                }
+                s.index(string(iter.Key()), document)
+        }
+}
+
+func main() {
+        s, err := newServer("docdb.data", "8080")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer s.db.Close()
+
+        s.reindex()
+
+        router := httprouter.New()
+        router.POST("/docs", s.addDocument)
+        router.GET("/docs", s.searchDocuments)
+        router.GET("/docs/:id", s.getDocument)
+
+        log.Println("Listening on " + s.port)
+        log.Fatal(http.ListenAndServe(":"+s.port, router))
+}
+```
+
+### Using the index
+
+When there is an equality filter we can look the equality filter
+up in the index database. Our filter language only supports AND-ed
+arugments. So the results matching the overall filter must be the set
+intersection of ids that match each individual equality
+filter. Greater than and less than filters will be filtered out after
+fetching all possible ids that match equality filters.
+
+If no ids are found in the index database meeting all equality filters
+then we'll fall back to the full table scan we already have.
+
+```go
+func (s server) searchDocuments(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+        q, err := parseQuery(r.URL.Query().Get("q"))
+        if err != nil {
+                jsonResponse(w, nil, err)
+                return
+        }
+
+        isRange := false
+        idsArgumentCount := map[string]int{}
+        nonRangeArguments := 0
+        for _, argument := range q.ands {
+                if argument.op == "=" {
+                        nonRangeArguments++
+
+                        ids, err := s.lookup(fmt.Sprintf("%s=%v", strings.Join(argument.key, "."), argument.value))
+                        if err != nil {
+                                jsonResponse(w, nil, err)
+                                return
+                        }
+
+                        for _, id := range ids {
+                                _, ok := idsArgumentCount[id]
+                                if !ok {
+                                        idsArgumentCount[id] = 0
+                                }
+
+                                idsArgumentCount[id]++
+                        }
+                } else {
+                        isRange = true
+                }
+        }
+
+        var idsInAll []string
+        for id, count := range idsArgumentCount {
+                if count == nonRangeArguments {
+                        idsInAll = append(idsInAll, id)
+                }
+        }
+
+        var documents []any
+        if r.URL.Query().Get("skipIndex") == "true" {
+                idsInAll = nil
+        }
+        if len(idsInAll) > 0 {
+                for _, id := range idsInAll {
+                        document, err := s.getDocumentById([]byte(id))
+                        if err != nil {
+                                jsonResponse(w, nil, err)
+                                return
+                        }
+
+                        if !isRange || q.match(document) {
+                                documents = append(documents, map[string]any{
+                                        "id":   id,
+                                        "body": document,
+                                })
+                        }
+                }
+        } else {
+                iter := s.db.NewIter(nil)
+                defer iter.Close()
+                for iter.First(); iter.Valid(); iter.Next() {
+                        var document map[string]any
+                        err = json.Unmarshal(iter.Value(), &document)
+                        if err != nil {
+                                jsonResponse(w, nil, err)
+                                return
+                        }
+
+                        if q.match(document) {
+                                documents = append(documents, map[string]any{
+                                        "id":   string(iter.Key()),
+                                        "body": document,
+                                })
+                        }
+                }
+        }
+
+        jsonResponse(w, map[string]any{"documents": documents, "count": len(documents)}, nil)
+}
+```
+
+The last unimplemented part is the `lookup` helper. Given a path-value
+pair it checks the database for IDs that match that pair.
+
+```go
+func (s server) lookup(pathValue string) ([]string, error) {
+        idsString, closer, err := s.indexDb.Get([]byte(pathValue))
+        if err != nil && err != pebble.ErrNotFound {
+                return nil, fmt.Errorf("Could not look up pathvalue [%#v]: %s", pathValue, err)
+        }
+        if closer != nil {
+                defer closer.Close()
+        }
+
+        if len(idsString) == 0 {
+                return nil, nil
+        }
+
+        return strings.Split(string(idsString), ","), nil
+}
+```
+
+We're done. Finally! Let's build it:
+
+```bash
+$ go build
+$ ./docdb
+```
+
+(This is going to take a while; to reindex.)
+
+Once the server is ready we can run:
+
+```
+$ time curl -s --get http://localhost:8080/docs --data-urlencode 'q="year":1918' | jq '.body.count'
+1280
+curl -s --get http://localhost:8080/docs --data-urlencode 'q="year":1918'  0.01s user 0.00s system 29% cpu 0.029 total
+```
+
+Hey that's not bad.
