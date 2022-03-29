@@ -303,7 +303,7 @@ parts of it easily. The result is more fun.</p>
 matches. Field names and field values can be quoted. They must be
 quoted if they contain spaces or colons, among other things. Key-value
 matches are separated by whitespace. They can only be AND-ed together
-and that is done implicity.</p>
+and that is done implicitly.</p>
 <p>The following are some valid filters in our implementation:</p>
 <ul>
 <li><code>a:1</code></li>
@@ -849,7 +849,7 @@ func main() {
 </code></pre>
 <h3 id="using-the-index">Using the index</h3><p>When there is an equality filter we can look the equality filter
 up in the index database. Our filter language only supports AND-ed
-arugments. So the results matching the overall filter must be the set
+arguments. So the results matching the overall filter must be the set
 intersection of ids that match each individual equality
 filter. Greater than and less than filters will be filtered out after
 fetching all possible ids that match equality filters.</p>

@@ -314,7 +314,7 @@ In our simplification of Lucene there will only be key-value
 matches. Field names and field values can be quoted. They must be
 quoted if they contain spaces or colons, among other things. Key-value
 matches are separated by whitespace. They can only be AND-ed together
-and that is done implicity.
+and that is done implicitly.
 
 The following are some valid filters in our implementation:
 
@@ -943,7 +943,7 @@ func main() {
 
 When there is an equality filter we can look the equality filter
 up in the index database. Our filter language only supports AND-ed
-arugments. So the results matching the overall filter must be the set
+arguments. So the results matching the overall filter must be the set
 intersection of ids that match each individual equality
 filter. Greater than and less than filters will be filtered out after
 fetching all possible ids that match equality filters.

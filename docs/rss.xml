@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 28 Mar 2022 20:48:11 +0000</lastBuildDate><item><title>Writing a document database from scratch in Go: Lucene-like filters and indexes</title><link>http://notes.eatonphil.com/documentdb.html</link><description>&lt;p&gt;In this post we'll write a rudimentary document database from scratch
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 29 Mar 2022 14:40:15 +0000</lastBuildDate><item><title>Writing a document database from scratch in Go: Lucene-like filters and indexes</title><link>http://notes.eatonphil.com/documentdb.html</link><description>&lt;p&gt;In this post we'll write a rudimentary document database from scratch
 in Go. In less than 500 lines of code we'll be able to support the
 following interactions, inspired by Elasticsearch:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ curl -X POST -H &amp;#39;Content-Type: application/json&amp;#39; -d &amp;#39;{&amp;quot;name&amp;quot;: &amp;quot;Kevin&amp;quot;, &amp;quot;age&amp;quot;: &amp;quot;45&amp;quot;}&amp;#39; http://localhost:8080/docs
@@ -255,7 +255,7 @@ parts of it easily. The result is more fun.&lt;/p&gt;
 matches. Field names and field values can be quoted. They must be
 quoted if they contain spaces or colons, among other things. Key-value
 matches are separated by whitespace. They can only be AND-ed together
-and that is done implicity.&lt;/p&gt;
+and that is done implicitly.&lt;/p&gt;
 &lt;p&gt;The following are some valid filters in our implementation:&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;code&gt;a:1&lt;/code&gt;&lt;/li&gt;
@@ -801,7 +801,7 @@ func main() {
 &lt;/code&gt;&lt;/pre&gt;
 &lt;h3 id="using-the-index"&gt;Using the index&lt;/h3&gt;&lt;p&gt;When there is an equality filter we can look the equality filter
 up in the index database. Our filter language only supports AND-ed
-arugments. So the results matching the overall filter must be the set
+arguments. So the results matching the overall filter must be the set
 intersection of ids that match each individual equality
 filter. Greater than and less than filters will be filtered out after
 fetching all possible ids that match equality filters.&lt;/p&gt;
