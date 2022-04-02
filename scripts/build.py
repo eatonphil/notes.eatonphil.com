@@ -34,9 +34,9 @@ HOME_PAGE = """
     where I build <a
     href="https://github.com/multiprocessio">open-source data
     tools</a> like <a
-    href="https://datastation.multiprocess.io">DataStation (1.2k+
+    href="https://datastation.multiprocess.io">DataStation (1.3k+
     stars)</a>, an open-source data IDE for developers, and <a
-    href="https://github.com/multiprocessio/dsq">dsq (1.5k+
+    href="https://github.com/multiprocessio/dsq">dsq (1.7k+
     stars)</a>, a commandline tool for running SQL queries against
     JSON, CSV, Parquet, Excel and more.
   </p>
