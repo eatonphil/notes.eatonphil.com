@@ -122,6 +122,14 @@ said this project is "from scratch" but I'm going to bring in a
 storage engine. My point is that you could easily follow this post and
 just read/write directly to disk if you felt strongly.
 
+<p class="note">
+  Because there were so many folks misconstruing this paragraph, I've
+  ported this blog post without Pebble as proof :D. You
+  can <a href="https://github.com/eatonphil/docdb/pull/1">find the
+  diff here</a>. Took me an hour for the +40/-40 diff that is still
+  <500 lines of code.
+</p>
+
 Any storage engine would be fine: direct read/write, SQLite,
 PostgreSQL. But we're going to grab a key-value storage engine. I've
 used Badger before so I'm going to try out [Cockroach Lab's

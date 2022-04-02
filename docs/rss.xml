@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 29 Mar 2022 14:40:15 +0000</lastBuildDate><item><title>Writing a document database from scratch in Go: Lucene-like filters and indexes</title><link>http://notes.eatonphil.com/documentdb.html</link><description>&lt;p&gt;In this post we'll write a rudimentary document database from scratch
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sat, 02 Apr 2022 12:30:57 +0000</lastBuildDate><item><title>Writing a document database from scratch in Go: Lucene-like filters and indexes</title><link>http://notes.eatonphil.com/documentdb.html</link><description>&lt;p&gt;In this post we'll write a rudimentary document database from scratch
 in Go. In less than 500 lines of code we'll be able to support the
 following interactions, inspired by Elasticsearch:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ curl -X POST -H &amp;#39;Content-Type: application/json&amp;#39; -d &amp;#39;{&amp;quot;name&amp;quot;: &amp;quot;Kevin&amp;quot;, &amp;quot;age&amp;quot;: &amp;quot;45&amp;quot;}&amp;#39; http://localhost:8080/docs
@@ -100,7 +100,13 @@ equivalent of using &lt;code&gt;ls&lt;/code&gt; on the filesystem. I mention thi
 said this project is "from scratch" but I'm going to bring in a
 storage engine. My point is that you could easily follow this post and
 just read/write directly to disk if you felt strongly.&lt;/p&gt;
-&lt;p&gt;Any storage engine would be fine: direct read/write, SQLite,
+&lt;p class="note"&gt;
+  Because there were so many folks misconstruing this paragraph, I've
+  ported this blog post without Pebble as proof :D. You
+  can &lt;a href="https://github.com/eatonphil/docdb/pull/1"&gt;find the
+  diff here&lt;/a&gt;. Took me an hour for the +40/-40 diff that is still
+  &lt;500 lines of code.
+&lt;/p&gt;&lt;p&gt;Any storage engine would be fine: direct read/write, SQLite,
 PostgreSQL. But we're going to grab a key-value storage engine. I've
 used Badger before so I'm going to try out &lt;a href="https://github.com/cockroachdb/pebble"&gt;Cockroach Lab's
 Pebble&lt;/a&gt; this time instead.&lt;/p&gt;
