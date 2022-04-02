@@ -153,7 +153,9 @@ just read/write directly to disk if you felt strongly.</p>
   ported this blog post without Pebble as proof :D. You
   can <a href="https://github.com/eatonphil/docdb/pull/1">find the
   diff here</a>. Took me an hour for the +40/-40 diff that is still
-  <500 lines of code.
+  <500 lines of code. You may notice the code basically looks
+  identical. That's because the storage engine isn't the interesting
+  part. :)
 </p><p>Any storage engine would be fine: direct read/write, SQLite,
 PostgreSQL. But we're going to grab a key-value storage engine. I've
 used Badger before so I'm going to try out <a href="https://github.com/cockroachdb/pebble">Cockroach Lab's
