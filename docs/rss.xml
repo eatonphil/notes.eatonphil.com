@@ -1,5 +1,10 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Sun, 03 Apr 2022 15:03:59 +0000</lastBuildDate><item><title>Writing a document database from scratch in Go: Lucene-like filters and indexes</title><link>http://notes.eatonphil.com/documentdb.html</link><description>&lt;p&gt;In this post we'll write a rudimentary document database from scratch
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 14 Apr 2022 18:50:36 +0000</lastBuildDate><item><title>Surveying SQL parser libraries in a few high-level languages</title><link>http://notes.eatonphil.com/sql-parsers.html</link><description>&lt;head&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2022-04-11-sql-parsers.html'" /&gt;
+&lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
+&lt;a href="https://datastation.multiprocess.io/blog/2022-04-11-sql-parsers.html"&gt;here&lt;/a&gt;
+if you are not redirected.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/sql-parsers.html</guid><pubDate>Mon, 11 Apr 2022 00:00:00 +0000</pubDate></item><item><title>Writing a document database from scratch in Go: Lucene-like filters and indexes</title><link>http://notes.eatonphil.com/documentdb.html</link><description>&lt;p&gt;In this post we'll write a rudimentary document database from scratch
 in Go. In less than 500 lines of code we'll be able to support the
 following interactions, inspired by Elasticsearch:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ curl -X POST -H &amp;#39;Content-Type: application/json&amp;#39; -d &amp;#39;{&amp;quot;name&amp;quot;: &amp;quot;Kevin&amp;quot;, &amp;quot;age&amp;quot;: &amp;quot;45&amp;quot;}&amp;#39; http://localhost:8080/docs
@@ -374,8 +379,8 @@ func parseQuery(q string) (*query, error) {
 
         op := "="
         if q[i] == '&amp;gt;' || q[i] == '&amp;lt;' {
-            i++
             op = string(q[i])
+        i++
         }
 
         value, nextIndex, err := lexString(qRune, i)
@@ -927,7 +932,12 @@ curl -s --get http://localhost:8080/docs --data-urlencode 'q="year":1918'  0.01s
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Hey that's not bad.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Hey here&amp;#39;s a new blog post on writing a document database from scratch with support for Lucene-like queries and basic indexes in less than 500 lines of Go&lt;a href="https://t.co/M3js6Pj9h0"&gt;https://t.co/M3js6Pj9h0&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1508546397943046150?ref_src=twsrc%5Etfw"&gt;March 28, 2022&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/documentdb.html</guid><pubDate>Mon, 28 Mar 2022 00:00:00 +0000</pubDate></item><item><title>SMTP protocol basics from scratch in Go: receiving email from Gmail</title><link>http://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</link><description>&lt;p&gt;I've never run my own mail server before. Before today I had no clue
+</description><guid isPermaLink="false">http://notes.eatonphil.com/documentdb.html</guid><pubDate>Mon, 28 Mar 2022 00:00:00 +0000</pubDate></item><item><title>Speeding up Go's builtin JSON encoder up to 55% for large arrays of objects</title><link>http://notes.eatonphil.com/improving-go-json-encoding-performance-for-large-arrays-of-objects.html</link><description>&lt;head&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2022-03-03-improving-go-json-encoding-performance-for-large-arrays-of-objects.html'" /&gt;
+&lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
+&lt;a href="https://datastation.multiprocess.io/blog/2022-03-03-improving-go-json-encoding-performance-for-large-arrays-of-objects.html"&gt;here&lt;/a&gt;
+if you are not redirected.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/improving-go-json-encoding-performance-for-large-arrays-of-objects.html</guid><pubDate>Thu, 03 Mar 2022 00:00:00 +0000</pubDate></item><item><title>SMTP protocol basics from scratch in Go: receiving email from Gmail</title><link>http://notes.eatonphil.com/handling-email-from-gmail-smtp-protocol-basics.html</link><description>&lt;p&gt;I've never run my own mail server before. Before today I had no clue
 how email worked under the hood other than the very few times I've set
 up mail clients.&lt;/p&gt;
 &lt;p&gt;I've heard no few times how hard it is to &lt;em&gt;send&lt;/em&gt; mail from a
