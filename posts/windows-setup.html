@@ -1,0 +1,61 @@
+# My Windows development setup
+## April 20, 2022
+###### windows,devenv
+
+This is a short post about my setup. I'm not trying to sell you on it
+it's more that I leave myself some notes in case I need to get back to
+this.
+
+I have a MiniForum mini pc with a Ryzen 7 and 32GB RAM I bought for
+$500 (plus $100 to upgrade the 16GB RAM to 32GB). It's my main machine
+at home. I have an old Macbook Pro for when I'm not at home or need to
+make good-looking screenshots.
+
+Aside from testing out [Electron apps I'm working
+on](https://github.com/multiprocessio/datastation), I do all my
+development in a Linux server hosted by OVH.
+
+I can't reliably install WSL either. I had it working on one laptop
+once but on this machine it doesn't work.
+
+So I mostly use [Windows
+Terminal](https://github.com/microsoft/terminal) and
+[PowerShell](https://docs.microsoft.com/en-us/powershell/).
+
+But Windows Terminal and PowerShell have weird defaults coming from
+[Oh My Zsh](https://ohmyz.sh/) and tmux world. Thankfully there's
+[Oh My Posh](https://ohmyposh.dev/) which gets you a little bit
+closer.
+
+It does however take 2-5 seconds to initialize every time I open up
+Windows Terminal (or a new tab or pane within it). That isn't great.
+
+Oh My Posh still doesn't get you far enough though. So my `$PROFILE` includes:
+
+```
+Import-Module PSReadLine
+Set-PSReadLineOption -EditMode Emacs
+Set-PSReadLineOption -HistorySearchCursorMovesToEnd
+Set-PSReadLineKeyHandler -Key UpArrow -Function HistorySearchBackward
+Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward
+Set-PSReadLineKeyHandler -Key Tab -Function Complete
+
+Import-Module posh-git
+Import-Module oh-my-posh
+Set-PoshPrompt -Theme material
+
+function e { emacs -nw $args }
+function gs { git status $args }
+del alias:gc -Force
+function gc { git commit $args }
+del alias:gp -Force
+function gp { git push -u origin $(git branch --show-current) }
+function python { python3 $args }
+```
+
+The first line turns on readline behavior. The second makes it
+Emacs-like (the default with GNU readline).
+
+The next three lines were also surprisingly not built into Oh My
+Posh. By default PowerShell starts at the beginning of the line when
+you hit the up key, rather than the end like in zsh/Oh My Zsh.
