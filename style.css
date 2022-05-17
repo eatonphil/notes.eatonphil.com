@@ -232,15 +232,11 @@ aside p {
 .note {
     line-height: 1.4rem;
     border: 1px solid #f0f0f0;
-    border-left: 5px solid #3661ff;
+    border-left: 1px solid rgb(0, 95, 255);
     padding: 15px;
 }
 
-.note, .note p {
-    font-size: .9rem;
-}
-
-.note a {
+.note, .note p, .note a {
     font-size: .8rem;
 }
 

@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 17 May 2022 17:03:05 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 17 May 2022 19:31:26 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
 &lt;a href="https://github.com/cockroachdb/cockroach/blob/master/go.mod"&gt;its go.mod&lt;/a&gt;
 and notice a number of dependencies that do a lot of work: &lt;a href="https://github.com/jackc/pgproto3"&gt;a
 PostgreSQL wire protocol
@@ -15,7 +15,14 @@ distributed Postgres proof of concept ourselves! We'll use only four
 major external libraries: for parsing SQL, handling Postgres's wire
 protocol, handling Raft, and handling the storage of table metadata
 and rows themselves.&lt;/p&gt;
-&lt;p&gt;By the end of this post, in around 600 lines of code, we'll have a
+&lt;p class="note"&gt;
+  For a not-reductionist understanding of the CockroachDB internals, I
+  recommend following the
+  excellent &lt;a href="https://www.cockroachlabs.com/blog/"&gt;Cockroach
+  Engineering blog&lt;/a&gt;
+  and &lt;a href="https://www.twitch.tv/large__data__bank"&gt;Jordan Lewis's
+  Hacking CockroachDB Twitch stream&lt;/a&gt;.
+&lt;/p&gt;&lt;p&gt;By the end of this post, in around 600 lines of code, we'll have a
 distributed "Postgres implementation" that will accept writes
 (&lt;code&gt;CREATE TABLE&lt;/code&gt;, &lt;code&gt;INSERT&lt;/code&gt;) on the leader and accept reads (&lt;code&gt;SELECT&lt;/code&gt;)
 on any node. All nodes will contain the same data.&lt;/p&gt;

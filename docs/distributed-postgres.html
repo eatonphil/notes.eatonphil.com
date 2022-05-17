@@ -63,7 +63,14 @@ distributed Postgres proof of concept ourselves! We'll use only four
 major external libraries: for parsing SQL, handling Postgres's wire
 protocol, handling Raft, and handling the storage of table metadata
 and rows themselves.</p>
-<p>By the end of this post, in around 600 lines of code, we'll have a
+<p class="note">
+  For a not-reductionist understanding of the CockroachDB internals, I
+  recommend following the
+  excellent <a href="https://www.cockroachlabs.com/blog/">Cockroach
+  Engineering blog</a>
+  and <a href="https://www.twitch.tv/large__data__bank">Jordan Lewis's
+  Hacking CockroachDB Twitch stream</a>.
+</p><p>By the end of this post, in around 600 lines of code, we'll have a
 distributed "Postgres implementation" that will accept writes
 (<code>CREATE TABLE</code>, <code>INSERT</code>) on the leader and accept reads (<code>SELECT</code>)
 on any node. All nodes will contain the same data.</p>

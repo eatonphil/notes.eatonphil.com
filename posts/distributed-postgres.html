@@ -20,6 +20,15 @@ major external libraries: for parsing SQL, handling Postgres's wire
 protocol, handling Raft, and handling the storage of table metadata
 and rows themselves.
 
+<p class="note">
+  For a not-reductionist understanding of the CockroachDB internals, I
+  recommend following the
+  excellent <a href="https://www.cockroachlabs.com/blog/">Cockroach
+  Engineering blog</a>
+  and <a href="https://www.twitch.tv/large__data__bank">Jordan Lewis's
+  Hacking CockroachDB Twitch stream</a>.
+</p>
+
 By the end of this post, in around 600 lines of code, we'll have a
 distributed "Postgres implementation" that will accept writes
 (`CREATE TABLE`, `INSERT`) on the leader and accept reads (`SELECT`)
