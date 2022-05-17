@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>Let's build a distributed Postgres proof of concept | notes.eatonphil.com</title>
+    <meta name="description" content="Let's build a distributed Postgres proof of concept" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <div class="row">
+	    <a href="/" class="sm-link">
+              Home
+            </a>
+	    <a href="/rss.xml" class="sm-link">
+              RSS
+            </a>
+
+	    <a href="https://github.com/sponsors/eatonphil" class="sm-link">
+              ❤️  Sponsor this blog
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+
+          <h2>May 17, 2022</h2>
+          <h1>Let's build a distributed Postgres proof of concept</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/postgres.html" class="tag">postgres</a><a href="/tags/golang.html" class="tag">golang</a><a href="/tags/raft.html" class="tag">raft</a><a href="/tags/parsing.html" class="tag">parsing</a><a href="/tags/databases.html" class="tag">databases</a></div>
+          </div>
+	</div>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="col-6">
+        <p>What is CockroachDB under the hood? Take a look at
+<a href="https://github.com/cockroachdb/cockroach/blob/master/go.mod">its go.mod</a>
+and notice a number of dependencies that do a lot of work: <a href="https://github.com/jackc/pgproto3">a
+PostgreSQL wire protocol
+implementation</a>, <a href="https://github.com/cockroachdb/pebble">a storage
+layer</a>, <a href="https://github.com/etcd-io/etcd">a Raft implementation
+for distributed consensus</a>. And not
+part of go.mod but still building on 3rd party code, <a href="https://github.com/cockroachdb/cockroach/blob/master/pkg/sql/parser/sql.y">PostgreSQL's
+grammar
+definition</a>.</p>
+<p>To be <em>absurdly</em> reductionist, CockroachDB is just the glue around these
+libraries. With that reductionist mindset, let's trying building a
+distributed Postgres proof of concept ourselves! We'll use only four
+major external libraries: for parsing, handling Postgres's wire
+protocol, handling Raft, and handling the storage of table metadata
+and rows themselves.</p>
+<p>By the end of this post, in under 600 lines of code, we'll have a
+distributed "Postgres implementation" that will accept writes
+(<code>CREATE TABLE</code>, <code>INSERT</code>) on the leader and accept reads (<code>SELECT</code>)
+on any node. All nodes will contain the same data.</p>
+<p>Here is a sample interaction against the leader:</p>
+<pre><code class="hljs bash">$ psql -h localhost -p 6000
+psql -h 127.0.0.1 -p 6000
+psql (13.4, server 0.0.0)
+Type &quot;help&quot; for help.
+
+phil=&gt; create table x (age int, name text);
+CREATE ok
+phil=&gt; insert into x values(14, &#39;garry&#39;), (20, &#39;ted&#39;);
+could not interpret result from server: INSERT ok
+INSERT ok
+phil=&gt; select name, age from x;
+  name   | age 
+---------+-----
+ &quot;garry&quot; |  14
+ &quot;ted&quot;   |  20
+(2 rows)
+</code></pre>
+<p>And against a follower (note the different port):</p>
+<pre><code class="hljs bash">$ psql -h 127.0.0.1 -p 6001
+psql (13.4, server 0.0.0)
+Type &quot;help&quot; for help.
+
+phil=&gt; select age, name from x;
+ age |  name
+-----+---------
+  20 | &quot;ted&quot;
+  14 | &quot;garry&quot;
+(2 rows)
+</code></pre>
+<p>All code for this post is <a href="https://github.com/eatonphil/waterbugdb">available on Github in the fondly named
+WaterbugDB repo</a>.</p>
+<h3 id="plan-of-attack">Plan of attack</h3><p>Influenced by <a href="https://youtu.be/rqO9PtBkiSQ?t=2332">Philip O'Toole's talk on rqlite at Hacker
+Nights</a> we'll
+have a Postgres wire protocol server in front. As it receives queries
+it will respond immediately to <code>SELECT</code>s. Otherwise for <code>CREATE TABLE</code>s
+and <code>INSERT</code>s it will send the entire query string to the Raft
+cluster. Each process that is part of the Raft cluster will implement
+the appropriate functions for handling Raft messages. In this case the
+messages will just be to create a table or insert data.</p>
+<p>So every running process will run a Postgres wire protocol server, a
+Raft server, and an HTTP server that you'll see is an implementation
+detail about how processes join to the same Raft cluster.</p>
+<p>Every running process will have its own directory for storing data.</p>
+<h3 id="raft">Raft</h3><p>There is likely a difference between Raft, the paper, and Raft, the
+implementations. When I refer to Raft in the rest of this post I'm
+going to be referring to an implementation.</p>
+<p>And although CockroachDB use's <a href="https://github.com/etcd-io/etcd">etcd's Raft
+implementation</a>, I didn't realize that
+so when building this project I used <a href="https://pkg.go.dev/github.com/hashicorp/raft">Hashicorp's Raft
+implementation</a>.</p>
+<p>Raft allows us to reliably keep multiple nodes in sync with a log of
+messages. Each node in the Raft cluster implements a finite state
+machine (FSM) with three operations: apply, snapshot, and restore.</p>
+<p>In Go the finite state machine is an interface we must implement with
+these three operations. Our finite state machine will embed a postgres
+engine we'll build out after this to handle query execution.</p>
+<pre><code class="hljs golang">package main
+
+import (
+    &quot;bytes&quot;
+    &quot;encoding/json&quot;
+    &quot;fmt&quot;
+    &quot;io&quot;
+    &quot;log&quot;
+    &quot;net&quot;
+    &quot;net/http&quot;
+    &quot;os&quot;
+    &quot;path&quot;
+    &quot;strings&quot;
+    &quot;time&quot;
+
+    &quot;github.com/google/uuid&quot;
+    &quot;github.com/hashicorp/raft&quot;
+    &quot;github.com/hashicorp/raft-boltdb&quot;
+    &quot;github.com/jackc/pgproto3/v2&quot;
+    pgquery &quot;github.com/pganalyze/pg_query_go/v2&quot;
+    bolt &quot;go.etcd.io/bbolt&quot;
+)
+
+type pgFsm struct {
+    pe *pgEngine
+}
+</code></pre>
+<p>From what I understand, the snapshot operation allows Raft to truncate
+logs. It is used in conjuction with restoring. On startup if there is
+a snapshot, restore is called so you can load the snapshot. Then
+afterwards all logs not yet snapshotted are replayed through the apply
+operation.</p>
+<p>To keep this implementation simple we'll just fail all snapshots so
+restore will never be called and all logs will be replayed every time
+on startup through the apply operation. This is of course inefficient
+but it keeps the code simpler.</p>
+<p>When we write the startup code we'll need to delete the database so
+that these apply calls happen fresh.</p>
+<pre><code class="hljs golang">type snapshotNoop struct{}
+
+func (sn snapshotNoop) Persist(sink raft.SnapshotSink) error {
+    return sink.Cancel()
+}
+
+func (sn snapshotNoop) Release() {}
+
+func (pf *pgFsm) Snapshot() (raft.FSMSnapshot, error) {
+    return snapshotNoop{}, nil
+}
+
+func (pf *pgFsm) Restore(rc io.ReadCloser) error {
+    return fmt.Errorf(&quot;Nothing to restore&quot;)
+}
+</code></pre>
+<p>Finally, applying is receiving a single message and applying it for the
+node. In this project the message will be a <code>CREATE TABLE</code> or <code>INSERT</code>
+query. So we'll parse the query and pass it to the postgres engine for
+execution.</p>
+<pre><code class="hljs golang">func (pf *pgFsm) Apply(log *raft.Log) any {
+    switch log.Type {
+    case raft.LogCommand:
+        ast, err := pgquery.Parse(string(log.Data))
+        if err != nil {
+            return fmt.Errorf(&quot;Could not parse payload: %s&quot;, err)
+        }
+
+        _, err = pf.pe.execute(ast)
+        if err != nil {
+            return err
+        }
+    default:
+        return fmt.Errorf(&quot;Unknown raft log type: %#v&quot;, log.Type)
+    }
+
+    return nil
+}
+</code></pre>
+<h4 id="raft-server">Raft server</h4><p>Now we can set up the actual Raft server and pass an instance of this
+FSM. This is a bunch of boilerplate that would matter in production
+installs but for us basically we just need to tell Raft where to run
+and how to store its own internal data, including its all-important
+message log.</p>
+<pre><code class="hljs golang">func setupRaft(dir, nodeId, raftAddress string, pf *pgFsm) (*raft.Raft, error) {
+    os.MkdirAll(dir, os.ModePerm)
+
+    store, err := raftboltdb.NewBoltStore(path.Join(dir, &quot;bolt&quot;))
+    if err != nil {
+        return nil, fmt.Errorf(&quot;Could not create bolt store: %s&quot;, err)
+    }
+
+    snapshots, err := raft.NewFileSnapshotStore(path.Join(dir, &quot;snapshot&quot;), 2, os.Stderr)
+    if err != nil {
+        return nil, fmt.Errorf(&quot;Could not create snapshot store: %s&quot;, err)
+    }
+
+    tcpAddr, err := net.ResolveTCPAddr(&quot;tcp&quot;, raftAddress)
+    if err != nil {
+        return nil, fmt.Errorf(&quot;Could not resolve address: %s&quot;, err)
+    }
+
+    transport, err := raft.NewTCPTransport(raftAddress, tcpAddr, 10, time.Second*10, os.Stderr)
+    if err != nil {
+        return nil, fmt.Errorf(&quot;Could not create tcp transport: %s&quot;, err)
+    }
+
+    raftCfg := raft.DefaultConfig()
+    raftCfg.LocalID = raft.ServerID(nodeId)
+
+    r, err := raft.NewRaft(raftCfg, pf, store, store, snapshots, transport)
+    if err != nil {
+        return nil, fmt.Errorf(&quot;Could not create raft instance: %s&quot;, err)
+    }
+
+    // Cluster consists of unjoined leaders. Picking a leader and
+    // creating a real cluster is done manually after startup.
+    r.BootstrapCluster(raft.Configuration{
+        Servers: []raft.Server{
+            {
+                ID:      raft.ServerID(nodeId),
+                Address: transport.LocalAddr(),
+            },
+        },
+    })
+
+    return r, nil
+}
+</code></pre>
+<p>Every instance of this process will run this and will start off as a
+leader in a new cluster. We'll expose an HTTP server that allows
+leaders to talk to other leaders to tell them to follow it. This HTTP
+endpoint in the HTTP server is how we'll get from N process with N
+leaders and N clusters to N processes with 1 leader and 1 cluster.</p>
+<p>That's basically it for the core Raft bits. So let's build out that
+HTTP server and follow endpoint.</p>
+<h3 id="http-follow-endpoint">HTTP follow endpoint</h3><p>Our HTTP server will have just one endpoint that tells the process (a)
+to contact another process (b) so that process (b) joins the process
+(a) cluster.</p>
+<p>The HTTP server will need to have the process (a)'s Raft instance
+to be able to start this join action. And in order for Raft to know
+how to contact the process (b) we'll need to tell it both the
+process (b)'s unique Raft node id (we'll give it a unique id ourselves
+when we start the process) and the process (b)'s Raft server port.</p>
+<pre><code class="hljs golang">type httpServer struct {
+    r *raft.Raft
+}
+
+func (hs httpServer) joinHandler(w http.ResponseWriter, r *http.Request) {
+    followerId := r.URL.Query().Get(&quot;followerId&quot;)
+    followerAddr := r.URL.Query().Get(&quot;followerAddr&quot;)
+
+    if hs.r.State() != raft.Leader {
+        json.NewEncoder(w).Encode(struct {
+            Error string `json:&quot;error&quot;`
+        }{
+            &quot;Not the leader&quot;,
+        })
+        http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+        return
+    }
+
+    err := hs.r.AddVoter(raft.ServerID(followerId), raft.ServerAddress(followerAddr), 0, 0).Error()
+    if err != nil {
+        log.Printf(&quot;Failed to add follower: %s&quot;, err)
+        http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+    }
+
+    w.WriteHeader(http.StatusOK)
+}
+</code></pre>
+<p>That's it! Let's move on to the query engine.</p>
+<h3 id="query-engine">Query engine</h3><p>The query engine is a wrapper around a storage layer. We'll bring in
+<a href="https://github.com/etcd-io/bbolt">bbolt</a>.</p>
+<p class="note">
+  I originally built this
+  with <a href="https://github.com/cockroachdb/pebble">Cockroach's pebble</a> but pebble has a
+  <a href="https://app.bountysource.com/issues/99017984-unable-to-build-xxhash-conflicts-with-other-package">transitive dependency on a C library that has function names that
+    conflict with function names in the C library that pg_query_go
+    wraps</a>.
+</p><pre><code class="hljs golang">type pgEngine struct {
+    db         *bolt.DB
+    bucketName []byte
+}
+
+func newPgEngine(db *bolt.DB) *pgEngine {
+    return &amp;pgEngine{db, []byte(&quot;data&quot;)}
+}
+</code></pre>
+<p class="note">
+  bbolt organizes data into buckets. Buckets might be a natural way to
+  store table rows (one bucket per table) but to keep the implementation
+  simple we'll put all table metadata and row data into a single `data`
+  bucket.
+</p><p>The entrypoint we called in the Raft apply implementation above was
+<code>execute</code>. It took a parsed list of statements. We'll iterate over the
+statements, figuring out the kind of each statement, and call out to a
+dedicated helper for each kind.</p>
+<pre><code class="hljs golang">func (pe *pgEngine) execute(tree *pgquery.ParseResult) error {
+    for _, stmt := range tree.GetStmts() {
+        n := stmt.GetStmt()
+        if c := n.GetCreateStmt(); c != nil {
+            return pe.executeCreate(c)
+        }
+
+        if c := n.GetInsertStmt(); c != nil {
+            return pe.executeInsert(c)
+        }
+
+        if c := n.GetSelectStmt(); c != nil {
+            _, err := pe.executeSelect(c)
+            return err
+        }
+
+        return fmt.Errorf(&quot;Unknown statement type: %s&quot;, stmt)
+    }
+
+    return nil
+}
+</code></pre>
+<p class="note">
+  The pg_query_go docs are not super helpful. I had to build a
+  <a href="https://github.com/eatonphil/waterbugdb/blob/main/astexplorer/main.go">separate
+  AST explorer program</a> to make it easier to understand this parser.
+</p><p>Let's start with creating a table.</p>
+<h3 id="create-table">Create table</h3><p>When a table is created, we'll need to store its metadata.</p>
+<pre><code class="hljs golang">type tableDefinition struct {
+    Name        string
+    ColumnNames []string
+    ColumnTypes []string
+}
+</code></pre>
+<p>The easiest/dumbest way to do this is to serialize its metadata to
+JSON and store it in the storage layer with a special key:
+<code>tables_${tableName}.</code>.</p>
+<pre><code class="hljs golang">func (pe *pgEngine) executeCreate(stmt *pgquery.CreateStmt) error {
+    tbl := tableDefinition{}
+    tbl.Name = stmt.Relation.Relname
+
+    for _, c := range stmt.TableElts {
+        cd := c.GetColumnDef()
+
+        tbl.ColumnNames = append(tbl.ColumnNames, cd.Colname)
+
+        // Names is namespaced. So `INT` is pg_catalog.int4. `BIGINT` is pg_catalog.int8.
+        var columnType string
+        for _, n := range cd.TypeName.Names {
+            if columnType != &quot;&quot; {
+                columnType += &quot;.&quot;
+            }
+            columnType += n.GetString_().Str
+        }
+        tbl.ColumnTypes = append(tbl.ColumnTypes, columnType)
+    }
+
+    tableBytes, err := json.Marshal(tbl)
+    if err != nil {
+        return fmt.Errorf(&quot;Could not marshal table: %s&quot;, err)
+    }
+
+    err = pe.db.Update(func(tx *bolt.Tx) error {
+        bkt, err := tx.CreateBucketIfNotExists(pe.bucketName)
+        if err != nil {
+            return err
+        }
+
+        return bkt.Put([]byte(&quot;tables_&quot;+tbl.Name), tableBytes)
+    })
+
+    if err != nil {
+        return fmt.Errorf(&quot;Could not set key-value: %s&quot;, err)
+    }
+
+    return nil
+}
+</code></pre>
+<p>And we'll build a helper to reverse that operation, pulling out table
+metadata from the storage layer by the table name:</p>
+<pre><code class="hljs golang">
+func (pe *pgEngine) getTableDefinition(name string) (*tableDefinition, error) {
+    var tbl tableDefinition
+
+    err := pe.db.View(func(tx *bolt.Tx) error {
+        bkt := tx.Bucket(pe.bucketName)
+        if bkt == nil {
+            return fmt.Errorf(&quot;Table does not exist&quot;)
+        }
+
+        valBytes := bkt.Get([]byte(&quot;tables_&quot; + name))
+        err := json.Unmarshal(valBytes, &amp;tbl)
+        if err != nil {
+            return fmt.Errorf(&quot;Could not unmarshal table: %s&quot;, err)
+        }
+
+        return nil
+    })
+
+    return &amp;tbl, err
+}
+</code></pre>
+<p>That's it for our basic <code>CREATE TABLE</code> support! Let's do <code>INSERT</code> next.</p>
+<h3 id="insert-row">Insert row</h3><p>Our support for insert will only support literal/constant <code>VALUES</code>.</p>
+<pre><code class="hljs golang">func (pe *pgEngine) executeInsert(stmt *pgquery.InsertStmt) error {
+    tblName := stmt.Relation.Relname
+
+    slct := stmt.GetSelectStmt().GetSelectStmt()
+    for _, values := range slct.ValuesLists {
+        var rowData []any
+        for _, value := range values.GetList().Items {
+            if c := value.GetAConst(); c != nil {
+                if s := c.Val.GetString_(); s != nil {
+                    rowData = append(rowData, s.Str)
+                    continue
+                }
+
+                if i := c.Val.GetInteger(); i != nil {
+                    rowData = append(rowData, i.Ival)
+                    continue
+                }
+            }
+
+            return fmt.Errorf(&quot;Unknown value type: %s&quot;, value)
+        }
+</code></pre>
+<p>It would be better to abstract this <code>VALUES</code> code into a helper so it
+could be used by <code>SELECT</code>s too but out of laziness we'll just keep
+this here.</p>
+<p>Next we need to write the row to the storage layer. We'll serialize
+the row data to JSON (inefficient because we know the row structure,
+but JSON is easy). We'll store the row with a prefix including the
+table name and we'll give its key a unique UUID. When we're iterating
+over rows in the table we'll be able to do a prefix scan that will
+recover just the rows in this table.</p>
+<pre><code class="hljs golang">
+        rowBytes, err := json.Marshal(rowData)
+        if err != nil {
+            return fmt.Errorf(&quot;Could not marshal row: %s&quot;, err)
+        }
+
+        id := uuid.New().String()
+        err = pe.db.Update(func(tx *bolt.Tx) error {
+            bkt, err := tx.CreateBucketIfNotExists(pe.bucketName)
+            if err != nil {
+                return err
+            }
+
+            return bkt.Put([]byte(&quot;rows_&quot;+tblName+&quot;_&quot;+id), rowBytes)
+        })
+        if err != nil {
+            return fmt.Errorf(&quot;Could not store row: %s&quot;, err)
+        }
+    }
+
+    return nil
+}
+</code></pre>
+<p>Finally we can move on to support <code>SELECT</code>!</p>
+<h3 id="select-rows">Select rows</h3><h3 id="summary">Summary</h3><p>So on the one hand this was a more complex post than my usual. Each
+process needed three servers running. Two of those servers we managed
+directly and the Raft server was managed by the Raft library.</p>
+<p>On the other hand, we did this all in a really small amount of
+code. Yes many edge cases were unhandled and massive amount of SQL was
+unhandled. And yes there are tons of inefficiencies like using JSON,
+an unstructured format when every table has fixed structure. But
+hopefully now you have an idea of how a project like this <em>could be
+structured</em>. And there's the beginnings of a framework for filling in
+syntax/edge cases over time.</p>
+<style>.feedback{display:initial;}</style>
+	<div class="feedback">
+	  <h4>Feedback</h4>
+	  <p>As always,
+	  please <a href="mailto:phil@eatonphil.com">email</a>
+	  or <a href="https://twitter.com/phil_eaton">tweet me</a>
+	    with questions, corrections, or ideas!</p>
+	</div>
+      </div>
+    </div>
+
+    <footer>
+      <div class="container">
+	<div>
+	  <div class="row">
+	    <a href="/" class="sm-link">
+              Home
+            </a>
+	    <a href="/rss.xml" class="sm-link">
+              RSS
+            </a>
+	    <a href="https://github.com/sponsors/eatonphil" class="sm-link">
+              ❤️  Sponsor this blog
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+	  <div class="feedback">
+	    <p>Frequent Topics</p>
+	    <div class="tags"><a href="/tags/javascript.html" class="tag">javascript (23)</a><a href="/tags/parsing.html" class="tag">parsing (17)</a><a href="/tags/golang.html" class="tag">golang (13)</a><a href="/tags/compilers.html" class="tag">compilers (13)</a><a href="/tags/postgres.html" class="tag">postgres (11)</a><a href="/tags/databases.html" class="tag">databases (10)</a><a href="/tags/sql.html" class="tag">sql (9)</a><a href="/tags/python.html" class="tag">python (8)</a><a href="/tags/management.html" class="tag">management (8)</a><a href="/tags/lisp.html" class="tag">lisp (8)</a><a href="/tags/interpreters.html" class="tag">interpreters (8)</a><a href="/tags/json.html" class="tag">json (6)</a><a href="/tags/books.html" class="tag">books (6)</a><a href="/tags/x86-amd64.html" class="tag">x86/amd64 (5)</a><a href="/tags/typescript.html" class="tag">typescript (5)</a><a href="/tags/linux.html" class="tag">linux (5)</a><a href="/tags/communication.html" class="tag">communication (5)</a><a href="/tags/scheme.html" class="tag">scheme (4)</a><a href="/tags/learning.html" class="tag">learning (4)</a><a href="/tags/leadership.html" class="tag">leadership (4)</a></div>
+	  </div>
+	</div>
+      </div>
+    </footer>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>
