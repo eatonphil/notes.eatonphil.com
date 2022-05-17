@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 17 May 2022 15:34:37 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 17 May 2022 16:14:18 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
 &lt;a href="https://github.com/cockroachdb/cockroach/blob/master/go.mod"&gt;its go.mod&lt;/a&gt;
 and notice a number of dependencies that do a lot of work: &lt;a href="https://github.com/jackc/pgproto3"&gt;a
 PostgreSQL wire protocol
@@ -134,20 +134,20 @@ func (pf *pgFsm) Restore(rc io.ReadCloser) error {
 node. In this project the message will be a &lt;code&gt;CREATE TABLE&lt;/code&gt; or &lt;code&gt;INSERT&lt;/code&gt;
 query. So we'll parse the query and pass it to the postgres engine for
 execution.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs golang"&gt;func (pf *pgFsm) Apply(log *raft.Log) any {
+&lt;pre&gt;&lt;code class="hljs golang"&gt;func (pf *pgFsm) Apply(log *raft.Log) interface{} {
     switch log.Type {
     case raft.LogCommand:
         ast, err := pgquery.Parse(string(log.Data))
         if err != nil {
-            return fmt.Errorf(&amp;quot;Could not parse payload: %s&amp;quot;, err)
+            panic(fmt.Errorf(&amp;quot;Could not parse payload: %s&amp;quot;, err))
         }
 
-        _, err = pf.pe.execute(ast)
+        err = pf.pe.execute(ast)
         if err != nil {
-            return err
+            panic(err)
         }
     default:
-        return fmt.Errorf(&amp;quot;Unknown raft log type: %#v&amp;quot;, log.Type)
+        panic(fmt.Errorf(&amp;quot;Unknown raft log type: %#v&amp;quot;, log.Type))
     }
 
     return nil
@@ -222,9 +222,9 @@ when we start the process) and the process (b)'s Raft server port.&lt;/p&gt;
     r *raft.Raft
 }
 
-func (hs httpServer) joinHandler(w http.ResponseWriter, r *http.Request) {
-    followerId := r.URL.Query().Get(&amp;quot;followerId&amp;quot;)
-    followerAddr := r.URL.Query().Get(&amp;quot;followerAddr&amp;quot;)
+func (hs httpServer) addFollowerHandler(w http.ResponseWriter, r *http.Request) {
+    followerId := r.URL.Query().Get(&amp;quot;id&amp;quot;)
+    followerAddr := r.URL.Query().Get(&amp;quot;addr&amp;quot;)
 
     if hs.r.State() != raft.Leader {
         json.NewEncoder(w).Encode(struct {
@@ -240,6 +240,7 @@ func (hs httpServer) joinHandler(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         log.Printf(&amp;quot;Failed to add follower: %s&amp;quot;, err)
         http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+        return
     }
 
     w.WriteHeader(http.StatusOK)
@@ -522,8 +523,369 @@ protocol.&lt;/p&gt;
 implementation of the Postgres wire protocol for Go. It allows us to
 implement a server that can respond to requests by Postgres clients
 like &lt;code&gt;psql&lt;/code&gt;.&lt;/p&gt;
-&lt;p&gt;It works by wrapping a TCP connection.&lt;/p&gt;
-&lt;p&gt;&lt;code&gt;golang&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;It works by wrapping a TCP connection. So we'll start by building a
+function that does the TCP serving loop.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;
+func runPgServer(port string, db *bolt.DB, r *raft.Raft) {
+    ln, err := net.Listen(&amp;quot;tcp&amp;quot;, &amp;quot;localhost:&amp;quot;+port)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    for {
+        conn, err := ln.Accept()
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        pc := pgConn{conn, db, r}
+        go pc.handle()
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The &lt;code&gt;pgConn&lt;/code&gt; instance needs access to the database directly so it can
+respond to &lt;code&gt;SELECT&lt;/code&gt;s. And it needs the Raft instance for all other
+queries.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;type pgConn struct {
+    conn net.Conn
+    db   *bolt.DB
+    r    *raft.Raft
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The &lt;code&gt;handle&lt;/code&gt; function we called about will grab the current message
+via the pgproto3 package and handle startup messages and regular
+messages.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;func (pc pgConn) handle() {
+    pgc := pgproto3.NewBackend(pgproto3.NewChunkReader(pc.conn), pc.conn)
+    defer pc.conn.Close()
+
+    err := pc.handleStartupMessage(pgc)
+    if err != nil {
+        log.Println(err)
+        return
+    }
+
+    for {
+        err := pc.handleMessage(pgc)
+        if err != nil {
+            log.Println(err)
+            return
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Startup messages include authorization and SSL checks. We'll allow
+anything in the former and respond "no" to the latter.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;
+func (pc pgConn) handleStartupMessage(pgconn *pgproto3.Backend) error {
+    startupMessage, err := pgconn.ReceiveStartupMessage()
+    if err != nil {
+        return fmt.Errorf(&amp;quot;Error receiving startup message: %s&amp;quot;, err)
+    }
+
+    switch startupMessage.(type) {
+    case *pgproto3.StartupMessage:
+        buf := (&amp;amp;pgproto3.AuthenticationOk{}).Encode(nil)
+        buf = (&amp;amp;pgproto3.ReadyForQuery{TxStatus: &amp;#39;I&amp;#39;}).Encode(buf)
+        _, err = pc.conn.Write(buf)
+        if err != nil {
+            return fmt.Errorf(&amp;quot;Error sending ready for query: %s&amp;quot;, err)
+        }
+
+        return nil
+    case *pgproto3.SSLRequest:
+        _, err = pc.conn.Write([]byte(&amp;quot;N&amp;quot;))
+        if err != nil {
+            return fmt.Errorf(&amp;quot;Error sending deny SSL request: %s&amp;quot;, err)
+        }
+
+        return pc.handleStartupMessage(pgconn)
+    default:
+        return fmt.Errorf(&amp;quot;Unknown startup message: %#v&amp;quot;, startupMessage)
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Within the main &lt;code&gt;handleMessage&lt;/code&gt; logic we'll check the type of message.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;func (pc pgConn) handleMessage(pgc *pgproto3.Backend) error {
+    msg, err := pgc.Receive()
+    if err != nil {
+        return fmt.Errorf(&amp;quot;Error receiving message: %s&amp;quot;, err)
+    }
+
+    switch t := msg.(type) {
+    case *pgproto3.Query:
+                // TODO
+    case *pgproto3.Terminate:
+        return nil
+    default:
+        return fmt.Errorf(&amp;quot;Received message other than Query from client: %s&amp;quot;, msg)
+    }
+
+    return nil
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If the message is a query we'll parse it and respond immediately to &lt;code&gt;SELECT&lt;/code&gt;s.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;    switch t := msg.(type) {
+    case *pgproto3.Query:
+        stmts, err := pgquery.Parse(t.String)
+        if err != nil {
+            return fmt.Errorf(&amp;quot;Error parsing query: %s&amp;quot;, err)
+        }
+
+        if len(stmts.GetStmts()) &amp;gt; 1 {
+            return fmt.Errorf(&amp;quot;Only make one request at a time.&amp;quot;)
+        }
+
+        stmt := stmts.GetStmts()[0]
+
+        // Handle SELECTs here
+        s := stmt.GetStmt().GetSelectStmt()
+        if s != nil {
+            pe := newPgEngine(pc.db)
+            res, err := pe.executeSelect(s)
+            if err != nil {
+                return err
+            }
+
+            pc.writePgResult(res)
+            return nil
+        }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;(We'll implement that &lt;code&gt;writePgResult&lt;/code&gt; helper shortly below.) Otherwise
+we'll add the query to the Raft log and return a basic response.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;        // Otherwise it&amp;#39;s DDL/DML, raftify
+        future := pc.r.Apply([]byte(t.String), 500*time.Millisecond)
+        if err := future.Error(); err != nil {
+            return fmt.Errorf(&amp;quot;Could not apply: %s&amp;quot;, err)
+        }
+
+        e := future.Response()
+        if e != nil {
+            return fmt.Errorf(&amp;quot;Could not apply (internal): %s&amp;quot;, e)
+        }
+
+        pc.done(nil, strings.ToUpper(strings.Split(t.String, &amp;quot; &amp;quot;)[0])+&amp;quot; ok&amp;quot;)
+    case *pgproto3.Terminate:
+        return nil
+    default:
+        return fmt.Errorf(&amp;quot;Received message other than Query from client: %s&amp;quot;, msg)
+    }
+
+    return nil
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;code&gt;done&lt;/code&gt; is an important helper that tells the Postgres connection that
+the query is done and ready for another.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;func (pc pgConn) done(buf []byte, msg string) {
+    buf = (&amp;amp;pgproto3.CommandComplete{CommandTag: []byte(msg)}).Encode(buf)
+    buf = (&amp;amp;pgproto3.ReadyForQuery{TxStatus: &amp;#39;I&amp;#39;}).Encode(buf)
+    _, err := pc.conn.Write(buf)
+    if err != nil {
+        log.Printf(&amp;quot;Failed to write query response: %s&amp;quot;, err)
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And now let's implement the &lt;code&gt;writePgResult&lt;/code&gt; helper. This function
+needs to translate from our &lt;code&gt;pgResult&lt;/code&gt; struct to the format require by
+pgproto3.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;
+var dataTypeOIDMap = map[string]uint32{
+    &amp;quot;text&amp;quot;:            25,
+    &amp;quot;pg_catalog.int4&amp;quot;: 23,
+}
+
+func (pc pgConn) writePgResult(res *pgResult) {
+    rd := &amp;amp;pgproto3.RowDescription{}
+    for i, field := range res.fieldNames {
+        rd.Fields = append(rd.Fields, pgproto3.FieldDescription{
+            Name:        []byte(field),
+            DataTypeOID: dataTypeOIDMap[res.fieldTypes[i]],
+        })
+    }
+    buf := rd.Encode(nil)
+    for _, row := range res.rows {
+        dr := &amp;amp;pgproto3.DataRow{}
+        for _, value := range row {
+            bs, err := json.Marshal(value)
+            if err != nil {
+                log.Printf(&amp;quot;Failed to marshal cell: %s\n&amp;quot;, err)
+                return
+            }
+
+            dr.Values = append(dr.Values, bs)
+        }
+
+        buf = dr.Encode(buf)
+    }
+
+    pc.done(buf, fmt.Sprintf(&amp;quot;SELECT %d&amp;quot;, len(res.rows)))
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And we're done with everything but &lt;code&gt;func main()&lt;/code&gt;!&lt;/p&gt;
+&lt;h3 id="main"&gt;Main&lt;/h3&gt;&lt;p&gt;On startup, each process must be assigned (by the parent process) a
+unique node id (any unique string is ok) and ports for the Raft
+server, Postgres server, and HTTP server. We'll build a short
+&lt;code&gt;getConfig&lt;/code&gt; helper to grab these from arguments.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;type config struct {
+    id       string
+    httpPort string
+    raftPort string
+    pgPort   string
+}
+
+func getConfig() config {
+    cfg := config{}
+    for i, arg := range os.Args[1:] {
+        if arg == &amp;quot;--node-id&amp;quot; {
+            cfg.id = os.Args[i+2]
+            i++
+            continue
+        }
+
+        if arg == &amp;quot;--http-port&amp;quot; {
+            cfg.httpPort = os.Args[i+2]
+            i++
+            continue
+        }
+
+        if arg == &amp;quot;--raft-port&amp;quot; {
+            cfg.raftPort = os.Args[i+2]
+            i++
+            continue
+        }
+
+        if arg == &amp;quot;--pg-port&amp;quot; {
+            cfg.pgPort = os.Args[i+2]
+            i++
+            continue
+        }
+    }
+
+    if cfg.id == &amp;quot;&amp;quot; {
+        log.Fatal(&amp;quot;Missing required parameter: --node-id&amp;quot;)
+    }
+
+    if cfg.raftPort == &amp;quot;&amp;quot; {
+        log.Fatal(&amp;quot;Missing required parameter: --raft-port&amp;quot;)
+    }
+
+    if cfg.httpPort == &amp;quot;&amp;quot; {
+        log.Fatal(&amp;quot;Missing required parameter: --http-port&amp;quot;)
+    }
+
+    if cfg.pgPort == &amp;quot;&amp;quot; {
+        log.Fatal(&amp;quot;Missing required parameter: --pg-port&amp;quot;)
+    }
+
+    return cfg
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now in &lt;code&gt;main&lt;/code&gt; we'll grab the config and set up this process's
+database. All processes will put their data in a top-level &lt;code&gt;data&lt;/code&gt;
+directory to make managing the directories easier. But within that
+directory each process will have their own unique directories for data
+storage based on the unique node id.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;func main() {
+    cfg := getConfig()
+
+    dataDir := &amp;quot;data&amp;quot;
+    err := os.MkdirAll(dataDir, os.ModePerm)
+    if err != nil {
+        log.Fatalf(&amp;quot;Could not create data directory: %s&amp;quot;, err)
+    }
+
+    db, err := bolt.Open(path.Join(dataDir, &amp;quot;/data&amp;quot;+cfg.id), 0600, nil)
+    if err != nil {
+        log.Fatalf(&amp;quot;Could not open bolt db: %s&amp;quot;, err)
+    }
+    defer db.Close()
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We need to clean up the database.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;    pe := newPgEngine(db)
+    // Start off in clean state
+    pe.delete()
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Set up the Raft server.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;    pf := &amp;amp;pgFsm{pe}
+    r, err := setupRaft(path.Join(dataDir, &amp;quot;raft&amp;quot;+cfg.id), cfg.id, &amp;quot;localhost:&amp;quot;+cfg.raftPort, pf)
+    if err != nil {
+        log.Fatal(err)
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Set up the HTTP server.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;    hs := httpServer{r}
+    http.HandleFunc(&amp;quot;/add-follower&amp;quot;, hs.addFollowerHandler)
+    go func() {
+        err := http.ListenAndServe(&amp;quot;:&amp;quot;+cfg.httpPort, nil)
+        if err != nil {
+            log.Fatal(err)
+        }
+    }()
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And finally, kick off the Postgres server.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;
+    runPgServer(cfg.pgPort, db, r)
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Finally. Finally. Finally done. Let's give it a go. :)&lt;/p&gt;
+&lt;h3 id="what-hath-god-wrought"&gt;What hath god wrought&lt;/h3&gt;&lt;p&gt;First, initialize the go module and then build the app.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ go mod init waterbugdb
+$ go mod tidy
+$ go build
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now in terminal 1 start an instance of the database,&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ ./waterbugdb --node-id node1 --raft-port 2222 --http-port 8222 --pg-port 6000
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Then in terminal 2 start another instance.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ ./waterbugdb --node-id node2 --raft-port 2223 --http-port 8223 --pg-port 6001
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And in terminal 3, tell &lt;code&gt;node1&lt;/code&gt; to have &lt;code&gt;node2&lt;/code&gt; follow it.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ curl &amp;#39;localhost:8222/add-follower?addr=localhost:2223&amp;amp;id=node2&amp;#39;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And then open &lt;code&gt;psql&lt;/code&gt; against port &lt;code&gt;6000&lt;/code&gt;, the leader.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs sql"&gt;$ psql -h localhost -p 6000
+psql -h 127.0.0.1 -p 6000
+psql (13.4, server 0.0.0)
+Type &amp;quot;help&amp;quot; for help.
+
+phil=&amp;gt; create table x (age int, name text);
+CREATE ok
+phil=&amp;gt; insert into x values(14, &amp;#39;garry&amp;#39;), (20, &amp;#39;ted&amp;#39;);
+could not interpret result from server: INSERT ok
+INSERT ok
+phil=&amp;gt; select name, age from x;
+  name   | age 
+---------+-----
+ &amp;quot;garry&amp;quot; |  14
+ &amp;quot;ted&amp;quot;   |  20
+(2 rows)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now kill &lt;code&gt;node1&lt;/code&gt; in terminal 1. Then start it up again. &lt;code&gt;node2&lt;/code&gt; will
+now be the leader. So exit &lt;code&gt;psql&lt;/code&gt; in terminal 3 and enter it again
+pointed at &lt;code&gt;node2&lt;/code&gt;, port &lt;code&gt;6001&lt;/code&gt;. Add new data.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs sql"&gt;$ psql -h 127.0.0.1 -p 6001
+psql (13.4, server 0.0.0)
+Type &amp;quot;help&amp;quot; for help.
+
+phil=&amp;gt; insert into x values(19, &amp;#39;ava&amp;#39;), (18, &amp;#39;ming&amp;#39;);
+could not interpret result from server: INSERT ok
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Exit &lt;code&gt;psql&lt;/code&gt; in terminal 3 and start it up again against &lt;code&gt;node1&lt;/code&gt; again,
+port &lt;code&gt;6000&lt;/code&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs sql"&gt;$ psql -h 127.0.0.1 -p 6000
+psql (13.4, server 0.0.0)
+Type &amp;quot;help&amp;quot; for help.
+
+phil=&amp;gt; select age, name from x;
+ age |  name
+-----+---------
+  20 | &amp;quot;ted&amp;quot;
+  14 | &amp;quot;garry&amp;quot;
+  18 | &amp;quot;ming&amp;quot;
+  19 | &amp;quot;ava&amp;quot;
+(2 rows)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Nifty stuff.&lt;/p&gt;
 &lt;h3 id="summary"&gt;Summary&lt;/h3&gt;&lt;p&gt;So on the one hand this was a more complex post than my usual. Each
 process needed three servers running. Two of those servers we managed
 directly and the Raft server was managed by the Raft library.&lt;/p&gt;
@@ -534,6 +896,12 @@ an unstructured format when every table has fixed structure. But
 hopefully now you have an idea of how a project like this &lt;em&gt;could be
 structured&lt;/em&gt;. And there's the beginnings of a framework for filling in
 syntax/edge cases over time.&lt;/p&gt;
+&lt;p&gt;Join the discussion on the &lt;a href="https://discord.multiprocess.io/"&gt;Multiprocess Discord #hacking-dbs
+channel&lt;/a&gt;,
+&lt;a href="https://www.reddit.com/r/databasedevelopment"&gt;/r/databasedevelopment&lt;/a&gt;,
+&lt;a href="https://news.ycombinator.com/"&gt;Hacker News&lt;/a&gt;,
+&lt;a href="https://lobste.rs/"&gt;Lobsters&lt;/a&gt; or
+&lt;a href="https://twitter.com/phil_eaton"&gt;Twitter&lt;/a&gt;.&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/distributed-postgres.html</guid><pubDate>Tue, 17 May 2022 00:00:00 +0000</pubDate></item><item><title>Interview With Phil of DataStation</title><link>http://notes.eatonphil.com/console-101.html</link><description>&lt;head&gt;
     &lt;meta http-equiv="refresh" content="4;URL='https://console.substack.com/p/console-101'" /&gt;
 &lt;/head&gt;&lt;p&gt;This is an external interview. Click

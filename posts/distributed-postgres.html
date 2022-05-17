@@ -175,7 +175,7 @@ func (pf *pgFsm) Apply(log *raft.Log) interface{} {
 			panic(fmt.Errorf("Could not parse payload: %s", err))
 		}
 
-		_, err = pf.pe.execute(ast)
+		err = pf.pe.execute(ast)
 		if err != nil {
 			panic(err)
 		}
@@ -268,9 +268,9 @@ type httpServer struct {
 	r *raft.Raft
 }
 
-func (hs httpServer) joinHandler(w http.ResponseWriter, r *http.Request) {
-	followerId := r.URL.Query().Get("followerId")
-	followerAddr := r.URL.Query().Get("followerAddr")
+func (hs httpServer) addFollowerHandler(w http.ResponseWriter, r *http.Request) {
+	followerId := r.URL.Query().Get("id")
+	followerAddr := r.URL.Query().Get("addr")
 
 	if hs.r.State() != raft.Leader {
 		json.NewEncoder(w).Encode(struct {
@@ -286,6 +286,7 @@ func (hs httpServer) joinHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Failed to add follower: %s", err)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -1032,23 +1033,31 @@ phil=> select name, age from x;
 (2 rows)
 ```
 
-Now kill off `node2` in terminal 2 and in terminal 3 insert more data
-into the `psql` prompt talking to `node1`.
-
-```sql
-phil=> insert into x values(19, 'ava'), (18, 'ming');
-could not interpret result from server: INSERT ok
-```
-
-Now in terminal 2 start `node2` back up again with all the same
-arguments. You won't need to tell `node1` to have `node2` join it
-again this time.
-
-Exit `psql` in terminal 3 and start it up again against `node2, port
-`6001`.
+Now kill `node1` in terminal 1. Then start it up again. `node2` will
+now be the leader. So exit `psql` in terminal 3 and enter it again
+pointed at `node2`, port `6001`. Add new data.
 
 ```sql
 $ psql -h 127.0.0.1 -p 6001
+psql (13.4, server 0.0.0)
+Type "help" for help.
+
+phil=> insert into x values(19, 'ava'), (18, 'ming');
+could not interpret result from server: INSERT ok
+phil=> select age, name from x;
+ age |  name
+-----+---------
+  20 | "ted"
+  14 | "garry"
+  18 | "ming"
+  19 | "ava"
+```
+
+Exit `psql` in terminal 3 and start it up again against `node1` again,
+port `6000`.
+
+```sql
+$ psql -h 127.0.0.1 -p 6000
 psql (13.4, server 0.0.0)
 Type "help" for help.
 
@@ -1061,10 +1070,6 @@ phil=> select age, name from x;
   19 | "ava"
 (2 rows)
 ```
-
-And you can see that even though `node2` was down when these rows were
-added, when `node2` came back up the Raft logs were replayed and
-`node1` is now up to date with `node1` again!
 
 Nifty stuff.
 
