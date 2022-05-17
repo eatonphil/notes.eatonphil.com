@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 17 May 2022 16:14:18 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 17 May 2022 16:17:36 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
 &lt;a href="https://github.com/cockroachdb/cockroach/blob/master/go.mod"&gt;its go.mod&lt;/a&gt;
 and notice a number of dependencies that do a lot of work: &lt;a href="https://github.com/jackc/pgproto3"&gt;a
 PostgreSQL wire protocol
@@ -869,6 +869,13 @@ Type &amp;quot;help&amp;quot; for help.
 
 phil=&amp;gt; insert into x values(19, &amp;#39;ava&amp;#39;), (18, &amp;#39;ming&amp;#39;);
 could not interpret result from server: INSERT ok
+phil=&amp;gt; select age, name from x;
+ age |  name
+-----+---------
+  20 | &amp;quot;ted&amp;quot;
+  14 | &amp;quot;garry&amp;quot;
+  18 | &amp;quot;ming&amp;quot;
+  19 | &amp;quot;ava&amp;quot;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Exit &lt;code&gt;psql&lt;/code&gt; in terminal 3 and start it up again against &lt;code&gt;node1&lt;/code&gt; again,
 port &lt;code&gt;6000&lt;/code&gt;.&lt;/p&gt;

@@ -917,6 +917,13 @@ Type &quot;help&quot; for help.
 
 phil=&gt; insert into x values(19, &#39;ava&#39;), (18, &#39;ming&#39;);
 could not interpret result from server: INSERT ok
+phil=&gt; select age, name from x;
+ age |  name
+-----+---------
+  20 | &quot;ted&quot;
+  14 | &quot;garry&quot;
+  18 | &quot;ming&quot;
+  19 | &quot;ava&quot;
 </code></pre>
 <p>Exit <code>psql</code> in terminal 3 and start it up again against <code>node1</code> again,
 port <code>6000</code>.</p>
