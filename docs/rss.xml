@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 17 May 2022 16:20:22 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 17 May 2022 17:01:55 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
 &lt;a href="https://github.com/cockroachdb/cockroach/blob/master/go.mod"&gt;its go.mod&lt;/a&gt;
 and notice a number of dependencies that do a lot of work: &lt;a href="https://github.com/jackc/pgproto3"&gt;a
 PostgreSQL wire protocol
@@ -10,9 +10,9 @@ part of go.mod but still building on 3rd party code, &lt;a href="https://github.
 grammar
 definition&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;To be &lt;em&gt;absurdly&lt;/em&gt; reductionist, CockroachDB is just the glue around these
-libraries. With that reductionist mindset, let's trying building a
+libraries. With that reductionist mindset, let's try building a
 distributed Postgres proof of concept ourselves! We'll use only four
-major external libraries: for parsing, handling Postgres's wire
+major external libraries: for parsing SQL, handling Postgres's wire
 protocol, handling Raft, and handling the storage of table metadata
 and rows themselves.&lt;/p&gt;
 &lt;p&gt;By the end of this post, in around 600 lines of code, we'll have a
@@ -67,14 +67,14 @@ detail about how processes join to the same Raft cluster.&lt;/p&gt;
 implementations. When I refer to Raft in the rest of this post I'm
 going to be referring to an implementation.&lt;/p&gt;
 &lt;p&gt;And although CockroachDB use's &lt;a href="https://github.com/etcd-io/etcd"&gt;etcd's Raft
-implementation&lt;/a&gt;, I didn't realize that
-so when building this project I used &lt;a href="https://pkg.go.dev/github.com/hashicorp/raft"&gt;Hashicorp's Raft
+implementation&lt;/a&gt;, I didn't realize
+that when I started building this project. I used &lt;a href="https://pkg.go.dev/github.com/hashicorp/raft"&gt;Hashicorp's Raft
 implementation&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;Raft allows us to reliably keep multiple nodes in sync with a log of
 messages. Each node in the Raft cluster implements a finite state
-machine (FSM) with three operations: apply, snapshot, and restore.&lt;/p&gt;
-&lt;p&gt;In Go the finite state machine is an interface we must implement with
-these three operations. Our finite state machine will embed a postgres
+machine (FSM) with three operations: apply, snapshot, and restore. The
+finite state machine is an interface we must implement with these
+three operations. Our finite state machine will embed a postgres
 engine we'll build out after this to handle query execution.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs golang"&gt;package main
 

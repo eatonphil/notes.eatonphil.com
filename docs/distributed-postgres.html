@@ -58,9 +58,9 @@ part of go.mod but still building on 3rd party code, <a href="https://github.com
 grammar
 definition</a>.</p>
 <p>To be <em>absurdly</em> reductionist, CockroachDB is just the glue around these
-libraries. With that reductionist mindset, let's trying building a
+libraries. With that reductionist mindset, let's try building a
 distributed Postgres proof of concept ourselves! We'll use only four
-major external libraries: for parsing, handling Postgres's wire
+major external libraries: for parsing SQL, handling Postgres's wire
 protocol, handling Raft, and handling the storage of table metadata
 and rows themselves.</p>
 <p>By the end of this post, in around 600 lines of code, we'll have a
@@ -115,14 +115,14 @@ detail about how processes join to the same Raft cluster.</p>
 implementations. When I refer to Raft in the rest of this post I'm
 going to be referring to an implementation.</p>
 <p>And although CockroachDB use's <a href="https://github.com/etcd-io/etcd">etcd's Raft
-implementation</a>, I didn't realize that
-so when building this project I used <a href="https://pkg.go.dev/github.com/hashicorp/raft">Hashicorp's Raft
+implementation</a>, I didn't realize
+that when I started building this project. I used <a href="https://pkg.go.dev/github.com/hashicorp/raft">Hashicorp's Raft
 implementation</a>.</p>
 <p>Raft allows us to reliably keep multiple nodes in sync with a log of
 messages. Each node in the Raft cluster implements a finite state
-machine (FSM) with three operations: apply, snapshot, and restore.</p>
-<p>In Go the finite state machine is an interface we must implement with
-these three operations. Our finite state machine will embed a postgres
+machine (FSM) with three operations: apply, snapshot, and restore. The
+finite state machine is an interface we must implement with these
+three operations. Our finite state machine will embed a postgres
 engine we'll build out after this to handle query execution.</p>
 <pre><code class="hljs golang">package main
 
