@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 17 May 2022 19:31:26 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 17 May 2022 19:34:36 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
 &lt;a href="https://github.com/cockroachdb/cockroach/blob/master/go.mod"&gt;its go.mod&lt;/a&gt;
 and notice a number of dependencies that do a lot of work: &lt;a href="https://github.com/jackc/pgproto3"&gt;a
 PostgreSQL wire protocol
@@ -916,7 +916,17 @@ channel&lt;/a&gt;,
 &lt;a href="https://lobste.rs/"&gt;Lobsters&lt;/a&gt; or
 &lt;a href="https://twitter.com/phil_eaton"&gt;Twitter&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;New blog post is up :) Let&amp;#39;s build a distributed postgres proof of concept.&lt;a href="https://t.co/Z8BDzF1bUw"&gt;https://t.co/Z8BDzF1bUw&lt;/a&gt; &lt;a href="https://t.co/aSkOjr9Yrh"&gt;pic.twitter.com/aSkOjr9Yrh&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1526598365634605058?ref_src=twsrc%5Etfw"&gt;May 17, 2022&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/distributed-postgres.html</guid><pubDate>Tue, 17 May 2022 00:00:00 +0000</pubDate></item><item><title>Interview With Phil of DataStation</title><link>http://notes.eatonphil.com/console-101.html</link><description>&lt;head&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/distributed-postgres.html</guid><pubDate>Tue, 17 May 2022 00:00:00 +0000</pubDate></item><item><title>SQLite in Go, with and without cgo</title><link>http://notes.eatonphil.com/sqlite-in-go-with-and-without-cgo.html</link><description>&lt;head&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2022-05-12-sqlite-in-go-with-and-without-cgo.html'" /&gt;
+&lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
+&lt;a href="https://datastation.multiprocess.io/blog/2022-05-12-sqlite-in-go-with-and-without-cgo.html"&gt;here&lt;/a&gt;
+if you are not redirected.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/sqlite-in-go-with-and-without-cgo.html</guid><pubDate>Thu, 12 May 2022 00:00:00 +0000</pubDate></item><item><title>HTML event handler attributes: down the rabbit hole</title><link>http://notes.eatonphil.com/event-handler-attributes.html</link><description>&lt;head&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2022-04-26-event-handler-attributes.html'" /&gt;
+&lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
+&lt;a href="https://datastation.multiprocess.io/blog/2022-04-26-event-handler-attributes.html"&gt;here&lt;/a&gt;
+if you are not redirected.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/event-handler-attributes.html</guid><pubDate>Tue, 26 Apr 2022 00:00:00 +0000</pubDate></item><item><title>Interview With Phil of DataStation</title><link>http://notes.eatonphil.com/console-101.html</link><description>&lt;head&gt;
     &lt;meta http-equiv="refresh" content="4;URL='https://console.substack.com/p/console-101'" /&gt;
 &lt;/head&gt;&lt;p&gt;This is an external interview. Click
 &lt;a href="https://console.substack.com/p/console-101"&gt;here&lt;/a&gt;

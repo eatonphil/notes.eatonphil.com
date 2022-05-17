@@ -353,6 +353,14 @@
     <lastmod>2022-04-17</lastmod>
  </url>
   <url>
+    <loc>https://notes.eatonphil.com/event-handler-attributes.html</loc>
+    <lastmod>2022-04-26</lastmod>
+ </url>
+  <url>
+    <loc>https://notes.eatonphil.com/sqlite-in-go-with-and-without-cgo.html</loc>
+    <lastmod>2022-05-12</lastmod>
+ </url>
+  <url>
     <loc>https://notes.eatonphil.com/distributed-postgres.html</loc>
     <lastmod>2022-05-17</lastmod>
  </url>
