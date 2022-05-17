@@ -352,4 +352,8 @@
     <loc>https://notes.eatonphil.com/console-101.html</loc>
     <lastmod>2022-04-17</lastmod>
  </url>
+  <url>
+    <loc>https://notes.eatonphil.com/distributed-postgres.html</loc>
+    <lastmod>2022-05-17</lastmod>
+ </url>
 </urlset>

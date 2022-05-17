@@ -34,16 +34,16 @@ HOME_PAGE = """
     where I build <a
     href="https://github.com/multiprocessio">open-source data
     tools</a> like <a
-    href="https://datastation.multiprocess.io">DataStation (1.3k+
+    href="https://datastation.multiprocess.io">DataStation (1.5k+
     stars)</a>, an open-source data IDE for developers, and <a
-    href="https://github.com/multiprocessio/dsq">dsq (1.7k+
+    href="https://github.com/multiprocessio/dsq">dsq (1.9k+
     stars)</a>, a commandline tool for running SQL queries against
     JSON, CSV, Parquet, Excel and more.
   </p>
   <h3 class="fp-h3">Hang out</h3>
   <p>
     I host a <a href="https://discord.multiprocess.io">hacker Discord
-    (650+ members)</a> and a monthly virtual Meetup, <a
+    (700+ members)</a> and a monthly virtual Meetup, <a
     href="https://www.meetup.com/hackernights/">Hacker Nights (200+
     members)</a>, that has featured talks by the founder of <a
     href="bit.io">bit.io</a>, the creator of <a
@@ -54,17 +54,6 @@ HOME_PAGE = """
     of databases, compilers, operating systems, browsers, emulators,
     etc. And to provide a community around this kind of
     exploration. You are very welcome to join either!
-  </p>
-  <h3 class="fp-h3">Contract Development</h3>
-  <p>
-    With 10 years of experience, I've led frontend, backend and
-    fullstack teams. Particularly focused on Go, Python, Node/JS/TS,
-    React; and PostgreSQL or SQLite. Although my work with DataStation
-    has meant getting familiar with just about every database out
-    there. Over the last year I've also gotten exposed to Electron
-    while building DataStation. I'm always looking for new
-    opportunities. If I can help you out, <a
-    href="mailto:phil@multiprocess.io">please get in touch</a>!
   </p>
   <h3 class="fp-h3">Elsewhere</h3>
   <p>
