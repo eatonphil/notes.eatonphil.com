@@ -120,10 +120,9 @@ that when I started building this project. I used <a href="https://pkg.go.dev/gi
 implementation</a>.</p>
 <p>Raft allows us to reliably keep multiple nodes in sync with a log of
 messages. Each node in the Raft cluster implements a finite state
-machine (FSM) with three operations: apply, snapshot, and restore. The
-finite state machine is an interface we must implement with these
-three operations. Our finite state machine will embed a postgres
-engine we'll build out after this to handle query execution.</p>
+machine (FSM) with three operations: apply, snapshot, and restore. Our
+finite state machine will embed a postgres engine we'll build out
+after this to handle query execution.</p>
 <pre><code class="hljs golang">package main
 
 import (
