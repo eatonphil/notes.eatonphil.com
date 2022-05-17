@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 17 May 2022 15:10:08 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 17 May 2022 15:34:37 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
 &lt;a href="https://github.com/cockroachdb/cockroach/blob/master/go.mod"&gt;its go.mod&lt;/a&gt;
 and notice a number of dependencies that do a lot of work: &lt;a href="https://github.com/jackc/pgproto3"&gt;a
 PostgreSQL wire protocol
@@ -15,7 +15,7 @@ distributed Postgres proof of concept ourselves! We'll use only four
 major external libraries: for parsing, handling Postgres's wire
 protocol, handling Raft, and handling the storage of table metadata
 and rows themselves.&lt;/p&gt;
-&lt;p&gt;By the end of this post, in under 600 lines of code, we'll have a
+&lt;p&gt;By the end of this post, in around 600 lines of code, we'll have a
 distributed "Postgres implementation" that will accept writes
 (&lt;code&gt;CREATE TABLE&lt;/code&gt;, &lt;code&gt;INSERT&lt;/code&gt;) on the leader and accept reads (&lt;code&gt;SELECT&lt;/code&gt;)
 on any node. All nodes will contain the same data.&lt;/p&gt;
@@ -306,9 +306,7 @@ dedicated helper for each kind.&lt;/p&gt;
     ColumnTypes []string
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;The easiest/dumbest way to do this is to serialize its metadata to
-JSON and store it in the storage layer with a special key:
-&lt;code&gt;tables_${tableName}.&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;First we pull that metadata out of the AST.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs golang"&gt;func (pe *pgEngine) executeCreate(stmt *pgquery.CreateStmt) error {
     tbl := tableDefinition{}
     tbl.Name = stmt.Relation.Relname
@@ -328,7 +326,11 @@ JSON and store it in the storage layer with a special key:
         }
         tbl.ColumnTypes = append(tbl.ColumnTypes, columnType)
     }
-
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now we need to store this in the storage layer. The easiest/dumbest
+way to do this is to serialize its metadata to JSON and store it with
+key: &lt;code&gt;tables_${tableName}&lt;/code&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;
     tableBytes, err := json.Marshal(tbl)
     if err != nil {
         return fmt.Errorf(&amp;quot;Could not marshal table: %s&amp;quot;, err)
@@ -350,7 +352,7 @@ JSON and store it in the storage layer with a special key:
     return nil
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;And we'll build a helper to reverse that operation, pulling out table
+&lt;p&gt;Next we'll build a helper to reverse that operation, pulling out table
 metadata from the storage layer by the table name:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs golang"&gt;
 func (pe *pgEngine) getTableDefinition(name string) (*tableDefinition, error) {
@@ -431,7 +433,98 @@ recover just the rows in this table.&lt;/p&gt;
 }
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Finally we can move on to support &lt;code&gt;SELECT&lt;/code&gt;!&lt;/p&gt;
-&lt;h3 id="select-rows"&gt;Select rows&lt;/h3&gt;&lt;h3 id="summary"&gt;Summary&lt;/h3&gt;&lt;p&gt;So on the one hand this was a more complex post than my usual. Each
+&lt;h3 id="select-rows"&gt;Select rows&lt;/h3&gt;&lt;p&gt;Unlike &lt;code&gt;CREATE TABLE&lt;/code&gt; and &lt;code&gt;INSERT&lt;/code&gt;, &lt;code&gt;SELECT&lt;/code&gt; will need to return rows,
+column names, and because the Postgres wire protocol wants it, column
+types.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;type pgResult struct {
+    fieldNames []string
+    fieldTypes []string
+    rows       [][]any
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;First we pull out the table name and the fields selected, looking up
+field types in the table metadata.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;func (pe *pgEngine) executeSelect(stmt *pgquery.SelectStmt) (*pgResult, error) {
+    tblName := stmt.FromClause[0].GetRangeVar().Relname
+    tbl, err := pe.getTableDefinition(tblName)
+    if err != nil {
+        return nil, err
+    }
+
+    results := &amp;amp;pgResult{}
+    for _, c := range stmt.TargetList {
+        fieldName := c.GetResTarget().Val.GetColumnRef().Fields[0].GetString_().Str
+        results.fieldNames = append(results.fieldNames, fieldName)
+
+        fieldType := &amp;quot;&amp;quot;
+        for i, cn := range tbl.ColumnNames {
+            if cn == fieldName {
+                fieldType = tbl.ColumnTypes[i]
+            }
+        }
+
+        if fieldType == &amp;quot;&amp;quot; {
+            return nil, fmt.Errorf(&amp;quot;Unknown field: %s&amp;quot;, fieldName)
+        }
+
+        results.fieldTypes = append(results.fieldTypes, fieldType)
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Finally, we do a prefix scan to grab all rows in the table from the
+storage layer.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs golang"&gt;    prefix := []byte(&amp;quot;rows_&amp;quot; + tblName + &amp;quot;_&amp;quot;)
+    pe.db.View(func(tx *bolt.Tx) error {
+        c := tx.Bucket(pe.bucketName).Cursor()
+
+        for k, v := c.Seek(prefix); k != nil &amp;amp;&amp;amp; bytes.HasPrefix(k, prefix); k, v = c.Next() {
+            var row []any
+            err = json.Unmarshal(v, &amp;amp;row)
+            if err != nil {
+                return fmt.Errorf(&amp;quot;Unable to unmarshal row: %s&amp;quot;, err)
+            }
+
+            var targetRow []any
+            for _, target := range results.fieldNames {
+                for i, field := range tbl.ColumnNames {
+                    if target == field {
+                        targetRow = append(targetRow, row[i])
+                    }
+                }
+            }
+
+            results.rows = append(results.rows, targetRow)
+        }
+
+        return nil
+    })
+
+    return results, nil
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That's it for &lt;code&gt;SELECT&lt;/code&gt;! The last function we'll implement is a
+helper for deleting all data in the storage layer. This will be called
+on startup before Raft logs are applied so the database always ends up
+in a consistent state.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;func (pe *pgEngine) delete() error {
+    return pe.db.Update(func(tx *bolt.Tx) error {
+        bkt := tx.Bucket(pe.bucketName)
+        if bkt != nil {
+            return tx.DeleteBucket(pe.bucketName)
+        }
+
+        return nil
+    })
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And we're ready to move on to the final layer, the Postgres wire
+protocol.&lt;/p&gt;
+&lt;h3 id="postgres-wire-protocol-server"&gt;Postgres wire protocol server&lt;/h3&gt;&lt;p&gt;&lt;a href="https://github.com/jackc/pgproto3"&gt;jackc/pgproto3&lt;/a&gt; is an
+implementation of the Postgres wire protocol for Go. It allows us to
+implement a server that can respond to requests by Postgres clients
+like &lt;code&gt;psql&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;It works by wrapping a TCP connection.&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;golang&lt;/code&gt;&lt;/p&gt;
+&lt;h3 id="summary"&gt;Summary&lt;/h3&gt;&lt;p&gt;So on the one hand this was a more complex post than my usual. Each
 process needed three servers running. Two of those servers we managed
 directly and the Raft server was managed by the Raft library.&lt;/p&gt;
 &lt;p&gt;On the other hand, we did this all in a really small amount of
