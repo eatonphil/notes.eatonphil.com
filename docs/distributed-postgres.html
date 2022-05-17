@@ -207,6 +207,8 @@ execution.</p>
     return nil
 }
 </code></pre>
+<p>Panic-ing here is actually the <a href="https://github.com/hashicorp/raft/issues/307">advised
+behavior</a>.</p>
 <h4 id="raft-server">Raft server</h4><p>Now we can set up the actual Raft server and pass an instance of this
 FSM. This is a bunch of boilerplate that would matter in production
 installs but for us basically we just need to tell Raft where to run
@@ -606,7 +608,7 @@ queries.</p>
     r    *raft.Raft
 }
 </code></pre>
-<p>The <code>handle</code> function we called about will grab the current message
+<p>The <code>handle</code> function we called above will grab the current message
 via the pgproto3 package and handle startup messages and regular
 messages.</p>
 <pre><code class="hljs golang">func (pc pgConn) handle() {
@@ -729,7 +731,8 @@ we'll add the query to the Raft log and return a basic response.</p>
 }
 </code></pre>
 <p><code>done</code> is an important helper that tells the Postgres connection that
-the query is done and ready for another.</p>
+the query is done and ready for another. Without this response <code>psql</code>
+just hangs.</p>
 <pre><code class="hljs golang">func (pc pgConn) done(buf []byte, msg string) {
     buf = (&amp;pgproto3.CommandComplete{CommandTag: []byte(msg)}).Encode(buf)
     buf = (&amp;pgproto3.ReadyForQuery{TxStatus: &#39;I&#39;}).Encode(buf)

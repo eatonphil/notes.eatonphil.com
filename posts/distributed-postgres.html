@@ -194,6 +194,9 @@ func (pf *pgFsm) Apply(log *raft.Log) interface{} {
 }
 ```
 
+Panic-ing here is actually the [advised
+behavior](https://github.com/hashicorp/raft/issues/307).
+
 #### Raft server
 
 Now we can set up the actual Raft server and pass an instance of this
@@ -672,7 +675,7 @@ type pgConn struct {
 }
 ```
 
-The `handle` function we called about will grab the current message
+The `handle` function we called above will grab the current message
 via the pgproto3 package and handle startup messages and regular
 messages.
 
@@ -810,7 +813,8 @@ we'll add the query to the Raft log and return a basic response.
 ```
 
 `done` is an important helper that tells the Postgres connection that
-the query is done and ready for another.
+the query is done and ready for another. Without this response `psql`
+just hangs.
 
 ```golang
 func (pc pgConn) done(buf []byte, msg string) {

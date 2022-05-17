@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 17 May 2022 19:34:36 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 17 May 2022 20:09:35 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
 &lt;a href="https://github.com/cockroachdb/cockroach/blob/master/go.mod"&gt;its go.mod&lt;/a&gt;
 and notice a number of dependencies that do a lot of work: &lt;a href="https://github.com/jackc/pgproto3"&gt;a
 PostgreSQL wire protocol
@@ -159,6 +159,8 @@ execution.&lt;/p&gt;
     return nil
 }
 &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Panic-ing here is actually the &lt;a href="https://github.com/hashicorp/raft/issues/307"&gt;advised
+behavior&lt;/a&gt;.&lt;/p&gt;
 &lt;h4 id="raft-server"&gt;Raft server&lt;/h4&gt;&lt;p&gt;Now we can set up the actual Raft server and pass an instance of this
 FSM. This is a bunch of boilerplate that would matter in production
 installs but for us basically we just need to tell Raft where to run
@@ -558,7 +560,7 @@ queries.&lt;/p&gt;
     r    *raft.Raft
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;The &lt;code&gt;handle&lt;/code&gt; function we called about will grab the current message
+&lt;p&gt;The &lt;code&gt;handle&lt;/code&gt; function we called above will grab the current message
 via the pgproto3 package and handle startup messages and regular
 messages.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs golang"&gt;func (pc pgConn) handle() {
@@ -681,7 +683,8 @@ we'll add the query to the Raft log and return a basic response.&lt;/p&gt;
 }
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;&lt;code&gt;done&lt;/code&gt; is an important helper that tells the Postgres connection that
-the query is done and ready for another.&lt;/p&gt;
+the query is done and ready for another. Without this response &lt;code&gt;psql&lt;/code&gt;
+just hangs.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs golang"&gt;func (pc pgConn) done(buf []byte, msg string) {
     buf = (&amp;amp;pgproto3.CommandComplete{CommandTag: []byte(msg)}).Encode(buf)
     buf = (&amp;amp;pgproto3.ReadyForQuery{TxStatus: &amp;#39;I&amp;#39;}).Encode(buf)
