@@ -38,7 +38,6 @@ Here is a sample interaction against the leader:
 
 ```bash
 $ psql -h localhost -p 6000
-psql -h 127.0.0.1 -p 6000
 psql (13.4, server 0.0.0)
 Type "help" for help.
 
@@ -253,10 +252,11 @@ func setupRaft(dir, nodeId, raftAddress string, pf *pgFsm) (*raft.Raft, error) {
 ```
 
 Every instance of this process will run this and will start off as a
-leader in a new cluster. We'll expose an HTTP server that allows
-leaders to talk to other leaders to tell them to follow it. This HTTP
-endpoint in the HTTP server is how we'll get from N process with N
-leaders and N clusters to N processes with 1 leader and 1 cluster.
+leader in a new cluster. We'll expose an HTTP server that allows a
+leader to talk to other leaders to tell them to stop leading and
+follow it. This HTTP endpoint in the HTTP server is how we'll get from
+N process with N leaders and N clusters to N processes with 1 leader
+and 1 cluster.
 
 That's basically it for the core Raft bits. So let's build out that
 HTTP server and follow endpoint.
@@ -410,7 +410,7 @@ func (pe *pgEngine) executeCreate(stmt *pgquery.CreateStmt) error {
 ```
 
 Now we need to store this in the storage layer. The easiest/dumbest
-way to do this is to serialize its metadata to JSON and store it with
+way to do this is to serialize the metadata to JSON and store it with
 key: `tables_${tableName}`.
 
 ```golang
@@ -813,8 +813,8 @@ we'll add the query to the Raft log and return a basic response.
 ```
 
 `done` is an important helper that tells the Postgres connection that
-the query is done and ready for another. Without this response `psql`
-just hangs.
+the query is complete and the server is ready to receive another
+query. Without this response `psql` just hangs.
 
 ```golang
 func (pc pgConn) done(buf []byte, msg string) {
