@@ -76,7 +76,6 @@ distributed "Postgres implementation" that will accept writes
 on any node. All nodes will contain the same data.</p>
 <p>Here is a sample interaction against the leader:</p>
 <pre><code class="hljs bash">$ psql -h localhost -p 6000
-psql -h 127.0.0.1 -p 6000
 psql (13.4, server 0.0.0)
 Type &quot;help&quot; for help.
 
@@ -260,10 +259,11 @@ message log.</p>
 }
 </code></pre>
 <p>Every instance of this process will run this and will start off as a
-leader in a new cluster. We'll expose an HTTP server that allows
-leaders to talk to other leaders to tell them to follow it. This HTTP
-endpoint in the HTTP server is how we'll get from N process with N
-leaders and N clusters to N processes with 1 leader and 1 cluster.</p>
+leader in a new cluster. We'll expose an HTTP server that allows a
+leader to talk to other leaders to tell them to stop leading and
+follow it. This HTTP endpoint in the HTTP server is how we'll get from
+N process with N leaders and N clusters to N processes with 1 leader
+and 1 cluster.</p>
 <p>That's basically it for the core Raft bits. So let's build out that
 HTTP server and follow endpoint.</p>
 <h3 id="http-follow-endpoint">HTTP follow endpoint</h3><p>Our HTTP server will have just one endpoint that tells the process (a)
@@ -385,7 +385,7 @@ dedicated helper for each kind.</p>
     }
 </code></pre>
 <p>Now we need to store this in the storage layer. The easiest/dumbest
-way to do this is to serialize its metadata to JSON and store it with
+way to do this is to serialize the metadata to JSON and store it with
 key: <code>tables_${tableName}</code>.</p>
 <pre><code class="hljs golang">
     tableBytes, err := json.Marshal(tbl)
@@ -731,8 +731,8 @@ we'll add the query to the Raft log and return a basic response.</p>
 }
 </code></pre>
 <p><code>done</code> is an important helper that tells the Postgres connection that
-the query is done and ready for another. Without this response <code>psql</code>
-just hangs.</p>
+the query is complete and the server is ready to receive another
+query. Without this response <code>psql</code> just hangs.</p>
 <pre><code class="hljs golang">func (pc pgConn) done(buf []byte, msg string) {
     buf = (&amp;pgproto3.CommandComplete{CommandTag: []byte(msg)}).Encode(buf)
     buf = (&amp;pgproto3.ReadyForQuery{TxStatus: &#39;I&#39;}).Encode(buf)

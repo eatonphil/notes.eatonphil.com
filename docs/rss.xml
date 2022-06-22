@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 17 May 2022 20:09:35 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 22 Jun 2022 11:18:05 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
 &lt;a href="https://github.com/cockroachdb/cockroach/blob/master/go.mod"&gt;its go.mod&lt;/a&gt;
 and notice a number of dependencies that do a lot of work: &lt;a href="https://github.com/jackc/pgproto3"&gt;a
 PostgreSQL wire protocol
@@ -28,7 +28,6 @@ distributed "Postgres implementation" that will accept writes
 on any node. All nodes will contain the same data.&lt;/p&gt;
 &lt;p&gt;Here is a sample interaction against the leader:&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ psql -h localhost -p 6000
-psql -h 127.0.0.1 -p 6000
 psql (13.4, server 0.0.0)
 Type &amp;quot;help&amp;quot; for help.
 
@@ -212,10 +211,11 @@ message log.&lt;/p&gt;
 }
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Every instance of this process will run this and will start off as a
-leader in a new cluster. We'll expose an HTTP server that allows
-leaders to talk to other leaders to tell them to follow it. This HTTP
-endpoint in the HTTP server is how we'll get from N process with N
-leaders and N clusters to N processes with 1 leader and 1 cluster.&lt;/p&gt;
+leader in a new cluster. We'll expose an HTTP server that allows a
+leader to talk to other leaders to tell them to stop leading and
+follow it. This HTTP endpoint in the HTTP server is how we'll get from
+N process with N leaders and N clusters to N processes with 1 leader
+and 1 cluster.&lt;/p&gt;
 &lt;p&gt;That's basically it for the core Raft bits. So let's build out that
 HTTP server and follow endpoint.&lt;/p&gt;
 &lt;h3 id="http-follow-endpoint"&gt;HTTP follow endpoint&lt;/h3&gt;&lt;p&gt;Our HTTP server will have just one endpoint that tells the process (a)
@@ -337,7 +337,7 @@ dedicated helper for each kind.&lt;/p&gt;
     }
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Now we need to store this in the storage layer. The easiest/dumbest
-way to do this is to serialize its metadata to JSON and store it with
+way to do this is to serialize the metadata to JSON and store it with
 key: &lt;code&gt;tables_${tableName}&lt;/code&gt;.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs golang"&gt;
     tableBytes, err := json.Marshal(tbl)
@@ -683,8 +683,8 @@ we'll add the query to the Raft log and return a basic response.&lt;/p&gt;
 }
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;&lt;code&gt;done&lt;/code&gt; is an important helper that tells the Postgres connection that
-the query is done and ready for another. Without this response &lt;code&gt;psql&lt;/code&gt;
-just hangs.&lt;/p&gt;
+the query is complete and the server is ready to receive another
+query. Without this response &lt;code&gt;psql&lt;/code&gt; just hangs.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs golang"&gt;func (pc pgConn) done(buf []byte, msg string) {
     buf = (&amp;amp;pgproto3.CommandComplete{CommandTag: []byte(msg)}).Encode(buf)
     buf = (&amp;amp;pgproto3.ReadyForQuery{TxStatus: &amp;#39;I&amp;#39;}).Encode(buf)
