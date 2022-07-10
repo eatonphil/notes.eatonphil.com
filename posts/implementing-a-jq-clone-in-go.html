@@ -1,0 +1,287 @@
+# Implementing a basic jq clone in Go and basic Go memory profiling
+## July 10, 2022
+###### go,parsing,profiling
+
+In this post we'll build a basic jq clone in Go. It will only be able
+to pull a single path out of each object it reads. It won't be able to
+do filters, mapping, etc. We'll start by building a "control"
+implementation that uses Go's builtin JSON library with a JSON path
+tool on top.
+
+Then we'll implement a basic path-aware JSON parser in 600 lines of
+Go. It's going to use a technique (that may have a better name but) I
+call "partial parsing" or "fuzzy parsing" where we fully parse what we
+care about and only *sort of* parse the rest.
+
+<p class="note">
+  This partial parser is more complex than a typical handwritten
+  parser. If you are unfamiliar with handwritten JSON parsers, you may
+  want to take a look
+  at <a href="https://notes.eatonphil.com/tags/json.html">previous
+  articles</a> I've written about parsing JSON.
+<p>
+
+Once we get this partial parser working we'll turn to Go's builtin
+profiler to figure out why it's slow and what we can do to make it
+better.
+
+All code for this post is [available on
+Github](https://github.com/eatonphil/jqgo).
+
+### Machine specs, versions
+
+Since we're going to be doing some rudimentary comparisons of
+performance, here are my details. I am running everything on a
+dedicated server, [OVH
+Rise-1](https://us.ovhcloud.com/bare-metal/rise/rise-1/).
+
+* RAM: 64 GB DDR4 ECC 2,133 MHz
+* Disk: 2x450 GB SSD NVMe in Soft RAID
+* Processor: Intel Xeon E3-1230v6 - 4c/8t - 3.5 GHz/3.9 GHz
+
+And relevant versions:
+
+```
+$ jq --version
+jq-1.6
+$ go version
+go version go1.18 linux/amd64
+$ uname -a
+Linux phil 5.18.10-100.fc35.x86_64 #1 SMP PREEMPT_DYNAMIC Thu Jul 7 17:41:37 UTC 2022 x86_64 x86_64 x86_64 GNU/Linux
+```
+
+Now buckle up!
+
+### jq using Go's builtin JSON library
+
+This is a very simple program. We just parse JSON data from stdin in a
+loop. And after parsing each time we'll call a `extractValueAtPath`
+function to grab the value at the path the user asks for.
+
+To keep our path "parser" very simple we'll treat array access the
+same as object access. So we'll look for `x.0` instead of `x[0]`,
+unlike jq.
+
+```go
+package main
+
+import (
+	"encoding/json"
+	"io"
+	"log"
+	"os"
+	"strconv"
+	"strings"
+)
+
+func extractValueAtPath(a map[string]any, path []string) (any, error) {
+	// TODO
+}
+
+func main() {
+	path := strings.Split(os.Args[1], ".")
+	if path[0] == "" {
+		path = path[1:]
+	}
+
+	dec := json.NewDecoder(os.Stdin)
+	var a map[string]any
+
+	enc := json.NewEncoder(os.Stdout)
+
+	for {
+		err := dec.Decode(&a)
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		v, err := extractValueAtPath(a, path)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = enc.Encode(v)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+```
+
+Finally, we implement the `extractValueAtPath` function itself,
+entering into JSON arrays and objects until we reach the end of the
+path.
+
+```go
+func extractValueAtPath(a map[string]any, path []string) (any, error) {
+	if len(path) == 0 {
+		return nil, nil
+	}
+
+	var v any = a
+
+	for _, part := range path {
+		if arr, ok := v.([]any); ok {
+			n, err := strconv.Atoi(part)
+			if err != nil {
+				return nil, err
+			}
+
+			v = arr[n]
+			continue
+		}
+
+		m, ok := v.(map[string]any)
+		if !ok {
+			// Path into a non-map
+			return nil, nil
+		}
+
+		v, ok = m[part]
+		if !ok {
+			// Path does not exist
+			return nil, nil
+		}
+	}
+
+	return v, nil
+}
+```
+
+Alright, let's give it a module name and build and run it!
+
+```bash
+$ go mod init control
+$ go mod tidy
+$ go build
+# Grab a test file
+$ curl https://raw.githubusercontent.com/json-iterator/test-data/master/large-file.json | jq -c '.[]' > large-file.json
+$ cat large-file.json | head -n2 | ./control '.created_at'
+"2015-01-01T15:00:00Z"
+"2015-01-01T15:00:01Z"
+```
+
+Sweet. Now let's make sure it produces the same thing as jq.
+
+```bash
+$ cat large-file.json | ./control '.created_at' > control.test
+$ cat large-file.json | jq '.created_at' > jq.test
+$ diff jq.test control.test
+$ echo $?
+0
+```
+
+Great! It's working for some basic queries. Now let's see how it
+performs.
+
+```bash
+$ hyperfine \
+  "cat large-file.json | ./control '.created_at' > control.test" \
+  "cat large-file.json | jq '.created_at' > jq.test"
+Benchmark 1: cat large-file.json | ./control '.created_at' > control.test
+  Time (mean ± σ):     312.0 ms ±  12.8 ms    [User: 296.5 ms, System: 49.8 ms]
+  Range (min … max):   296.5 ms … 338.8 ms    10 runs
+ 
+Benchmark 2: cat large-file.json | jq '.created_at' > jq.test
+  Time (mean ± σ):     348.5 ms ±   1.6 ms    [User: 340.4 ms, System: 27.2 ms]
+  Range (min … max):   347.1 ms … 352.3 ms    10 runs
+ 
+Summary
+  'cat large-file.json | ./control '.created_at' > control.test' ran
+    1.12 ± 0.05 times faster than 'cat large-file.json | jq '.created_at' > jq.test'
+```
+
+Now that's surprising! This naive implementation in Go is a bit faster
+than standard jq. But our implementation supports a heck of a lot less
+than jq. So this benchmark on its own isn't incredibly meaningful.
+
+However, it's a good base for comparing to our next implementation.
+
+<p class="note">
+  Astute readers may notice that this version doesn't use a buffered
+  reader from stdin, while the next version will. I tried this version
+  with and without wrapping stdin in a buffered reader but it didn't
+  make a meaningful difference. It might be because Go's JSON decoder
+  does its own buffering. I'm not sure.
+</p>
+
+Let's do the fun implementation.
+
+### Partial parsing
+
+Unlike a typical handwritten parser this partial parser is going to
+contain almost two parsers. One parser will care exactly about the
+structure of JSON. The other parser will only care about reading past
+the current value (whether it be a number or string or array or
+object, etc.) The path we pass to the parser will be used to decide
+whether each value should be fully parsed or partially parsed.
+
+<p class="note">
+  I'll reiterate: this partial parser is more complex than a typical
+  handwritten parser. If you are unfamiliar with handwritten JSON
+  parsers, you may want to take a look
+  at <a href="https://notes.eatonphil.com/tags/json.html">previous
+  articles</a> I've written about parsing JSON.
+<p>
+
+The shell of this partial parser is going to look similar to the shell
+of the first parser.
+
+```go
+package main
+
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"strconv"
+	"strings"
+)
+
+type jsonReader struct {
+	read []byte
+}
+
+... TO IMPLEMENT ...
+
+func main() {
+	path := strings.Split(os.Args[1], ".")
+	if path[0] == "" {
+		path = path[1:]
+	}
+
+	b := bufio.NewReader(os.Stdin)
+	enc := json.NewEncoder(os.Stdout)
+
+	var jr jsonReader
+	var val any
+	var err error
+
+	for {
+		val, err = jr.extractDataFromJsonPath(b, path)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Println("Read", string(jr.read))
+			log.Fatalln(err)
+		}
+
+		err = enc.Encode(val)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
+}
+```
+
+Except instead of using the builtin JSON parser we'll call our own
+`extractDataFromJsonPath` function that handles parsing and extraction
+all at once.
