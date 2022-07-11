@@ -1574,9 +1574,9 @@ In the project repo I also built a [generic vector
 type](https://github.com/eatonphil/jqgo/blob/main/vector.go) with a
 pop operation that is used for the stack in the `eatValue`
 function. It is shared on the `jsonReader` instance like the
-`expectString` buffer. This ended up shaving another 20ms or so off
-but would introduces an additional bit of complexity. But I leave
-investigation of that usage as an exercise to the reader. :)
+`expectString` buffer. This ended up shaving another 20ms. But since
+this post is already long enough I leave investigation of that usage
+as an exercise to the reader. :)
 
 Hopefully you're getting the gist of how you might investigate CPU and
 memory usage. It's still a lot of poking around and trying different
