@@ -574,7 +574,7 @@ enter into a scalar value.
 		// the path remains. So this object doesn't
 		// contain this path.
 		return nil, nil
-	}	
+	}
 ```
 
 Then we try to parse a scalar (numbers, strings, `null`) and
@@ -669,7 +669,6 @@ conversion itself.
 
 ```
 func (jr *jsonReader) tryNumber(r *bufio.Reader) (bool, any, error) {
-	var hint []byte
 	var number []byte
 
 	for {
@@ -678,8 +677,6 @@ func (jr *jsonReader) tryNumber(r *bufio.Reader) (bool, any, error) {
 			return false, nil, err
 		}
 		c := bs[0]
-
-		hint = append(hint, c)
 
 		isNumberCharacter := (c >= '0' && c <= '9') || c == 'e' || c == '-'
 		if !isNumberCharacter {
@@ -924,15 +921,15 @@ $ hyperfine --warmup 2 \
 Benchmark 1: cat large-file.json | ./control/control '.repo.url' > control.test
   Time (mean ± σ):     302.0 ms ±   3.4 ms    [User: 283.7 ms, System: 53.1 ms]
   Range (min … max):   297.4 ms … 309.0 ms    10 runs
- 
+
 Benchmark 2: cat large-file.json | ./jqgo '.repo.url' > jqgo.test
   Time (mean ± σ):     258.8 ms ±   2.2 ms    [User: 230.3 ms, System: 47.6 ms]
   Range (min … max):   256.3 ms … 262.6 ms    11 runs
- 
+
 Benchmark 3: cat large-file.json | jq '.repo.url' > jq.test
   Time (mean ± σ):     357.6 ms ±   2.9 ms    [User: 350.0 ms, System: 28.3 ms]
   Range (min … max):   355.0 ms … 362.9 ms    10 runs
- 
+
 Summary
   'cat large-file.json | ./jqgo '.repo.url' > jqgo.test' ran
     1.17 ± 0.02 times faster than 'cat large-file.json | ./control/control '.repo.url' > control.test'
@@ -951,3 +948,637 @@ demonstrate the process of profiling to improve performance.
 Let's dig in. :)
 
 ### Profiling in Go
+
+There are various ways to enable profiling in Go. One way some people
+recommend is through the [builtin benchmark
+support](https://dave.cheney.net/2013/06/30/how-to-write-benchmarks-in-go)
+in `go test`. I don't really like this method though. I prefer to use
+[pkg/profile](https://github.com/pkg/profile) manually in `main.go`.
+
+```diff
+@@ -9,6 +9,8 @@
+        "os"
+        "strconv"
+        "strings"
++
++       "github.com/pkg/profile"
+ )
+
+ type jsonReader struct {
+@@ -450,6 +452,7 @@
+ }
+
+ func main() {
++       defer profile.Start().Stop()
+        path := strings.Split(os.Args[1], ".")
+        if path[0] == "" {
+                path = path[1:]
+```
+
+Build and run:
+
+```
+$ go mod tidy
+$ go build
+$ cat large-file.json | ./jqgo '.repo.url' > /dev/null
+2022/07/11 02:38:57 profile: cpu profiling enabled, /tmp/profile3691177944/cpu.pprof
+2022/07/11 02:38:58 profile: cpu profiling disabled, /tmp/profile3691177944/cpu.pprof
+```
+
+Go can [run a web
+server](https://www.honeycomb.io/blog/golang-observability-using-the-new-pprof-web-ui-to-debug-memory-usage/)
+to visualize the pprof results but I find (after literally a few years
+of trying to figure it out) the CLI makes more sense to me.
+
+```go
+$ go tool pprof /tmp/profile3691177944/cpu.pprof
+File: jqgo
+Type: cpu
+Time: Jul 11, 2022 at 2:38am (UTC)
+Duration: 401.63ms, Total samples = 270ms (67.23%)
+Entering interactive mode (type "help" for commands, "o" for options)
+(pprof)
+```
+
+Now we run `top10` to see where we spend the bulk of time.
+
+```go
+(pprof) top10
+Showing nodes accounting for 260ms, 100% of 260ms total
+Showing top 10 nodes out of 31
+      flat  flat%   sum%        cum   cum%
+      90ms 34.62% 34.62%      230ms 88.46%  main.(*jsonReader).eatValue
+      60ms 23.08% 57.69%       70ms 26.92%  bufio.(*Reader).Peek
+      50ms 19.23% 76.92%       60ms 23.08%  bufio.(*Reader).Discard
+      20ms  7.69% 84.62%       20ms  7.69%  syscall.Syscall
+      10ms  3.85% 88.46%       10ms  3.85%  bufio.(*Reader).Buffered (inline)
+      10ms  3.85% 92.31%       10ms  3.85%  main.(*jsonReader).readByte
+      10ms  3.85% 96.15%       10ms  3.85%  runtime.slicebytetostring
+      10ms  3.85%   100%       10ms  3.85%  runtime.stkbucket
+         0     0%   100%       10ms  3.85%  bufio.(*Reader).fill
+         0     0%   100%       10ms  3.85%  encoding/json.(*Encoder).Encode
+```
+
+Now this is weird. Why are `Peek` and `Discard` so expensive? And why
+are we spending so much time in `syscall.Syscall`? The entire point of
+buffered I/O is to avoid hitting syscalls too frequently.
+
+But since 88% of time is spent in `eatValue`, let's verify where in
+`eatValue` we are spending that time.
+
+Within the `pprof` REPL we can enter `list X` where `X` is a regexp of
+a function name.
+
+```go
+(pprof) list eatValue
+Total: 260ms
+ROUTINE ======================== main.(*jsonReader).eatValue in /home/phil/tmp/jqgo/mainprof.go
+      90ms      230ms (flat, cum) 88.46% of Total
+         .          .    159:   err := jr.eatWhitespace(r)
+         .          .    160:   if err != nil {
+         .          .    161:           return err
+         .          .    162:   }
+         .          .    163:
+         .       20ms    164:   ok, _, err := jr.tryScalar(r)
+         .          .    165:   if err != nil {
+         .          .    166:           return err
+         .          .    167:   }
+         .          .    168:
+         .          .    169:   // It was a scalar, we're done!
+         .          .    170:   if ok {
+         .          .    171:           return nil
+         .          .    172:   }
+         .          .    173:
+         .          .    174:   // Otherwise it's an array or object
+         .          .    175:   first := true
+         .          .    176:
+         .          .    177:   for first || len(stack) > 0 {
+         .          .    178:           first = false
+         .          .    179:
+         .       60ms    180:           bs, err := r.Peek(1)
+         .          .    181:           if err != nil {
+         .          .    182:                   return err
+         .          .    183:           }
+      10ms       10ms    184:           b := bs[0]
+         .          .    185:
+      10ms       10ms    186:           if inString {
+         .          .    187:                   if b == '"' && prev != '\\' {
+         .          .    188:                           inString = false
+         .          .    189:                   }
+         .          .    190:
+         .          .    191:                   // Two \\-es cancel eachother out
+      10ms       10ms    192:                   if b == '\\' && prev == '\\' {
+         .          .    193:                           prev = byte(0)
+         .          .    194:                   } else {
+         .          .    195:                           prev = b
+         .          .    196:                   }
+         .          .    197:
+         .       60ms    198:                   r.Discard(1)
+         .          .    199:                   continue
+         .          .    200:           }
+         .          .    201:
+         .          .    202:           switch b {
+         .          .    203:           case '[':
+         .          .    204:                   stack = append(stack, b)
+      10ms       10ms    205:           case ']':
+         .          .    206:                   c := stack[len(stack)-1]
+         .          .    207:                   stack = stack[:len(stack)-1]
+         .          .    208:                   if c != '[' {
+         .          .    209:                           return fmt.Errorf("Unexpected end of array: '%s'", string(c))
+         .          .    210:                   }
+         .          .    211:           case '{':
+         .          .    212:                   stack = append(stack, b)
+         .          .    213:           case '}':
+      50ms       50ms    214:                   c := stack[len(stack)-1]
+         .          .    215:                   stack = stack[:len(stack)-1]
+         .          .    216:                   if c != '{' {
+         .          .    217:                           return fmt.Errorf("Unexpected end of object: '%s'", string(c))
+         .          .    218:                   }
+         .          .    219:           case '"':
+```
+
+So by rank we can see we do spend the most time in `Peek` and
+`Discard`. Then in pulling the last item out of the stack??? That's
+weird. Let's ignore that.
+
+### Peek and Discard
+
+Let's look at `Peek` in the pprof REPL:
+
+```go
+(pprof) list Peek
+Total: 260ms
+ROUTINE ======================== bufio.(*Reader).Peek in /usr/local/go/src/bufio/bufio.go
+      60ms       70ms (flat, cum) 26.92% of Total
+         .          .    130:// also returns an error explaining why the read is short. The error is
+         .          .    131:// ErrBufferFull if n is larger than b's buffer size.
+         .          .    132://
+         .          .    133:// Calling Peek prevents a UnreadByte or UnreadRune call from succeeding
+         .          .    134:// until the next read operation.
+      10ms       10ms    135:func (b *Reader) Peek(n int) ([]byte, error) {
+         .          .    136:   if n < 0 {
+         .          .    137:           return nil, ErrNegativeCount
+         .          .    138:   }
+         .          .    139:
+      10ms       10ms    140:   b.lastByte = -1
+         .          .    141:   b.lastRuneSize = -1
+         .          .    142:
+      20ms       20ms    143:   for b.w-b.r < n && b.w-b.r < len(b.buf) && b.err == nil {
+         .       10ms    144:           b.fill() // b.w-b.r < len(b.buf) => buffer is not full
+         .          .    145:   }
+         .          .    146:
+         .          .    147:   if n > len(b.buf) {
+         .          .    148:           return b.buf[b.r:b.w], ErrBufferFull
+         .          .    149:   }
+         .          .    150:
+         .          .    151:   // 0 <= n <= len(b.buf)
+         .          .    152:   var err error
+         .          .    153:   if avail := b.w - b.r; avail < n {
+         .          .    154:           // not enough data in buffer
+         .          .    155:           n = avail
+         .          .    156:           err = b.readErr()
+         .          .    157:           if err == nil {
+      10ms       10ms    158:                   err = ErrBufferFull
+         .          .    159:           }
+         .          .    160:   }
+      10ms       10ms    161:   return b.buf[b.r : b.r+n], err
+         .          .    162:}
+         .          .    163:
+         .          .    164:// Discard skips the next n bytes, returning the number of bytes discarded.
+         .          .    165://
+         .          .    166:// If Discard skips fewer than n bytes, it also returns an error.
+```
+
+The bulk of time here is spent in refilling the buffer (the `fill`
+method). So it seems like while `bufio.Reader` buffers *reads* it
+basically seems to not buffer *peeks*.
+
+But hey, we were peeking one at a time anyway. Instead we can buffer
+peeks. And based on that top function above, we need to buffer peeks
+in `eatValue`.
+
+```diff
+@@ -170,16 +170,31 @@
+        }
+
+        // Otherwise it's an array or object
++       length := 0
+        first := true
+-
++       var bs []byte
+        for first || len(stack) > 0 {
++               length++
+                first = false
+
+-               bs, err := r.Peek(1)
+-               if err != nil {
+-                       return err
++               for {
++                       bs, err = r.Peek(length)
++                       if err == bufio.ErrBufferFull {
++                               _, err = r.Discard(length - 1)
++                               if err != nil {
++                                       return err
++                               }
++
++                               length = 1
++                               continue
++                       }
++                       if err != nil {
++                               return err
++                       }
++
++                       break
+                }
+-               b := bs[0]
++               b := bs[length-1]
+
+                if inString {
+                        if b == '"' && prev != '\\' {
+@@ -193,7 +208,6 @@
+                                prev = b
+                        }
+
+-                       r.Discard(1)
+                        continue
+                }
+
+@@ -219,11 +233,11 @@
+                        // Closing quote case handled elsewhere, above
+                }
+
+-               r.Discard(1)
+                prev = b
+        }
+
+-       return nil
++       _, err = r.Discard(length)
++       return err
+ }
+
+ func (jr *jsonReader) tryScalar(r *bufio.Reader) (bool, any, error) {
+```
+
+Comment out the `pkg/profile` bits (profiling slows the whole thing down), rebuild, and rerun:
+
+```
+$ hyperfine --warmup 2 \
+  "cat large-file.json | ./control/control '.repo.url' > control.test" \
+  "cat large-file.json | ./jqgo '.repo.url' > jqgo.test" \
+  "cat large-file.json | jq '.repo.url' > jq.test"
+Benchmark 1: cat large-file.json | ./control/control '.repo.url' > control.test
+  Time (mean ± σ):     302.0 ms ±   4.2 ms    [User: 287.7 ms, System: 49.7 ms]  Range (min … max):   296.6 ms … 308.2 ms    10 runs
+
+Benchmark 2: cat large-file.json | ./jqgo '.repo.url' > jqgo.test
+  Time (mean ± σ):     215.0 ms ±   1.6 ms    [User: 189.1 ms, System: 46.9 ms]
+  Range (min … max):   213.5 ms … 218.7 ms    13 runs
+
+Benchmark 3: cat large-file.json | jq '.repo.url' > jq.test
+  Time (mean ± σ):     355.7 ms ±   1.4 ms    [User: 349.9 ms, System: 26.4 ms]
+  Range (min … max):   354.3 ms … 359.1 ms    10 runs
+
+Summary
+  'cat large-file.json | ./jqgo '.repo.url' > jqgo.test' ran
+    1.40 ± 0.02 times faster than 'cat large-file.json | ./control/control '.repo.url' > control.test'
+    1.65 ± 0.01 times faster than 'cat large-file.json | jq '.repo.url' > jq.test'
+```
+
+And great! We've shaved off another 40ms. Let's enable profiling,
+re-run the program and go back into the pprof REPL.
+
+```bash
+$ cat large-file.json | ./jqgo '.repo.url' > /dev/null
+2022/07/11 03:12:07 profile: cpu profiling enabled, /tmp/profile2229743747/cpu.pprof
+2022/07/11 03:12:07 profile: cpu profiling disabled, /tmp/profile2229743747/cpu.pprof
+$ go tool pprof /tmp/profile2229743747/cpu.pprof
+File: jqgo
+Type: cpu
+Time: Jul 11, 2022 at 3:12am (UTC)
+Duration: 401.33ms, Total samples = 210ms (52.33%)
+Entering interactive mode (type "help" for commands, "o" for options)
+(pprof) top10
+Showing nodes accounting for 210ms, 100% of 210ms total
+Showing top 10 nodes out of 20
+      flat  flat%   sum%        cum   cum%
+     100ms 47.62% 47.62%      180ms 85.71%  main.(*jsonReader).eatValue
+      70ms 33.33% 80.95%       70ms 33.33%  bufio.(*Reader).Peek
+      10ms  4.76% 85.71%       10ms  4.76%  encoding/json.(*encodeState).string
+      10ms  4.76% 90.48%       20ms  9.52%  main.(*jsonReader).expectString
+      10ms  4.76% 95.24%       10ms  4.76%  main.(*jsonReader).readByte
+      10ms  4.76%   100%       10ms  4.76%  reflect.Value.Type
+         0     0%   100%       10ms  4.76%  encoding/json.(*Encoder).Encode
+         0     0%   100%       10ms  4.76%  encoding/json.(*decodeState).literalStore
+         0     0%   100%       10ms  4.76%  encoding/json.(*decodeState).unmarshal
+         0     0%   100%       10ms  4.76%  encoding/json.(*decodeState).value
+```
+
+Nice, `syscall.Syscall` is no longer in the top 10. But `eatValue` is
+and we're still spending a bunch of time in `Peek`.
+
+List `eatValue`.
+
+```bash
+(pprof) list eatValue
+Total: 210ms
+ROUTINE ======================== main.(*jsonReader).eatValue in /home/phil/tmp/jqgo/mainpeek.go
+     100ms      180ms (flat, cum) 85.71% of Total
+         .          .    159:   err := jr.eatWhitespace(r)
+         .          .    160:   if err != nil {
+         .          .    161:           return err
+         .          .    162:   }
+         .          .    163:
+         .       20ms    164:   ok, _, err := jr.tryScalar(r)
+         .          .    165:   if err != nil {
+         .          .    166:           return err
+         .          .    167:   }
+         .          .    168:
+         .          .    169:   // It was a scalar, we're done!
+         .          .    170:   if ok {
+         .          .    171:           return nil
+         .          .    172:   }
+         .          .    173:
+         .          .    174:   // Otherwise it's an array or object
+         .          .    175:   length := 0
+         .          .    176:   first := true
+         .          .    177:   var bs []byte
+      20ms       20ms    178:   for first || len(stack) > 0 {
+      10ms       10ms    179:           length++
+         .          .    180:           first = false
+         .          .    181:
+         .          .    182:           for {
+      20ms       80ms    183:                   bs, err = r.Peek(length)
+         .          .    184:                   if err == bufio.ErrBufferFull {
+         .          .    185:                           _, err = r.Discard(length - 1)
+         .          .    186:                           if err != nil {
+         .          .    187:                                   return err
+         .          .    188:                           }
+         .          .    189:
+         .          .    190:                           length = 1
+         .          .    191:                           continue
+         .          .    192:                   }
+         .          .    193:                   if err != nil {
+         .          .    194:                           return err
+         .          .    195:                   }
+         .          .    196:
+         .          .    197:                   break
+         .          .    198:           }
+      10ms       10ms    199:           b := bs[length-1]
+         .          .    200:
+      10ms       10ms    201:           if inString {
+      10ms       10ms    202:                   if b == '"' && prev != '\\' {
+	                     203:                           inString = false
+         .          .    204:                   }
+         .          .    205:
+         .          .    206:                   // Two \\-es cancel eachother out
+      20ms       20ms    207:                   if b == '\\' && prev == '\\' {
+         .          .    208:                           prev = byte(0)
+         .          .    209:                   } else {
+         .          .    210:                           prev = b
+         .          .    211:                   }
+         .
+```
+
+The bulk of time is spent in `Peek`. Let's list `Peek` again.
+
+```bash
+(pprof) list Peek
+Total: 210ms
+ROUTINE ======================== bufio.(*Reader).Peek in /usr/local/go/src/bufio/bufio.go
+      70ms       70ms (flat, cum) 33.33% of Total
+         .          .    130:// also returns an error explaining why the read is short. The error is
+         .          .    131:// ErrBufferFull if n is larger than b's buffer size.
+         .          .    132://
+         .          .    133:// Calling Peek prevents a UnreadByte or UnreadRune call from succeeding
+         .          .    134:// until the next read operation.
+      10ms       10ms    135:func (b *Reader) Peek(n int) ([]byte, error) {
+         .          .    136:   if n < 0 {
+         .          .    137:           return nil, ErrNegativeCount
+         .          .    138:   }
+         .          .    139:
+         .          .    140:   b.lastByte = -1
+         .          .    141:   b.lastRuneSize = -1
+         .          .    142:
+      10ms       10ms    143:   for b.w-b.r < n && b.w-b.r < len(b.buf) && b.err == nil {
+         .          .    144:           b.fill() // b.w-b.r < len(b.buf) => buffer is not full
+         .          .    145:   }
+         .          .    146:
+         .          .    147:   if n > len(b.buf) {
+         .          .    148:           return b.buf[b.r:b.w], ErrBufferFull
+         .          .    149:   }
+         .          .    150:
+         .          .    151:   // 0 <= n <= len(b.buf)
+         .          .    152:   var err error
+         .          .    153:   if avail := b.w - b.r; avail < n {
+         .          .    154:           // not enough data in buffer
+         .          .    155:           n = avail
+         .          .    156:           err = b.readErr()
+         .          .    157:           if err == nil {
+         .          .    158:                   err = ErrBufferFull
+         .          .    159:           }
+         .          .    160:   }
+      50ms       50ms    161:   return b.buf[b.r : b.r+n], err
+         .          .    162:}
+         .          .    163:
+         .          .    164:// Discard skips the next n bytes, returning the number of bytes discarded.
+         .          .    165://
+         .          .    166:// If Discard skips fewer than n bytes, it also returns an error.
+```
+
+Well it's not really clear to me from this why we spend so much time
+slicing here. So let's give this train of thought a break.
+
+### Memory profiling
+
+Let's change tactics entirely. Memory allocation tends to be
+expensive. Allocating in a loop is generally a bad idea. And this
+entire program is a loop. So let's try doing a memory profile instead
+of a cpu profile.
+
+Instead of `defer profile.Start().Stop()` we'll set `defer
+profile.Start(profile.MemProfile).Stop()`.
+
+Build, rerun and enter pprof with the `-alloc_space` flag. We want to
+see where memory is being allocated.
+
+```
+$ go build
+$ cat large-file.json | ./jqgo '.repo.url' > /dev/null
+2022/07/11 03:24:55 profile: memory profiling enabled (rate 4096), /tmp/profile1407859643/mem.pprof
+2022/07/11 03:24:56 profile: memory profiling disabled, /tmp/profile1407859643/mem.pprof
+$ go tool pprof -alloc_objects /tmp/profile1407859643/mem.pprof
+File: jqgo
+Type: alloc_objects
+Time: Jul 11, 2022 at 3:24am (UTC)
+Entering interactive mode (type "help" for commands, "o" for options)
+(pprof) top10
+Showing nodes accounting for 365899, 99.95% of 366086 total
+Dropped 24 nodes (cum <= 1830)
+Showing top 10 nodes out of 14
+      flat  flat%   sum%        cum   cum%
+    227585 62.17% 62.17%     262708 71.76%  main.(*jsonReader).expectString
+     40945 11.18% 73.35%      40945 11.18%  main.(*jsonReader).readByte
+     39500 10.79% 84.14%     252585 69.00%  main.(*jsonReader).tryScalar
+     30009  8.20% 92.34%      41924 11.45%  main.(*jsonReader).tryNumber
+     12055  3.29% 95.63%     215416 58.84%  main.(*jsonReader).eatValue
+      7555  2.06% 97.70%      11915  3.25%  encoding/json.Unmarshal
+      4360  1.19% 98.89%       4360  1.19%  encoding/json.(*decodeState).literalStore
+      3847  1.05% 99.94%       3847  1.05%  main.(*jsonReader).expectIdentifier
+        43 0.012% 99.95%     365931   100%  runtime.main
+         0     0% 99.95%       4360  1.19%  encoding/json.(*decodeState).unmarshal
+```
+
+And just like in the cpu profile we can list functions to see where
+the allocations happen in code. Let's list the biggest memory user
+here, `expectString`.
+
+```
+(pprof) list expectString
+Total: 366086
+ROUTINE ======================== main.(*jsonReader).expectString in /home/phil/tmp/jqgo/mainpeek.go
+    227585     262708 (flat, cum) 71.76% of Total
+         .          .     58:   err := jr.eatWhitespace(r)
+         .          .     59:   if err != nil {
+         .          .     60:           return "", err
+         .          .     61:   }
+         .          .     62:
+         .       4941     63:   b, err := jr.readByte(r)
+         .          .     64:   if err != nil {
+         .          .     65:           return "", err
+         .          .     66:   }
+         .          .     67:
+         .          .     68:   if b != '"' {
+         .          .     69:           return "", fmt.Errorf("Expected double quote to start string, got: '%s'", string(b))
+         .          .     70:   }
+         .          .     71:
+         .          .     72:   var prev byte
+         .          .     73:   for {
+         .      30182     74:           b, err := jr.readByte(r)
+         .          .     75:           if err != nil {
+         .          .     76:                   return "", err
+         .          .     77:           }
+         .          .     78:
+         .          .     79:           if b == '\\' && prev == '\\' {
+         .          .     80:                   // Just skip
+         .          .     81:                   prev = byte(0)
+         .          .     82:                   continue
+         .          .     83:           } else if b == '"' {
+         .          .     84:                   // Overwrite the escaped double quote
+         .          .     85:                   if prev == '\\' {
+         .          .     86:                           s[len(s)-1] = '"'
+         .          .     87:                   } else {
+         .          .     88:                           // Otherwise it's the actual end
+         .          .     89:                           break
+         .          .     90:                   }
+         .          .     91:           }
+         .          .     92:
+    146302     146302     93:           s = append(s, b)
+         .          .     94:           prev = b
+         .          .     95:   }
+         .          .     96:
+     81283      81283     97:   return string(s), nil
+         .          .     98:}
+         .          .     99:
+         .          .    100:func (jr *jsonReader) expectIdentifier(r *bufio.Reader, ident string, value any) (any, error) {
+         .          .    101:   var s []byte
+         .          .    102:
+```
+
+And the biggest offender is growing the string! We could deal with
+this by switching from a string to a
+[bytes.Builder](https://pkg.go.dev/bytes#Buffer) and sharing this
+object across all calls of this function. This would work because this
+code isn't multithreaded and because `expectString` won't itself be
+called recursively. (Or maybe this would be a good place to try
+[sync.Pool](https://pkg.go.dev/sync#Pool)? Not sure.)
+
+```go
+@@ -2,6 +2,7 @@
+ 
+ import (
+        "bufio"
++       "bytes"
+        "encoding/json"
+        "fmt"
+        "io"
+@@ -13,6 +14,8 @@
+ 
+ type jsonReader struct {
+        read []byte
++
++       expectString_buffer bytes.Buffer
+ }
+ 
+ func (jr *jsonReader) reset() {
+@@ -51,7 +54,7 @@
+ }
+ 
+ func (jr *jsonReader) expectString(r *bufio.Reader) (string, error) {
+-       var s []byte
++       jr.expectString_buffer.Reset()
+ 
+        err := jr.eatWhitespace(r)
+        if err != nil {
+@@ -81,18 +84,18 @@
+                } else if b == '"' {
+                        // Overwrite the escaped double quote
+                        if prev == '\\' {
+-                               s[len(s)-1] = '"'
++                               jr.expectString_buffer.Bytes()[jr.expectString_buffer.Len()-1] = '"'
+                        } else {
+                                // Otherwise it's the actual end
+                                break
+                        }
+                }
+ 
+-               s = append(s, b)
++               jr.expectString_buffer.WriteByte(b)
+                prev = b
+        }
+ 
+-       return string(s), nil
++       return jr.expectString_buffer.String(), nil
+ }
+```
+
+Disable `pkg/profile`, build and rerun with hyperfine.
+
+```bash
+$ hyperfine --warmup 2 \
+  "cat large-file.json | ./control/control '.repo.url' > control.test" \
+  "cat large-file.json | ./jqgo '.repo.url' > jqgo.test" \
+  "cat large-file.json | jq '.repo.url' > jq.test"
+Benchmark 1: cat large-file.json | ./control/control '.repo.url' > control.test
+  Time (mean ± σ):     307.2 ms ±  10.8 ms    [User: 292.8 ms, System: 49.4 ms]
+  Range (min … max):   296.5 ms … 326.2 ms    10 runs
+ 
+Benchmark 2: cat large-file.json | ./jqgo '.repo.url' > jqgo.test
+  Time (mean ± σ):     210.8 ms ±   2.2 ms    [User: 185.4 ms, System: 44.9 ms]
+  Range (min … max):   209.1 ms … 216.8 ms    14 runs
+ 
+Benchmark 3: cat large-file.json | jq '.repo.url' > jq.test
+  Time (mean ± σ):     356.1 ms ±   2.6 ms    [User: 349.1 ms, System: 26.9 ms]
+  Range (min … max):   354.1 ms … 362.9 ms    10 runs
+ 
+Summary
+  'cat large-file.json | ./jqgo '.repo.url' > jqgo.test' ran
+    1.46 ± 0.05 times faster than 'cat large-file.json | ./control/control '.repo.url' > control.test'
+    1.69 ± 0.02 times faster than 'cat large-file.json | jq '.repo.url' > jq.test'
+```
+
+And we've shaved another 20ms off. That's not bad!
+
+### Coming to a close
+
+
+In the project repo I also built a [generic vector
+type](https://github.com/eatonphil/jqgo/blob/main/vector.go) with a
+pop operation that is used for the stack in the `eatValue`
+function. It is shared on the `jsonReader` instance like the
+`expectString` buffer. This ended up shaving another 20ms or so off
+but would introduces an additional bit of complexity. But I leave
+investigation of that usage as an exercise to the reader. :)
+
+Hopefully you're getting the gist of how you might investigate CPU and
+memory usage. It's still a lot of poking around and trying different
+things for me. But after a few years of trying to get better at
+profiling Go programs I think I'm starting to get it.
