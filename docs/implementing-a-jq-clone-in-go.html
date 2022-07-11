@@ -3,8 +3,8 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     
-    <title>Implementing a basic jq clone in Go and basic Go memory profiling | notes.eatonphil.com</title>
-    <meta name="description" content="Implementing a basic jq clone in Go and basic Go memory profiling" />
+    <title>Implementing a simple jq clone in Go, and basics of Go memory profiling | notes.eatonphil.com</title>
+    <meta name="description" content="Implementing a simple jq clone in Go, and basics of Go memory profiling" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
@@ -37,7 +37,7 @@
 	  </div>
 
           <h2>July 10, 2022</h2>
-          <h1>Implementing a basic jq clone in Go and basic Go memory profiling</h1>
+          <h1>Implementing a simple jq clone in Go, and basics of Go memory profiling</h1>
           <div class="row" style="padding-bottom: 5px">
             <div class="tags"><a href="/tags/go.html" class="tag">go</a><a href="/tags/parsing.html" class="tag">parsing</a><a href="/tags/profiling.html" class="tag">profiling</a></div>
           </div>
@@ -850,7 +850,7 @@ profiling. For this blog post I tried to remake the slowest variation
 I could remember but I couldn't get it slower than this.</p>
 <p>That said, the best version <em>was</em> faster than this so I <em>can</em>
 demonstrate the process of profiling to improve performance.</p>
-<p>Let's dig into that. :)</p>
+<p>Let's dig in. :)</p>
 <h3 id="profiling-in-go">Profiling in Go</h3><style>.feedback{display:initial;}</style>
 	<div class="feedback">
 	  <h4>Feedback</h4>

@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 11 Jul 2022 01:03:34 +0000</lastBuildDate><item><title>Implementing a basic jq clone in Go and basic Go memory profiling</title><link>http://notes.eatonphil.com/implementing-a-jq-clone-in-go.html</link><description>&lt;p&gt;In this post we'll build a basic jq clone in Go. It will only be able
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 11 Jul 2022 01:06:14 +0000</lastBuildDate><item><title>Implementing a simple jq clone in Go, and basics of Go memory profiling</title><link>http://notes.eatonphil.com/implementing-a-jq-clone-in-go.html</link><description>&lt;p&gt;In this post we'll build a basic jq clone in Go. It will only be able
 to pull a single path out of each object it reads. It won't be able to
 do filters, mapping, etc.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ cat large-file.json | head -n2 | ./jqgo &amp;#39;.repo.url&amp;#39;
@@ -802,7 +802,7 @@ profiling. For this blog post I tried to remake the slowest variation
 I could remember but I couldn't get it slower than this.&lt;/p&gt;
 &lt;p&gt;That said, the best version &lt;em&gt;was&lt;/em&gt; faster than this so I &lt;em&gt;can&lt;/em&gt;
 demonstrate the process of profiling to improve performance.&lt;/p&gt;
-&lt;p&gt;Let's dig into that. :)&lt;/p&gt;
+&lt;p&gt;Let's dig in. :)&lt;/p&gt;
 &lt;h3 id="profiling-in-go"&gt;Profiling in Go&lt;/h3&gt;</description><guid isPermaLink="false">http://notes.eatonphil.com/implementing-a-jq-clone-in-go.html</guid><pubDate>Sun, 10 Jul 2022 00:00:00 +0000</pubDate></item><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
 &lt;a href="https://github.com/cockroachdb/cockroach/blob/master/go.mod"&gt;its go.mod&lt;/a&gt;
 and notice a number of dependencies that do a lot of work: &lt;a href="https://github.com/jackc/pgproto3"&gt;a
