@@ -28,8 +28,15 @@ HOME_PAGE = """
 <div class="fp-section fp-section--about">
   <h2 class="fp-h2">Welcome!</h2>
   <p>
-    Hey! I'm Phil. I've been a developer or manager for the last 10
-    years, at startups and Oracle. I quit my job at Oracle in 2021 to start <a
+    Hey! I'm Phil. In the past 10 years I've been a developer or
+    manager or founder, at startups and Oracle. I'm currently <a
+    href="mailto:phil@eatonphil.com">on the job market</a>! I don't
+    have a CS degree and I'd be happy to chat except for at places
+    that ask me to implement easily-Googleable algorithms in an
+    interview. :)
+  </p>
+  <p>
+    I quit my job at Oracle in 2021 to start <a
     href="https://multiprocess.io">Multiprocess Labs</a> (just me)
     where I build <a
     href="https://github.com/multiprocessio">open-source data
@@ -39,6 +46,10 @@ HOME_PAGE = """
     href="https://github.com/multiprocessio/dsq">dsq (2.5k+
     stars)</a>, a commandline tool for running SQL queries against
     JSON, CSV, Parquet, Excel and more.
+  </p>
+  <p>
+    You can read about my experience doing this for a year <a
+    href="https://datastation.multiprocess.io/blog/2022-06-11-year-in-review.html">here</a>.
   </p>
   <h3 class="fp-h3">Hang out</h3>
   <p>
