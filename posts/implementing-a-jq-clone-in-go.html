@@ -20,6 +20,15 @@ Go. It's going to use a technique (that may have a better name but) I
 call "partial parsing" or "fuzzy parsing" where we fully parse what we
 care about and only *sort of* parse the rest.
 
+Why partial parsing? There are two general reasons. One is to use
+less memory than parsers that must always turn all of a text into an
+object in your language. The other is for when the language has
+complexities you don't want or need to deal with. We'll basically have
+to deal with all the complexities of JSON so this post is about the
+former reason: using less memory. I've written about a case for the
+second reason though in [building a simple, fast SCSS
+implementation](https://datastation.multiprocess.io/blog/2021-10-31-building-a-nested-css-rule-expander.html).
+
 <p class="note">
   This partial parser is more complex than a typical handwritten
   parser. If you are unfamiliar with handwritten JSON parsers, you may
@@ -118,7 +127,7 @@ func main() {
 }
 ```
 
-Finally, we implement the `extractValueAtPath` function itself,
+Then we implement the `extractValueAtPath` function itself,
 entering into JSON arrays and objects until we reach the end of the
 path.
 
@@ -158,7 +167,7 @@ func extractValueAtPath(a map[string]any, path []string) (any, error) {
 }
 ```
 
-Alright, let's give it a module name and build and run it!
+Alright, let's give it a go module and build and run it!
 
 ```bash
 $ go mod init control
@@ -231,7 +240,7 @@ whether each value should be fully parsed or partially parsed.
   parsers, you may want to take a look
   at <a href="https://notes.eatonphil.com/tags/json.html">previous
   articles</a> I've written about parsing JSON.
-<p>
+</p>
 
 The shell of this partial parser is going to look similar to the shell
 of the first parser.
@@ -443,8 +452,8 @@ go into this key).
 
 And that's it! The core parsing loop is done. The meat now becomes 1)
 the `eatValue` function that partially parses JSON and 2) the
-`expectValue` function that either encounters a scalary value and
-returns it or recursively calls the `extractDataFromJsonPath`.
+`expectValue` function that either encounters a scalar value and
+returns it or recursively calls `extractDataFromJsonPath` to enter some new object.
 
 But first let's fill in the two helpers we skipped. First off, `eatWhitespace`.
 
@@ -478,8 +487,8 @@ That's it! Next we need to fill in `expectString`.
 
 ### expectString
 
-This helper is a standard handwritten parser helper that looks for a
-double quote and keeps collecting bytes until it finds the ending
+This is a standard handwritten parser helper that looks for a
+double quote and keeps collecting bytes until it finds an ending
 double quote that is not escaped.
 
 ```
@@ -577,7 +586,7 @@ enter into a scalar value.
 	}
 ```
 
-Then we try to parse a scalar (numbers, strings, `null`) and
+Then we try to parse a scalar (numbers, strings, booleans, `null`) and
 ultimately return an error if nothing worked.
 
 ```go
@@ -825,12 +834,12 @@ func (jr *jsonReader) eatValue(r *bufio.Reader) error {
 
 All it does is read until the value ends.
 
-If the value is not a scalar though we need to look read past JSON
+If the value is not a scalar though we need to read past complete JSON
 arrays and/or objects.
 
-To do this we'll simply read through characters, monitoring a stack of
+To do this we'll simply read through bytes, monitoring a stack of
 open and close braces and brackets. If we enter a string we'll skip
-all values inside the string until the string ends.
+all bytes inside the string until the string ends.
 
 ```go
 
@@ -937,10 +946,10 @@ Summary
 ```
 
 Now to my surprise we're already beating the non-path-aware control
-implementation! Before I went to write this post the path-aware
-version was slower than the control. So I had to start performance
-profiling. For this blog post I tried to remake the slowest variation
-I could remember but I couldn't get it slower than this.
+implementation! When I first wrote the path-aware version, it was
+slower than the control. So I had to start performance profiling. For
+this blog post I tried to remake the slowest variation I could
+remember but I couldn't get it slower than this.
 
 That said, the best version *was* faster than this so I *can*
 demonstrate the process of profiling to improve performance.
@@ -1153,9 +1162,18 @@ The bulk of time here is spent in refilling the buffer (the `fill`
 method). So it seems like while `bufio.Reader` buffers *reads* it
 basically seems to not buffer *peeks*.
 
-But hey, we were peeking one at a time anyway. Instead we can buffer
-peeks. And based on that top function above, we need to buffer peeks
-in `eatValue`.
+But hey, we were peeking and discarding one at a time anyway. Peeking
+and discarding were the same cost in `eatValue`. So let's ignore
+peeking for a second and think about discarding.
+
+We could avoid doing so many discards if we just keep track of how
+much we are peeking at in the loop and only discard once at the end of
+the loop. (As an implementation detail, since there's a max internal
+buffer size we'll need to actually periodically discard when we try to
+peek and get a "buffer full" error.)
+
+And based on that `top10` result above, we need to do this in
+`eatValue`.
 
 ```diff
 @@ -170,16 +170,31 @@
@@ -1243,7 +1261,7 @@ Summary
     1.65 ± 0.01 times faster than 'cat large-file.json | jq '.repo.url' > jq.test'
 ```
 
-And great! We've shaved off another 40ms. Let's enable profiling,
+Great! We've shaved off another 40ms. Let's enable profiling,
 re-run the program and go back into the pprof REPL.
 
 ```bash
@@ -1273,7 +1291,8 @@ Showing top 10 nodes out of 20
 ```
 
 Nice, `syscall.Syscall` is no longer in the top 10. But `eatValue` is
-and we're still spending a bunch of time in `Peek`.
+and we're still spending a bunch of time in `Peek`. We didn't try to
+stop calling `Peek` so much, we just cut down on calling `Discard`.
 
 List `eatValue`.
 
@@ -1385,14 +1404,20 @@ ROUTINE ======================== bufio.(*Reader).Peek in /usr/local/go/src/bufio
 ```
 
 Well it's not really clear to me from this why we spend so much time
-slicing here. So let's give this train of thought a break.
+slicing here.
+
+We might be able to use `Peek` much less if we kept our own FIFO queue
+of peeked-at bytes. But I don't feel like writing a correct, efficient
+FIFO queue (a ring buffer, basically) and maybe there are other
+aspects of this program we can look at. So let's give this train of
+thought a break.
 
 ### Memory profiling
 
 Let's change tactics entirely. Memory allocation tends to be
 expensive. Allocating in a loop is generally a bad idea. And this
 entire program is a loop. So let's try doing a memory profile instead
-of a cpu profile.
+of a CPU profile.
 
 Instead of `defer profile.Start().Stop()` we'll set `defer
 profile.Start(profile.MemProfile).Stop()`.
@@ -1427,7 +1452,7 @@ Showing top 10 nodes out of 14
          0     0% 99.95%       4360  1.19%  encoding/json.(*decodeState).unmarshal
 ```
 
-And just like in the cpu profile we can list functions to see where
+And just like in the CPU profile we can list functions to see where
 the allocations happen in code. Let's list the biggest memory user
 here, `expectString`.
 
@@ -1483,17 +1508,20 @@ ROUTINE ======================== main.(*jsonReader).expectString in /home/phil/t
          .          .    102:
 ```
 
-And the biggest offender is growing the string! We could deal with
-this by switching from a string to a
-[bytes.Builder](https://pkg.go.dev/bytes#Buffer) and sharing this
-object across all calls of this function. This would work because this
-code isn't multithreaded and because `expectString` won't itself be
-called recursively. (Or maybe this would be a good place to try
-[sync.Pool](https://pkg.go.dev/sync#Pool)? Not sure.)
+And the biggest offender is growing the string! The good thing is that
+growing this string can be amortized because we can share the
+underlying string memory across calls on the `jsonResponse`
+struct. This way, `expectString` only needs to grow the string when it
+actually sees a bigger string than we've already seen.
+
+The builtin [bytes.Buffer](https://pkg.go.dev/bytes#Buffer) type does
+exactly this. We can put a `bytes.Buffer` on the `jsonResponse` struct
+because this code isn't multithreaded and because `expectString`
+doesn't call itself.
 
 ```go
 @@ -2,6 +2,7 @@
- 
+
  import (
         "bufio"
 +       "bytes"
@@ -1501,21 +1529,21 @@ called recursively. (Or maybe this would be a good place to try
         "fmt"
         "io"
 @@ -13,6 +14,8 @@
- 
+
  type jsonReader struct {
         read []byte
 +
 +       expectString_buffer bytes.Buffer
  }
- 
+
  func (jr *jsonReader) reset() {
 @@ -51,7 +54,7 @@
  }
- 
+
  func (jr *jsonReader) expectString(r *bufio.Reader) (string, error) {
 -       var s []byte
 +       jr.expectString_buffer.Reset()
- 
+
         err := jr.eatWhitespace(r)
         if err != nil {
 @@ -81,18 +84,18 @@
@@ -1529,16 +1557,21 @@ called recursively. (Or maybe this would be a good place to try
                                 break
                         }
                 }
- 
+
 -               s = append(s, b)
 +               jr.expectString_buffer.WriteByte(b)
                 prev = b
         }
- 
+
 -       return string(s), nil
 +       return jr.expectString_buffer.String(), nil
  }
 ```
+
+<p class="note">
+  Or instead of sharing memory on the struct, maybe this would be a
+  good place to use <a href="https://pkg.go.dev/sync#Pool">sync.Pool</a>?
+</p>
 
 Disable `pkg/profile`, build and rerun with hyperfine.
 
@@ -1550,15 +1583,15 @@ $ hyperfine --warmup 2 \
 Benchmark 1: cat large-file.json | ./control/control '.repo.url' > control.test
   Time (mean ± σ):     307.2 ms ±  10.8 ms    [User: 292.8 ms, System: 49.4 ms]
   Range (min … max):   296.5 ms … 326.2 ms    10 runs
- 
+
 Benchmark 2: cat large-file.json | ./jqgo '.repo.url' > jqgo.test
   Time (mean ± σ):     210.8 ms ±   2.2 ms    [User: 185.4 ms, System: 44.9 ms]
   Range (min … max):   209.1 ms … 216.8 ms    14 runs
- 
+
 Benchmark 3: cat large-file.json | jq '.repo.url' > jq.test
   Time (mean ± σ):     356.1 ms ±   2.6 ms    [User: 349.1 ms, System: 26.9 ms]
   Range (min … max):   354.1 ms … 362.9 ms    10 runs
- 
+
 Summary
   'cat large-file.json | ./jqgo '.repo.url' > jqgo.test' ran
     1.46 ± 0.05 times faster than 'cat large-file.json | ./control/control '.repo.url' > control.test'
@@ -1569,16 +1602,18 @@ And we've shaved another 20ms off. That's not bad!
 
 ### Coming to a close
 
+There is more we could do but this is a long post already.
 
-In the project repo I also built a [generic vector
+For example, in the project repo I also built a [generic vector
 type](https://github.com/eatonphil/jqgo/blob/main/vector.go) with a
 pop operation that is used for the stack in the `eatValue`
 function. It is shared on the `jsonReader` instance like the
-`expectString` buffer. This ended up shaving another 20ms. But since
-this post is already long enough I leave investigation of that usage
-as an exercise to the reader. :)
+`expectString` buffer. This ended up shaving another 20ms. And I also
+got rid of most conversions from `[]byte` to `string` (which is an
+expensive allocation you may notice listed as `bytes.String()` in the
+`top10` of `-alloc_objects` if you run the profiler again now.)
 
-Hopefully you're getting the gist of how you might investigate CPU and
-memory usage. It's still a lot of poking around and trying different
-things for me. But after a few years of trying to get better at
-profiling Go programs I think I'm starting to get it.
+But hopefully you're getting the gist of how you might investigate CPU
+and memory usage. For me it's still a lot of poking around and trying
+different things. But after a few years of trying to get better at
+profiling Go programs I think I'm starting to get the hang of it.
