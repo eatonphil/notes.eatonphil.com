@@ -1,5 +1,809 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 22 Jun 2022 11:18:05 +0000</lastBuildDate><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 11 Jul 2022 01:03:34 +0000</lastBuildDate><item><title>Implementing a basic jq clone in Go and basic Go memory profiling</title><link>http://notes.eatonphil.com/implementing-a-jq-clone-in-go.html</link><description>&lt;p&gt;In this post we'll build a basic jq clone in Go. It will only be able
+to pull a single path out of each object it reads. It won't be able to
+do filters, mapping, etc.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ cat large-file.json | head -n2 | ./jqgo &amp;#39;.repo.url&amp;#39;
+&amp;quot;https://api.github.com/repos/petroav/6.828&amp;quot;
+&amp;quot;https://api.github.com/repos/rspt/rspt-theme&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We'll start by building a "control" implementation that uses Go's
+builtin JSON library with a JSON path tool on top.&lt;/p&gt;
+&lt;p&gt;Then we'll implement a basic path-aware JSON parser in 600 lines of
+Go. It's going to use a technique (that may have a better name but) I
+call "partial parsing" or "fuzzy parsing" where we fully parse what we
+care about and only &lt;em&gt;sort of&lt;/em&gt; parse the rest.&lt;/p&gt;
+&lt;p class="note"&gt;
+  This partial parser is more complex than a typical handwritten
+  parser. If you are unfamiliar with handwritten JSON parsers, you may
+  want to take a look
+  at &lt;a href="https://notes.eatonphil.com/tags/json.html"&gt;previous
+  articles&lt;/a&gt; I've written about parsing JSON.
+&lt;/p&gt;&lt;p&gt;Once we get this partial parser working we'll turn to Go's builtin
+profiler to find what we can do to make it faster.&lt;/p&gt;
+&lt;p&gt;All code for this post is &lt;a href="https://github.com/eatonphil/jqgo"&gt;available on
+Github&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id="machine-specs,-versions"&gt;Machine specs, versions&lt;/h3&gt;&lt;p&gt;Since we're going to be doing some rudimentary comparisons of
+performance, here are my details. I am running everything on a
+dedicated server, &lt;a href="https://us.ovhcloud.com/bare-metal/rise/rise-1/"&gt;OVH
+Rise-1&lt;/a&gt;.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;RAM: 64 GB DDR4 ECC 2,133 MHz&lt;/li&gt;
+&lt;li&gt;Disk: 2x450 GB SSD NVMe in Soft RAID&lt;/li&gt;
+&lt;li&gt;Processor: Intel Xeon E3-1230v6 - 4c/8t - 3.5 GHz/3.9 GHz&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;And relevant versions:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ jq --version
+jq-1.6
+$ go version
+go version go1.18 linux/amd64
+$ uname -a
+Linux phil 5.18.10-100.fc35.x86_64 #1 SMP PREEMPT_DYNAMIC Thu Jul 7 17:41:37 UTC 2022 x86_64 x86_64 x86_64 GNU/Linux
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now buckle up!&lt;/p&gt;
+&lt;h3 id="jq-using-go's-builtin-json-library"&gt;jq using Go's builtin JSON library&lt;/h3&gt;&lt;p&gt;This is a very simple program. We just parse JSON data from stdin in a
+loop. And after parsing each time we'll call a &lt;code&gt;extractValueAtPath&lt;/code&gt;
+function to grab the value at the path the user asks for.&lt;/p&gt;
+&lt;p&gt;To keep our path "parser" very simple we'll treat array access the
+same as object access. So we'll look for &lt;code&gt;x.0&lt;/code&gt; instead of &lt;code&gt;x[0]&lt;/code&gt;,
+unlike jq.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;package main
+
+import (
+    &amp;quot;encoding/json&amp;quot;
+    &amp;quot;io&amp;quot;
+    &amp;quot;log&amp;quot;
+    &amp;quot;os&amp;quot;
+    &amp;quot;strconv&amp;quot;
+    &amp;quot;strings&amp;quot;
+)
+
+func extractValueAtPath(a map[string]any, path []string) (any, error) {
+    // TODO
+}
+
+func main() {
+    path := strings.Split(os.Args[1], &amp;quot;.&amp;quot;)
+    if path[0] == &amp;quot;&amp;quot; {
+        path = path[1:]
+    }
+
+    dec := json.NewDecoder(os.Stdin)
+    var a map[string]any
+
+    enc := json.NewEncoder(os.Stdout)
+
+    for {
+        err := dec.Decode(&amp;amp;a)
+        if err == io.EOF {
+            break
+        }
+
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        v, err := extractValueAtPath(a, path)
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        err = enc.Encode(v)
+        if err != nil {
+            log.Fatal(err)
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Finally, we implement the &lt;code&gt;extractValueAtPath&lt;/code&gt; function itself,
+entering into JSON arrays and objects until we reach the end of the
+path.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;func extractValueAtPath(a map[string]any, path []string) (any, error) {
+    if len(path) == 0 {
+        return nil, nil
+    }
+
+    var v any = a
+
+    for _, part := range path {
+        if arr, ok := v.([]any); ok {
+            n, err := strconv.Atoi(part)
+            if err != nil {
+                return nil, err
+            }
+
+            v = arr[n]
+            continue
+        }
+
+        m, ok := v.(map[string]any)
+        if !ok {
+            // Path into a non-map
+            return nil, nil
+        }
+
+        v, ok = m[part]
+        if !ok {
+            // Path does not exist
+            return nil, nil
+        }
+    }
+
+    return v, nil
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Alright, let's give it a module name and build and run it!&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ go mod init control
+$ go mod tidy
+$ go build
+# Grab a test file
+$ curl https://raw.githubusercontent.com/json-iterator/test-data/master/large-file.json | jq -c &amp;#39;.[]&amp;#39; &amp;gt; large-file.json
+$ cat large-file.json | head -n2 | ./control &amp;#39;.repo.url&amp;#39;
+&amp;quot;https://api.github.com/repos/petroav/6.828&amp;quot;
+&amp;quot;https://api.github.com/repos/rspt/rspt-theme&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Sweet. Now let's make sure it produces the same thing as jq.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ cat large-file.json | ./control &amp;#39;.repo.url&amp;#39; &amp;gt; control.test
+$ cat large-file.json | jq &amp;#39;.repo.url&amp;#39; &amp;gt; jq.test
+$ diff jq.test control.test
+$ echo $?
+0
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Great! It's working for a basic query. Let's see how it performs.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ hyperfine \
+  &amp;quot;cat large-file.json | ./control &amp;#39;.repo.url&amp;#39; &amp;gt; control.test&amp;quot; \
+  &amp;quot;cat large-file.json | jq &amp;#39;.repo.url&amp;#39; &amp;gt; jq.test&amp;quot;
+Benchmark 1: cat large-file.json | ./control &amp;#39;.repo.url&amp;#39; &amp;gt; control.test
+  Time (mean ± σ):     310.0 ms ±  14.4 ms    [User: 296.2 ms, System: 49.3 ms]
+  Range (min … max):   296.1 ms … 344.9 ms    10 runs
+
+Benchmark 2: cat large-file.json | jq &amp;#39;.repo.url&amp;#39; &amp;gt; jq.test
+  Time (mean ± σ):     355.8 ms ±   1.1 ms    [User: 348.8 ms, System: 27.7 ms]
+  Range (min … max):   354.8 ms … 358.5 ms    10 runs
+
+Summary
+  &amp;#39;cat large-file.json | ./control &amp;#39;.repo.url&amp;#39; &amp;gt; control.test&amp;#39; ran
+    1.15 ± 0.05 times faster than &amp;#39;cat large-file.json | jq &amp;#39;.repo.url&amp;#39; &amp;gt; jq.test&amp;#39;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now that's surprising! This naive implementation in Go is a bit faster
+than standard jq. But our implementation supports a heck of a lot less
+than jq. So this benchmark on its own isn't incredibly meaningful.&lt;/p&gt;
+&lt;p&gt;However, it's a good base for comparing to our next implementation.&lt;/p&gt;
+&lt;p class="note"&gt;
+  Astute readers may notice that this version doesn't use a buffered
+  reader from stdin, while the next version will. I tried this version
+  with and without wrapping stdin in a buffered reader but it didn't
+  make a meaningful difference. It might be because Go's JSON decoder
+  does its own buffering. I'm not sure.
+&lt;/p&gt;&lt;p&gt;Let's do the fun implementation.&lt;/p&gt;
+&lt;h3 id="partial-parsing"&gt;Partial parsing&lt;/h3&gt;&lt;p&gt;Unlike a typical handwritten parser this partial parser is going to
+contain almost two parsers. One parser will care exactly about the
+structure of JSON. The other parser will only care about reading past
+the current value (whether it be a number or string or array or
+object, etc.) The path we pass to the parser will be used to decide
+whether each value should be fully parsed or partially parsed.&lt;/p&gt;
+&lt;p&gt;&lt;p class="note"&gt;
+  I'll reiterate: this partial parser is more complex than a typical
+  handwritten parser. If you are unfamiliar with handwritten JSON
+  parsers, you may want to take a look
+  at &lt;a href="https://notes.eatonphil.com/tags/json.html"&gt;previous
+  articles&lt;/a&gt; I've written about parsing JSON.&lt;/p&gt;
+&lt;p&gt;
+
+&lt;p&gt;The shell of this partial parser is going to look similar to the shell
+of the first parser.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;package main
+
+import (
+    &amp;quot;bufio&amp;quot;
+    &amp;quot;encoding/json&amp;quot;
+    &amp;quot;fmt&amp;quot;
+    &amp;quot;io&amp;quot;
+    &amp;quot;log&amp;quot;
+    &amp;quot;os&amp;quot;
+    &amp;quot;strconv&amp;quot;
+    &amp;quot;strings&amp;quot;
+)
+
+type jsonReader struct {
+    read []byte
+}
+
+... TO IMPLEMENT ...
+
+func main() {
+    path := strings.Split(os.Args[1], &amp;quot;.&amp;quot;)
+    if path[0] == &amp;quot;&amp;quot; {
+        path = path[1:]
+    }
+
+    b := bufio.NewReader(os.Stdin)
+    enc := json.NewEncoder(os.Stdout)
+
+    var jr jsonReader
+    var val any
+    var err error
+
+    for {
+        jr.reset()
+
+        val, err = jr.extractDataFromJsonPath(b, path)
+        if err == io.EOF {
+            break
+        }
+        if err != nil {
+            log.Println(&amp;quot;Read&amp;quot;, string(jr.read))
+            log.Fatalln(err)
+        }
+
+        err = enc.Encode(val)
+        if err != nil {
+            log.Fatalln(err)
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Except instead of using the builtin JSON parser we'll call our own
+&lt;code&gt;extractDataFromJsonPath&lt;/code&gt; function that handles parsing and extraction
+all at once.&lt;/p&gt;
+&lt;p&gt;Before doing that we'll add a few helper functions. The first one grabs
+a byte from a reader and stores the read byte locally (so we can print
+out all read bytes if the program fails).&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;type jsonReader struct {
+    read []byte
+}
+
+func (jr *jsonReader) readByte(r *bufio.Reader) (byte, error) {
+    c, err := r.ReadByte()
+    if err != nil {
+        return byte(0), err
+    }
+
+    jr.read = append(jr.read, c)
+
+    return c, nil
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The &lt;code&gt;reset&lt;/code&gt; member zeroes out the &lt;code&gt;read&lt;/code&gt; bytes and gets called before
+each object is parsed in the &lt;code&gt;main&lt;/code&gt; main loop.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;func (jr *jsonReader) reset() {
+    jr.read = nil
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now let's get into &lt;code&gt;extractDataFromJsonPath&lt;/code&gt;.&lt;/p&gt;
+&lt;h3 id="extractdatafromjsonpath"&gt;extractDataFromJsonPath&lt;/h3&gt;&lt;p&gt;This is the real parser. It expects a JSON object and fully parses the
+object, almost.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;func (jr *jsonReader) extractDataFromJsonPath(r *bufio.Reader, path []string) (any, error) {
+    if len(path) == 0 {
+        return nil, nil
+    }
+
+    err := jr.eatWhitespace(r)
+    if err != nil {
+        return nil, err
+    }
+
+    b, err := jr.readByte(r)
+    if err != nil {
+        return nil, err
+    }
+
+    if b != &amp;#39;{&amp;#39; {
+        return nil, fmt.Errorf(&amp;quot;Expected opening curly brace, got: &amp;#39;%s&amp;#39;&amp;quot;, string(b))
+    }
+
+    i := -1
+
+    var result any
+    for {
+        i++
+
+        err = jr.eatWhitespace(r)
+        if err != nil {
+            return nil, err
+        }
+
+        bs, err := r.Peek(1)
+        if err != nil {
+            return nil, err
+        }
+        b := bs[0]
+
+        if b == &amp;#39;}&amp;#39; {
+            r.Discard(1)
+            break
+        }
+
+        if i &amp;gt; 0 {
+            if b == &amp;#39;,&amp;#39; {
+                r.Discard(1)
+            } else {
+                return nil, fmt.Errorf(&amp;quot;Expected comma between key-value pairs, got: &amp;#39;%s&amp;#39;&amp;quot;, string(b))
+            }
+        }
+
+        err = jr.eatWhitespace(r)
+        if err != nil {
+            return nil, err
+        }
+
+        // Grab the key
+        s, err := jr.expectString(r)
+        if err != nil {
+            return nil, err
+        }
+
+        err = jr.eatWhitespace(r)
+        if err != nil {
+            return nil, err
+        }
+
+        b, err = jr.readByte(r)
+        if err != nil {
+            return nil, err
+        }
+
+        if b != &amp;#39;:&amp;#39; {
+            return nil, fmt.Errorf(&amp;quot;Expected colon, got: &amp;#39;%s&amp;#39;&amp;quot;, string(b))
+        }
+
+        err = jr.eatWhitespace(r)
+        if err != nil {
+            return nil, err
+        }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Up to this point it looks like any old handwritten parser. There are a
+few helpers in there (&lt;code&gt;eatWhitespace&lt;/code&gt;, &lt;code&gt;expectString&lt;/code&gt;) we'll implement
+shortly.&lt;/p&gt;
+&lt;p&gt;But once we see each key and are ready to look for a value we can
+decide if we need to fully parse the value (if the path goes into this
+key) or if we can partially parse the value (because the path does not
+go into this key).&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;        // If the key is not the start of this path, skip past this value
+        if path[0] != s {
+            err = jr.eatValue(r)
+            if err != nil {
+                return nil, err
+            }
+
+            continue
+        }
+
+        result, err = jr.expectValue(r, path[1:])
+        if err != nil {
+            return nil, err
+        }
+    }
+
+    return result, nil
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And that's it! The core parsing loop is done. The meat now becomes 1)
+the &lt;code&gt;eatValue&lt;/code&gt; function that partially parses JSON and 2) the
+&lt;code&gt;expectValue&lt;/code&gt; function that either encounters a scalary value and
+returns it or recursively calls the &lt;code&gt;extractDataFromJsonPath&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;But first let's fill in the two helpers we skipped. First off, &lt;code&gt;eatWhitespace&lt;/code&gt;.&lt;/p&gt;
+&lt;h3 id="eatwhitespace"&gt;eatWhitespace&lt;/h3&gt;&lt;p&gt;This function peeks and reads bytes while the bytes are whitespace.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;func (jr *jsonReader) eatWhitespace(r *bufio.Reader) error {
+    for {
+        bs, err := r.Peek(1)
+        if err != nil {
+            return err
+        }
+        b := bs[0]
+
+        isWhitespace := b == &amp;#39; &amp;#39; ||
+            b == &amp;#39;\n&amp;#39; ||
+            b == &amp;#39;\t&amp;#39; ||
+            b == &amp;#39;\r&amp;#39;
+        if !isWhitespace {
+            return nil
+        }
+
+        r.Discard(1)
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That's it! Next we need to fill in &lt;code&gt;expectString&lt;/code&gt;.&lt;/p&gt;
+&lt;h3 id="expectstring"&gt;expectString&lt;/h3&gt;&lt;p&gt;This helper is a standard handwritten parser helper that looks for a
+double quote and keeps collecting bytes until it finds the ending
+double quote that is not escaped.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;func (jr *jsonReader) expectString(r *bufio.Reader) (string, error) {
+    var s []byte
+
+    err := jr.eatWhitespace(r)
+    if err != nil {
+        return "", err
+    }
+
+    b, err := jr.readByte(r)
+    if err != nil {
+        return "", err
+    }
+
+    if b != '"' {
+        return "", fmt.Errorf("Expected double quote to start string, got: '%s'", string(b))
+    }
+
+    var prev byte
+    for {
+        b, err := jr.readByte(r)
+        if err != nil {
+            return "", err
+        }
+
+        if b == '\\' &amp;amp;&amp;amp; prev == '\\' {
+            // Just skip
+            prev = byte(0)
+            continue
+        } else if b == '"' {
+            // Overwrite the escaped double quote
+            if prev == '\\' {
+                s[len(s)-1] = '"'
+            } else {
+                // Otherwise it's the actual end
+                break
+            }
+        }
+
+        s = append(s, b)
+        prev = b
+    }
+
+    return string(s), nil
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Standard stuff! Now let's get back to those meaty functions we
+introduced before, starting with &lt;code&gt;expectValue&lt;/code&gt;.&lt;/p&gt;
+&lt;h3 id="expectvalue"&gt;expectValue&lt;/h3&gt;&lt;p&gt;This function is called by &lt;code&gt;extractDataFromJsonPath&lt;/code&gt; when it wants to
+fully parse a value.&lt;/p&gt;
+&lt;p&gt;If we see a left curly brace, we call &lt;code&gt;extractDataFromJsonPath&lt;/code&gt; with
+it.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;func (jr *jsonReader) expectValue(r *bufio.Reader, path []string) (any, error) {
+    bs, err := r.Peek(1)
+    if err != nil {
+        return nil, err
+    }
+    c := bs[0]
+
+    if c == &amp;#39;{&amp;#39; {
+        return jr.extractDataFromJsonPath(r, path)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Otherwise if we see a left bracket we call a new helper
+&lt;code&gt;extractArrayDataFromJsonPath&lt;/code&gt; which will be almost identical to
+&lt;code&gt;extractDataFromJsonPath&lt;/code&gt; but for parsing array syntax.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;    } else if c == &amp;#39;[&amp;#39; {
+        return jr.extractArrayDataFromJsonPath(r, path)
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If the value we're trying to parse isn't an array or object and
+there's more of a path then we have to return null because we can't
+enter into a scalar value.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;    // Can't go any further into a path
+
+    if len(path) != 0 {
+        // Reached the end of this object but more of
+        // the path remains. So this object doesn't
+        // contain this path.
+        return nil, nil
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Then we try to parse a scalar (numbers, strings, &lt;code&gt;null&lt;/code&gt;) and
+ultimately return an error if nothing worked.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;    ok, val, err := jr.tryScalar(r)
+    if err != nil {
+        return nil, err
+    }
+    if !ok {
+        return nil, fmt.Errorf(&amp;quot;Expected scalar, got: &amp;#39;%s&amp;#39;&amp;quot;, string(c))
+    }
+
+    return val, err
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Let's implement &lt;code&gt;tryScalar&lt;/code&gt; and its dependencies now. And we'll come
+back to &lt;code&gt;extractArrayDataFromJsonPath&lt;/code&gt; afterward.&lt;/p&gt;
+&lt;h3 id="tryscalar"&gt;tryScalar&lt;/h3&gt;&lt;p&gt;The &lt;code&gt;tryScalar&lt;/code&gt; is similar to &lt;code&gt;expectValue&lt;/code&gt;. It's called &lt;code&gt;tryScalar&lt;/code&gt;
+because it's allowed to fail.&lt;/p&gt;
+&lt;p&gt;We peek at the first byte and switch on a dedicated parsing helper
+based on it.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;func (jr *jsonReader) tryScalar(r *bufio.Reader) (bool, any, error) {
+    bs, err := r.Peek(1)
+    if err != nil {
+        return false, nil, err
+    }
+    c := bs[0]
+
+    if c == &amp;#39;&amp;quot;&amp;#39; {
+        val, err := jr.expectString(r)
+        return true, string(val), err
+    } else if c == &amp;#39;t&amp;#39; {
+        val, err := jr.expectIdentifier(r, &amp;quot;true&amp;quot;, true)
+        return true, val, err
+    } else if c == &amp;#39;f&amp;#39; {
+        val, err := jr.expectIdentifier(r, &amp;quot;false&amp;quot;, false)
+        return true, val, err
+    } else if c == &amp;#39;n&amp;#39; {
+        val, err := jr.expectIdentifier(r, &amp;quot;null&amp;quot;, nil)
+        return true, val, err
+    }
+
+    return jr.tryNumber(r)
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This passes control flow to two new functions, &lt;code&gt;expectIdentifier&lt;/code&gt; and
+&lt;code&gt;tryNumber&lt;/code&gt;. Let's do &lt;code&gt;expectIdentifier&lt;/code&gt; next.&lt;/p&gt;
+&lt;h3 id="expectidentifier"&gt;expectIdentifier&lt;/h3&gt;&lt;p&gt;This function tries to match the reader on a string passed to it.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;func (jr *jsonReader) expectIdentifier(r *bufio.Reader, ident string, value any) (any, error) {
+    var s []byte
+
+    for i := 0; i &amp;lt; len(ident); i++ {
+        bs, err := r.Peek(1)
+        if err != nil {
+            return nil, err
+        }
+
+        s = append(s, bs[0])
+
+        r.Discard(1)
+    }
+
+    if string(s) == ident {
+        return value, nil
+    }
+
+    return nil, fmt.Errorf(&amp;quot;Unknown value: &amp;#39;%s&amp;#39;&amp;quot;, string(s))
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id="trynumber"&gt;tryNumber&lt;/h3&gt;&lt;p&gt;This function tries to parse a number. We'll do a very lazy number
+parser that will &lt;em&gt;most likely&lt;/em&gt; allow all valid numbers. Internally
+we'll call &lt;code&gt;json.Unmarshal&lt;/code&gt; on the bytes we build up to do the
+conversion itself.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;func (jr *jsonReader) tryNumber(r *bufio.Reader) (bool, any, error) {
+    var hint []byte
+    var number []byte
+
+    for {
+        bs, err := r.Peek(1)
+        if err != nil {
+            return false, nil, err
+        }
+        c := bs[0]
+
+        hint = append(hint, c)
+
+        isNumberCharacter := (c &amp;gt;= '0' &amp;amp;&amp;amp; c &amp;lt;= '9') || c == 'e' || c == '-'
+        if !isNumberCharacter {
+            break
+        }
+
+        number = append(number, c)
+
+        r.Discard(1)
+    }
+
+    if len(number) == 0 {
+        return false, nil, nil
+    }
+
+    var n float64
+    err := json.Unmarshal(number, &amp;amp;n)
+    return true, n, err
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If we can't find a number, that's ok. We'll just say so in the first
+argument by returning &lt;code&gt;false&lt;/code&gt;.&lt;/p&gt;
+&lt;h3 id="outstanding-functions"&gt;Outstanding functions&lt;/h3&gt;&lt;p&gt;Ok we've come a while building out helper functions. The last two
+remaining helpers are &lt;code&gt;extractArrayDataFromJsonPath&lt;/code&gt; and
+&lt;code&gt;eatValue&lt;/code&gt;. Let's finish up these real parser functions before getting
+to &lt;code&gt;eatValue&lt;/code&gt;, the primary partial parsing function.&lt;/p&gt;
+&lt;h3 id="extractarraydatafromjsonpath"&gt;extractArrayDataFromJsonPath&lt;/h3&gt;&lt;p&gt;This function is almost identical to &lt;code&gt;extractDataFromJsonPath&lt;/code&gt; but
+rather than parsing key-value pairs inside curly braces it parses
+values inside brackets.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;func (jr *jsonReader) extractArrayDataFromJsonPath(r *bufio.Reader, path []string) (any, error) {
+    n, err := strconv.Atoi(string(path[0]))
+    if err != nil {
+        return nil, err
+    }
+
+    b, err := jr.readByte(r)
+    if err != nil {
+        return nil, err
+    }
+
+    if b != &amp;#39;[&amp;#39; {
+        return nil, fmt.Errorf(&amp;quot;Expected opening bracket, got: &amp;#39;%s&amp;#39;&amp;quot;, string(b))
+    }
+
+    var result any
+    i := -1
+    for {
+        i++
+
+        err = jr.eatWhitespace(r)
+        if err != nil {
+            return nil, err
+        }
+
+        bs, err := r.Peek(1)
+        if err != nil {
+            return nil, err
+        }
+        b := bs[0]
+
+        if b == &amp;#39;]&amp;#39; {
+            r.Discard(1)
+            break
+        }
+
+        if i &amp;gt; 0 {
+            if b == &amp;#39;,&amp;#39; {
+                r.Discard(1)
+            } else {
+                return nil, fmt.Errorf(&amp;quot;Expected comma between key-value pairs, got: &amp;#39;%s&amp;#39;&amp;quot;, string(b))
+            }
+        }
+
+        err = jr.eatWhitespace(r)
+        if err != nil {
+            return nil, err
+        }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Just like &lt;code&gt;extractDataFromJsonPath&lt;/code&gt; it either calls &lt;code&gt;eatValue&lt;/code&gt; or
+&lt;code&gt;expectValue&lt;/code&gt; depending on whether the current index matches the
+requested path.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;        // If the key is not the start of this path, skip past this value
+        if i != n {
+            err = jr.eatValue(r)
+            if err != nil {
+                return nil, err
+            }
+
+            continue
+        }
+
+        result, err = jr.expectValue(r, path[1:])
+        if err != nil {
+            return nil, err
+        }
+    }
+
+    return result, nil
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That's it for full parser functions! Let's do the partial parser,
+&lt;code&gt;eatValue&lt;/code&gt;.&lt;/p&gt;
+&lt;h3 id="eatvalue"&gt;eatValue&lt;/h3&gt;&lt;p&gt;This function is simpler than the full parser functions we wrote
+before.&lt;/p&gt;
+&lt;p&gt;First off it looks for the simple case where the value is a scalar.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;func (jr *jsonReader) eatValue(r *bufio.Reader) error {
+    var stack []byte
+
+    inString := false
+    var prev byte
+
+    err := jr.eatWhitespace(r)
+    if err != nil {
+        return err
+    }
+
+    ok, _, err := jr.tryScalar(r)
+    if err != nil {
+        return err
+    }
+
+    // It was a scalar, we're done!
+    if ok {
+        return nil
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;All it does is read until the value ends.&lt;/p&gt;
+&lt;p&gt;If the value is not a scalar though we need to look read past JSON
+arrays and/or objects.&lt;/p&gt;
+&lt;p&gt;To do this we'll simply read through characters, monitoring a stack of
+open and close braces and brackets. If we enter a string we'll skip
+all values inside the string until the string ends.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs go"&gt;
+    // Otherwise it&amp;#39;s an array or object
+    first := true
+
+    for first || len(stack) &amp;gt; 0 {
+        first = false
+
+        bs, err := r.Peek(1)
+        if err != nil {
+            return err
+        }
+        b := bs[0]
+
+        if inString {
+            if b == &amp;#39;&amp;quot;&amp;#39; &amp;amp;&amp;amp; prev != &amp;#39;\\&amp;#39; {
+                inString = false
+            }
+
+            // Two \\-es cancel eachother out
+            if b == &amp;#39;\\&amp;#39; &amp;amp;&amp;amp; prev == &amp;#39;\\&amp;#39; {
+                prev = byte(0)
+            } else {
+                prev = b
+            }
+
+            r.Discard(1)
+            continue
+        }
+
+        switch b {
+        case &amp;#39;[&amp;#39;:
+            stack = append(stack, b)
+        case &amp;#39;]&amp;#39;:
+            c := stack[len(stack)-1]
+            stack = stack[:len(stack)-1]
+            if c != &amp;#39;[&amp;#39; {
+                return fmt.Errorf(&amp;quot;Unexpected end of array: &amp;#39;%s&amp;#39;&amp;quot;, string(c))
+            }
+        case &amp;#39;{&amp;#39;:
+            stack = append(stack, b)
+        case &amp;#39;}&amp;#39;:
+            c := stack[len(stack)-1]
+            stack = stack[:len(stack)-1]
+            if c != &amp;#39;{&amp;#39; {
+                return fmt.Errorf(&amp;quot;Unexpected end of object: &amp;#39;%s&amp;#39;&amp;quot;, string(c))
+            }
+        case &amp;#39;&amp;quot;&amp;#39;:
+            inString = true
+            // Closing quote case handled elsewhere, above
+        }
+
+        r.Discard(1)
+        prev = b
+    }
+
+    return nil
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And we're finally done the first pass of the path-aware jq
+implementation.&lt;/p&gt;
+&lt;h3 id="build,-test,-benchmark"&gt;Build, test, benchmark&lt;/h3&gt;&lt;p&gt;Let's give it a go module, build and test it.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ go mod init jqgo
+$ go build
+$ curl https://raw.githubusercontent.com/json-iterator/test-data/master/large-file.json | jq -c &amp;#39;.[]&amp;#39; &amp;gt; large-file.json
+$ cat large-file.json | ./jqgo &amp;#39;.repo.url&amp;#39; &amp;gt; jqgo.test
+$ cat large-file.json | jq &amp;#39;.repo.url&amp;#39; &amp;gt; jq.test
+$ diff jq.test jqgo.test
+$ echo $?
+0
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Great! :) Let's benchmark it against jq and the control
+implementation.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ hyperfine --warmup 2 \
+  &amp;quot;cat large-file.json | ./control/control &amp;#39;.repo.url&amp;#39; &amp;gt; control.test&amp;quot; \
+  &amp;quot;cat large-file.json | ./jqgo &amp;#39;.repo.url&amp;#39; &amp;gt; jqgo.test&amp;quot; \
+  &amp;quot;cat large-file.json | jq &amp;#39;.repo.url&amp;#39; &amp;gt; jq.test&amp;quot;
+Benchmark 1: cat large-file.json | ./control/control &amp;#39;.repo.url&amp;#39; &amp;gt; control.test
+  Time (mean ± σ):     302.0 ms ±   3.4 ms    [User: 283.7 ms, System: 53.1 ms]
+  Range (min … max):   297.4 ms … 309.0 ms    10 runs
+
+Benchmark 2: cat large-file.json | ./jqgo &amp;#39;.repo.url&amp;#39; &amp;gt; jqgo.test
+  Time (mean ± σ):     258.8 ms ±   2.2 ms    [User: 230.3 ms, System: 47.6 ms]
+  Range (min … max):   256.3 ms … 262.6 ms    11 runs
+
+Benchmark 3: cat large-file.json | jq &amp;#39;.repo.url&amp;#39; &amp;gt; jq.test
+  Time (mean ± σ):     357.6 ms ±   2.9 ms    [User: 350.0 ms, System: 28.3 ms]
+  Range (min … max):   355.0 ms … 362.9 ms    10 runs
+
+Summary
+  &amp;#39;cat large-file.json | ./jqgo &amp;#39;.repo.url&amp;#39; &amp;gt; jqgo.test&amp;#39; ran
+    1.17 ± 0.02 times faster than &amp;#39;cat large-file.json | ./control/control &amp;#39;.repo.url&amp;#39; &amp;gt; control.test&amp;#39;
+    1.38 ± 0.02 times faster than &amp;#39;cat large-file.json | jq &amp;#39;.repo.url&amp;#39; &amp;gt; jq.test&amp;#39;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now to my surprise we're already beating the non-path-aware control
+implementation! Before I went to write this post the path-aware
+version was slower than the control. So I had to start performance
+profiling. For this blog post I tried to remake the slowest variation
+I could remember but I couldn't get it slower than this.&lt;/p&gt;
+&lt;p&gt;That said, the best version &lt;em&gt;was&lt;/em&gt; faster than this so I &lt;em&gt;can&lt;/em&gt;
+demonstrate the process of profiling to improve performance.&lt;/p&gt;
+&lt;p&gt;Let's dig into that. :)&lt;/p&gt;
+&lt;h3 id="profiling-in-go"&gt;Profiling in Go&lt;/h3&gt;</description><guid isPermaLink="false">http://notes.eatonphil.com/implementing-a-jq-clone-in-go.html</guid><pubDate>Sun, 10 Jul 2022 00:00:00 +0000</pubDate></item><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
 &lt;a href="https://github.com/cockroachdb/cockroach/blob/master/go.mod"&gt;its go.mod&lt;/a&gt;
 and notice a number of dependencies that do a lot of work: &lt;a href="https://github.com/jackc/pgproto3"&gt;a
 PostgreSQL wire protocol

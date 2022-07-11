@@ -4,9 +4,16 @@
 
 In this post we'll build a basic jq clone in Go. It will only be able
 to pull a single path out of each object it reads. It won't be able to
-do filters, mapping, etc. We'll start by building a "control"
-implementation that uses Go's builtin JSON library with a JSON path
-tool on top.
+do filters, mapping, etc.
+
+```bash
+$ cat large-file.json | head -n2 | ./jqgo '.repo.url'
+"https://api.github.com/repos/petroav/6.828"
+"https://api.github.com/repos/rspt/rspt-theme"
+```
+
+We'll start by building a "control" implementation that uses Go's
+builtin JSON library with a JSON path tool on top.
 
 Then we'll implement a basic path-aware JSON parser in 600 lines of
 Go. It's going to use a technique (that may have a better name but) I
@@ -19,11 +26,10 @@ care about and only *sort of* parse the rest.
   want to take a look
   at <a href="https://notes.eatonphil.com/tags/json.html">previous
   articles</a> I've written about parsing JSON.
-<p>
+</p>
 
 Once we get this partial parser working we'll turn to Go's builtin
-profiler to figure out why it's slow and what we can do to make it
-better.
+profiler to find what we can do to make it faster.
 
 All code for this post is [available on
 Github](https://github.com/eatonphil/jqgo).
@@ -160,39 +166,38 @@ $ go mod tidy
 $ go build
 # Grab a test file
 $ curl https://raw.githubusercontent.com/json-iterator/test-data/master/large-file.json | jq -c '.[]' > large-file.json
-$ cat large-file.json | head -n2 | ./control '.created_at'
-"2015-01-01T15:00:00Z"
-"2015-01-01T15:00:01Z"
+$ cat large-file.json | head -n2 | ./control '.repo.url'
+"https://api.github.com/repos/petroav/6.828"
+"https://api.github.com/repos/rspt/rspt-theme"
 ```
 
 Sweet. Now let's make sure it produces the same thing as jq.
 
 ```bash
-$ cat large-file.json | ./control '.created_at' > control.test
-$ cat large-file.json | jq '.created_at' > jq.test
+$ cat large-file.json | ./control '.repo.url' > control.test
+$ cat large-file.json | jq '.repo.url' > jq.test
 $ diff jq.test control.test
 $ echo $?
 0
 ```
 
-Great! It's working for some basic queries. Now let's see how it
-performs.
+Great! It's working for a basic query. Let's see how it performs.
 
 ```bash
 $ hyperfine \
-  "cat large-file.json | ./control '.created_at' > control.test" \
-  "cat large-file.json | jq '.created_at' > jq.test"
-Benchmark 1: cat large-file.json | ./control '.created_at' > control.test
-  Time (mean ± σ):     312.0 ms ±  12.8 ms    [User: 296.5 ms, System: 49.8 ms]
-  Range (min … max):   296.5 ms … 338.8 ms    10 runs
- 
-Benchmark 2: cat large-file.json | jq '.created_at' > jq.test
-  Time (mean ± σ):     348.5 ms ±   1.6 ms    [User: 340.4 ms, System: 27.2 ms]
-  Range (min … max):   347.1 ms … 352.3 ms    10 runs
- 
+  "cat large-file.json | ./control '.repo.url' > control.test" \
+  "cat large-file.json | jq '.repo.url' > jq.test"
+Benchmark 1: cat large-file.json | ./control '.repo.url' > control.test
+  Time (mean ± σ):     310.0 ms ±  14.4 ms    [User: 296.2 ms, System: 49.3 ms]
+  Range (min … max):   296.1 ms … 344.9 ms    10 runs
+
+Benchmark 2: cat large-file.json | jq '.repo.url' > jq.test
+  Time (mean ± σ):     355.8 ms ±   1.1 ms    [User: 348.8 ms, System: 27.7 ms]
+  Range (min … max):   354.8 ms … 358.5 ms    10 runs
+
 Summary
-  'cat large-file.json | ./control '.created_at' > control.test' ran
-    1.12 ± 0.05 times faster than 'cat large-file.json | jq '.created_at' > jq.test'
+  'cat large-file.json | ./control '.repo.url' > control.test' ran
+    1.15 ± 0.05 times faster than 'cat large-file.json | jq '.repo.url' > jq.test'
 ```
 
 Now that's surprising! This naive implementation in Go is a bit faster
@@ -265,6 +270,8 @@ func main() {
 	var err error
 
 	for {
+		jr.reset()
+
 		val, err = jr.extractDataFromJsonPath(b, path)
 		if err == io.EOF {
 			break
@@ -285,3 +292,662 @@ func main() {
 Except instead of using the builtin JSON parser we'll call our own
 `extractDataFromJsonPath` function that handles parsing and extraction
 all at once.
+
+Before doing that we'll add a few helper functions. The first one grabs
+a byte from a reader and stores the read byte locally (so we can print
+out all read bytes if the program fails).
+
+```go
+type jsonReader struct {
+	read []byte
+}
+
+func (jr *jsonReader) readByte(r *bufio.Reader) (byte, error) {
+	c, err := r.ReadByte()
+	if err != nil {
+		return byte(0), err
+	}
+
+	jr.read = append(jr.read, c)
+
+	return c, nil
+}
+```
+
+The `reset` member zeroes out the `read` bytes and gets called before
+each object is parsed in the `main` main loop.
+
+```go
+func (jr *jsonReader) reset() {
+	jr.read = nil
+}
+```
+
+Now let's get into `extractDataFromJsonPath`.
+
+### extractDataFromJsonPath
+
+This is the real parser. It expects a JSON object and fully parses the
+object, almost.
+
+```go
+func (jr *jsonReader) extractDataFromJsonPath(r *bufio.Reader, path []string) (any, error) {
+	if len(path) == 0 {
+		return nil, nil
+	}
+
+	err := jr.eatWhitespace(r)
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := jr.readByte(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if b != '{' {
+		return nil, fmt.Errorf("Expected opening curly brace, got: '%s'", string(b))
+	}
+
+	i := -1
+
+	var result any
+	for {
+		i++
+
+		err = jr.eatWhitespace(r)
+		if err != nil {
+			return nil, err
+		}
+
+		bs, err := r.Peek(1)
+		if err != nil {
+			return nil, err
+		}
+		b := bs[0]
+
+		if b == '}' {
+			r.Discard(1)
+			break
+		}
+
+		if i > 0 {
+			if b == ',' {
+				r.Discard(1)
+			} else {
+				return nil, fmt.Errorf("Expected comma between key-value pairs, got: '%s'", string(b))
+			}
+		}
+
+		err = jr.eatWhitespace(r)
+		if err != nil {
+			return nil, err
+		}
+
+		// Grab the key
+		s, err := jr.expectString(r)
+		if err != nil {
+			return nil, err
+		}
+
+		err = jr.eatWhitespace(r)
+		if err != nil {
+			return nil, err
+		}
+
+		b, err = jr.readByte(r)
+		if err != nil {
+			return nil, err
+		}
+
+		if b != ':' {
+			return nil, fmt.Errorf("Expected colon, got: '%s'", string(b))
+		}
+
+		err = jr.eatWhitespace(r)
+		if err != nil {
+			return nil, err
+		}
+```
+
+Up to this point it looks like any old handwritten parser. There are a
+few helpers in there (`eatWhitespace`, `expectString`) we'll implement
+shortly.
+
+But once we see each key and are ready to look for a value we can
+decide if we need to fully parse the value (if the path goes into this
+key) or if we can partially parse the value (because the path does not
+go into this key).
+
+```go
+		// If the key is not the start of this path, skip past this value
+		if path[0] != s {
+			err = jr.eatValue(r)
+			if err != nil {
+				return nil, err
+			}
+
+			continue
+		}
+
+		result, err = jr.expectValue(r, path[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}
+```
+
+And that's it! The core parsing loop is done. The meat now becomes 1)
+the `eatValue` function that partially parses JSON and 2) the
+`expectValue` function that either encounters a scalary value and
+returns it or recursively calls the `extractDataFromJsonPath`.
+
+But first let's fill in the two helpers we skipped. First off, `eatWhitespace`.
+
+### eatWhitespace
+
+This function peeks and reads bytes while the bytes are whitespace.
+
+```go
+func (jr *jsonReader) eatWhitespace(r *bufio.Reader) error {
+	for {
+		bs, err := r.Peek(1)
+		if err != nil {
+			return err
+		}
+		b := bs[0]
+
+		isWhitespace := b == ' ' ||
+			b == '\n' ||
+			b == '\t' ||
+			b == '\r'
+		if !isWhitespace {
+			return nil
+		}
+
+		r.Discard(1)
+	}
+}
+```
+
+That's it! Next we need to fill in `expectString`.
+
+### expectString
+
+This helper is a standard handwritten parser helper that looks for a
+double quote and keeps collecting bytes until it finds the ending
+double quote that is not escaped.
+
+```
+func (jr *jsonReader) expectString(r *bufio.Reader) (string, error) {
+	var s []byte
+
+	err := jr.eatWhitespace(r)
+	if err != nil {
+		return "", err
+	}
+
+	b, err := jr.readByte(r)
+	if err != nil {
+		return "", err
+	}
+
+	if b != '"' {
+		return "", fmt.Errorf("Expected double quote to start string, got: '%s'", string(b))
+	}
+
+	var prev byte
+	for {
+		b, err := jr.readByte(r)
+		if err != nil {
+			return "", err
+		}
+
+		if b == '\\' && prev == '\\' {
+			// Just skip
+			prev = byte(0)
+			continue
+		} else if b == '"' {
+			// Overwrite the escaped double quote
+			if prev == '\\' {
+				s[len(s)-1] = '"'
+			} else {
+				// Otherwise it's the actual end
+				break
+			}
+		}
+
+		s = append(s, b)
+		prev = b
+	}
+
+	return string(s), nil
+}
+```
+
+Standard stuff! Now let's get back to those meaty functions we
+introduced before, starting with `expectValue`.
+
+### expectValue
+
+This function is called by `extractDataFromJsonPath` when it wants to
+fully parse a value.
+
+If we see a left curly brace, we call `extractDataFromJsonPath` with
+it.
+
+```go
+func (jr *jsonReader) expectValue(r *bufio.Reader, path []string) (any, error) {
+	bs, err := r.Peek(1)
+	if err != nil {
+		return nil, err
+	}
+	c := bs[0]
+
+	if c == '{' {
+		return jr.extractDataFromJsonPath(r, path)
+```
+
+Otherwise if we see a left bracket we call a new helper
+`extractArrayDataFromJsonPath` which will be almost identical to
+`extractDataFromJsonPath` but for parsing array syntax.
+
+```go
+	} else if c == '[' {
+		return jr.extractArrayDataFromJsonPath(r, path)
+	}
+```
+
+If the value we're trying to parse isn't an array or object and
+there's more of a path then we have to return null because we can't
+enter into a scalar value.
+
+```
+	// Can't go any further into a path
+
+	if len(path) != 0 {
+		// Reached the end of this object but more of
+		// the path remains. So this object doesn't
+		// contain this path.
+		return nil, nil
+	}	
+```
+
+Then we try to parse a scalar (numbers, strings, `null`) and
+ultimately return an error if nothing worked.
+
+```go
+	ok, val, err := jr.tryScalar(r)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("Expected scalar, got: '%s'", string(c))
+	}
+
+	return val, err
+}
+```
+
+Let's implement `tryScalar` and its dependencies now. And we'll come
+back to `extractArrayDataFromJsonPath` afterward.
+
+### tryScalar
+
+The `tryScalar` is similar to `expectValue`. It's called `tryScalar`
+because it's allowed to fail.
+
+We peek at the first byte and switch on a dedicated parsing helper
+based on it.
+
+```go
+func (jr *jsonReader) tryScalar(r *bufio.Reader) (bool, any, error) {
+	bs, err := r.Peek(1)
+	if err != nil {
+		return false, nil, err
+	}
+	c := bs[0]
+
+	if c == '"' {
+		val, err := jr.expectString(r)
+		return true, string(val), err
+	} else if c == 't' {
+		val, err := jr.expectIdentifier(r, "true", true)
+		return true, val, err
+	} else if c == 'f' {
+		val, err := jr.expectIdentifier(r, "false", false)
+		return true, val, err
+	} else if c == 'n' {
+		val, err := jr.expectIdentifier(r, "null", nil)
+		return true, val, err
+	}
+
+	return jr.tryNumber(r)
+}
+```
+
+This passes control flow to two new functions, `expectIdentifier` and
+`tryNumber`. Let's do `expectIdentifier` next.
+
+### expectIdentifier
+
+This function tries to match the reader on a string passed to it.
+
+```go
+func (jr *jsonReader) expectIdentifier(r *bufio.Reader, ident string, value any) (any, error) {
+	var s []byte
+
+	for i := 0; i < len(ident); i++ {
+		bs, err := r.Peek(1)
+		if err != nil {
+			return nil, err
+		}
+
+		s = append(s, bs[0])
+
+		r.Discard(1)
+	}
+
+	if string(s) == ident {
+		return value, nil
+	}
+
+	return nil, fmt.Errorf("Unknown value: '%s'", string(s))
+}
+```
+
+### tryNumber
+
+This function tries to parse a number. We'll do a very lazy number
+parser that will *most likely* allow all valid numbers. Internally
+we'll call `json.Unmarshal` on the bytes we build up to do the
+conversion itself.
+
+```
+func (jr *jsonReader) tryNumber(r *bufio.Reader) (bool, any, error) {
+	var hint []byte
+	var number []byte
+
+	for {
+		bs, err := r.Peek(1)
+		if err != nil {
+			return false, nil, err
+		}
+		c := bs[0]
+
+		hint = append(hint, c)
+
+		isNumberCharacter := (c >= '0' && c <= '9') || c == 'e' || c == '-'
+		if !isNumberCharacter {
+			break
+		}
+
+		number = append(number, c)
+
+		r.Discard(1)
+	}
+
+	if len(number) == 0 {
+		return false, nil, nil
+	}
+
+	var n float64
+	err := json.Unmarshal(number, &n)
+	return true, n, err
+}
+```
+
+If we can't find a number, that's ok. We'll just say so in the first
+argument by returning `false`.
+
+### Outstanding functions
+
+Ok we've come a while building out helper functions. The last two
+remaining helpers are `extractArrayDataFromJsonPath` and
+`eatValue`. Let's finish up these real parser functions before getting
+to `eatValue`, the primary partial parsing function.
+
+### extractArrayDataFromJsonPath
+
+This function is almost identical to `extractDataFromJsonPath` but
+rather than parsing key-value pairs inside curly braces it parses
+values inside brackets.
+
+```go
+func (jr *jsonReader) extractArrayDataFromJsonPath(r *bufio.Reader, path []string) (any, error) {
+	n, err := strconv.Atoi(string(path[0]))
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := jr.readByte(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if b != '[' {
+		return nil, fmt.Errorf("Expected opening bracket, got: '%s'", string(b))
+	}
+
+	var result any
+	i := -1
+	for {
+		i++
+
+		err = jr.eatWhitespace(r)
+		if err != nil {
+			return nil, err
+		}
+
+		bs, err := r.Peek(1)
+		if err != nil {
+			return nil, err
+		}
+		b := bs[0]
+
+		if b == ']' {
+			r.Discard(1)
+			break
+		}
+
+		if i > 0 {
+			if b == ',' {
+				r.Discard(1)
+			} else {
+				return nil, fmt.Errorf("Expected comma between key-value pairs, got: '%s'", string(b))
+			}
+		}
+
+		err = jr.eatWhitespace(r)
+		if err != nil {
+			return nil, err
+		}
+```
+
+Just like `extractDataFromJsonPath` it either calls `eatValue` or
+`expectValue` depending on whether the current index matches the
+requested path.
+
+```go
+		// If the key is not the start of this path, skip past this value
+		if i != n {
+			err = jr.eatValue(r)
+			if err != nil {
+				return nil, err
+			}
+
+			continue
+		}
+
+		result, err = jr.expectValue(r, path[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}
+```
+
+That's it for full parser functions! Let's do the partial parser,
+`eatValue`.
+
+### eatValue
+
+This function is simpler than the full parser functions we wrote
+before.
+
+First off it looks for the simple case where the value is a scalar.
+
+```
+func (jr *jsonReader) eatValue(r *bufio.Reader) error {
+	var stack []byte
+
+	inString := false
+	var prev byte
+
+	err := jr.eatWhitespace(r)
+	if err != nil {
+		return err
+	}
+
+	ok, _, err := jr.tryScalar(r)
+	if err != nil {
+		return err
+	}
+
+	// It was a scalar, we're done!
+	if ok {
+		return nil
+	}
+```
+
+All it does is read until the value ends.
+
+If the value is not a scalar though we need to look read past JSON
+arrays and/or objects.
+
+To do this we'll simply read through characters, monitoring a stack of
+open and close braces and brackets. If we enter a string we'll skip
+all values inside the string until the string ends.
+
+```go
+
+	// Otherwise it's an array or object
+	first := true
+
+	for first || len(stack) > 0 {
+		first = false
+
+		bs, err := r.Peek(1)
+		if err != nil {
+			return err
+		}
+		b := bs[0]
+
+		if inString {
+			if b == '"' && prev != '\\' {
+				inString = false
+			}
+
+			// Two \\-es cancel eachother out
+			if b == '\\' && prev == '\\' {
+				prev = byte(0)
+			} else {
+				prev = b
+			}
+
+			r.Discard(1)
+			continue
+		}
+
+		switch b {
+		case '[':
+			stack = append(stack, b)
+		case ']':
+			c := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if c != '[' {
+				return fmt.Errorf("Unexpected end of array: '%s'", string(c))
+			}
+		case '{':
+			stack = append(stack, b)
+		case '}':
+			c := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if c != '{' {
+				return fmt.Errorf("Unexpected end of object: '%s'", string(c))
+			}
+		case '"':
+			inString = true
+			// Closing quote case handled elsewhere, above
+		}
+
+		r.Discard(1)
+		prev = b
+	}
+
+	return nil
+}
+```
+
+And we're finally done the first pass of the path-aware jq
+implementation.
+
+### Build, test, benchmark
+
+Let's give it a go module, build and test it.
+
+```bash
+$ go mod init jqgo
+$ go build
+$ curl https://raw.githubusercontent.com/json-iterator/test-data/master/large-file.json | jq -c '.[]' > large-file.json
+$ cat large-file.json | ./jqgo '.repo.url' > jqgo.test
+$ cat large-file.json | jq '.repo.url' > jq.test
+$ diff jq.test jqgo.test
+$ echo $?
+0
+```
+
+Great! :) Let's benchmark it against jq and the control
+implementation.
+
+```bash
+$ hyperfine --warmup 2 \
+  "cat large-file.json | ./control/control '.repo.url' > control.test" \
+  "cat large-file.json | ./jqgo '.repo.url' > jqgo.test" \
+  "cat large-file.json | jq '.repo.url' > jq.test"
+Benchmark 1: cat large-file.json | ./control/control '.repo.url' > control.test
+  Time (mean ± σ):     302.0 ms ±   3.4 ms    [User: 283.7 ms, System: 53.1 ms]
+  Range (min … max):   297.4 ms … 309.0 ms    10 runs
+ 
+Benchmark 2: cat large-file.json | ./jqgo '.repo.url' > jqgo.test
+  Time (mean ± σ):     258.8 ms ±   2.2 ms    [User: 230.3 ms, System: 47.6 ms]
+  Range (min … max):   256.3 ms … 262.6 ms    11 runs
+ 
+Benchmark 3: cat large-file.json | jq '.repo.url' > jq.test
+  Time (mean ± σ):     357.6 ms ±   2.9 ms    [User: 350.0 ms, System: 28.3 ms]
+  Range (min … max):   355.0 ms … 362.9 ms    10 runs
+ 
+Summary
+  'cat large-file.json | ./jqgo '.repo.url' > jqgo.test' ran
+    1.17 ± 0.02 times faster than 'cat large-file.json | ./control/control '.repo.url' > control.test'
+    1.38 ± 0.02 times faster than 'cat large-file.json | jq '.repo.url' > jq.test'
+```
+
+Now to my surprise we're already beating the non-path-aware control
+implementation! Before I went to write this post the path-aware
+version was slower than the control. So I had to start performance
+profiling. For this blog post I tried to remake the slowest variation
+I could remember but I couldn't get it slower than this.
+
+That said, the best version *was* faster than this so I *can*
+demonstrate the process of profiling to improve performance.
+
+Let's dig into that. :)
+
+### Profiling in Go
