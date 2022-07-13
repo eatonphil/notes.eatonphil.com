@@ -341,6 +341,7 @@ object, almost.</p>
         return nil, err
     }
 
+    // Make sure we&#39;re actually going into an object
     if b != &#39;{&#39; {
         return nil, fmt.Errorf(&quot;Expected opening curly brace, got: &#39;%s&#39;&quot;, string(b))
     }
@@ -362,11 +363,13 @@ object, almost.</p>
         }
         b := bs[0]
 
+        // We found the end of the object
         if b == &#39;}&#39; {
             r.Discard(1)
             break
         }
 
+        // Key-value pairs must be separated by commas
         if i &gt; 0 {
             if b == &#39;,&#39; {
                 r.Discard(1)
@@ -391,6 +394,7 @@ object, almost.</p>
             return nil, err
         }
 
+        // Find a colon separating key from value
         b, err = jr.readByte(r)
         if err != nil {
             return nil, err
@@ -422,6 +426,7 @@ go into this key).</p>
             continue
         }
 
+        // Otherwise this is a path we want, grab the value
         result, err = jr.expectValue(r, path[1:])
         if err != nil {
             return nil, err
@@ -435,6 +440,13 @@ go into this key).</p>
 the <code>eatValue</code> function that partially parses JSON and 2) the
 <code>expectValue</code> function that either encounters a scalar value and
 returns it or recursively calls <code>extractDataFromJsonPath</code> to enter some new object.</p>
+<h4 id="notes-on-helper-naming">Notes on helper naming</h4><p>There are three main kinds of helpers you'll see. <code>expectX</code> helpers
+like <code>expectString</code> will return early with an error if they fail to
+find what they're looking for. <code>eatX</code> helpers like <code>eatWhitespace</code>
+will not return any value and will only move the read cursor
+forward. And <code>tryX</code> helpers like <code>tryNumber</code> will do the same thing as
+<code>expectString</code> but return an additional boolean argument. So the
+caller can decide whether or not to make other attempts at parsing.</p>
 <p>But first let's fill in the two helpers we skipped. First off, <code>eatWhitespace</code>.</p>
 <h3 id="eatwhitespace">eatWhitespace</h3><p>This function peeks and reads bytes while the bytes are whitespace.</p>
 <pre><code class="hljs go">func (jr *jsonReader) eatWhitespace(r *bufio.Reader) error {
@@ -469,6 +481,7 @@ double quote that is not escaped.</p>
         return "", err
     }
 
+    // Look for opening quote
     b, err := jr.readByte(r)
     if err != nil {
         return "", err
@@ -591,14 +604,12 @@ based on it.</p>
     var s []byte
 
     for i := 0; i &lt; len(ident); i++ {
-        bs, err := r.Peek(1)
+        b, err := r.ReadByte()
         if err != nil {
             return nil, err
         }
 
-        s = append(s, bs[0])
-
-        r.Discard(1)
+        s = append(s, b)
     }
 
     if string(s) == ident {
@@ -608,13 +619,19 @@ based on it.</p>
     return nil, fmt.Errorf(&quot;Unknown value: &#39;%s&#39;&quot;, string(s))
 }
 </code></pre>
-<h3 id="trynumber">tryNumber</h3><p>This function tries to parse a number. We'll do a very lazy number
+<p class="note">
+  Thanks <a href="https://twitter.com/deliberatecoder">Michael
+  Lynch</a> for pointing out in an earlier version that
+  <code>expectIdentifier</code> does not need to <code>Peek</code>/<code>Discard</code> but can just
+  <code>ReadByte</code> instead.
+</p><h3 id="trynumber">tryNumber</h3><p>This function tries to parse a number. We'll do a very lazy number
 parser that will <em>most likely</em> allow all valid numbers. Internally
 we'll call <code>json.Unmarshal</code> on the bytes we build up to do the
 conversion itself.</p>
 <pre><code>func (jr *jsonReader) tryNumber(r *bufio.Reader) (bool, any, error) {
     var number []byte
 
+    // Loop trying to find all number-like characters in a row
     for {
         bs, err := r.Peek(1)
         if err != nil {
@@ -651,11 +668,13 @@ to <code>eatValue</code>, the primary partial parsing function.</p>
 rather than parsing key-value pairs inside curly braces it parses
 values inside brackets.</p>
 <pre><code class="hljs go">func (jr *jsonReader) extractArrayDataFromJsonPath(r *bufio.Reader, path []string) (any, error) {
+    // Path inside an array must be an integer
     n, err := strconv.Atoi(string(path[0]))
     if err != nil {
         return nil, err
     }
 
+    // Look for opening bracket. Make sure we&#39;re in an array
     b, err := jr.readByte(r)
     if err != nil {
         return nil, err
@@ -681,11 +700,13 @@ values inside brackets.</p>
         }
         b := bs[0]
 
+        // Found closing bracket, exit the array
         if b == &#39;]&#39; {
             r.Discard(1)
             break
         }
 
+        // Array values must be separated by a comma
         if i &gt; 0 {
             if b == &#39;,&#39; {
                 r.Discard(1)
