@@ -7,7 +7,7 @@ body {
     padding: 0;
     color: black;
     font-size: 1.1rem;
-    font-family: "Segoe UI", "SF Pro", sans-serif;
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 h1, h2, h3, h4, h5, h6 {
