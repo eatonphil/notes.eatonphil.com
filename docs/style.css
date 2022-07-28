@@ -6,24 +6,22 @@ body {
     margin: 0 auto;
     padding: 0;
     color: black;
-    background: #fcfcfc;
     font-size: 1.1rem;
-    font-family: sans-serif;
+    font-family: "Segoe UI", "SF Pro", sans-serif;
 }
 
 h1, h2, h3, h4, h5, h6 {
     font-style: normal;
     font-variant: normal;
+    font-weight: normal;
 }
 
 h1 {
-    color: #333;
     margin: 1rem 0 .5rem 0;
 }
 
 h2 {
     font-size: 1rem;
-    font-weight: normal;
     line-height: 1.1rem;
     margin: 0;
     padding-top: 15px;
@@ -31,22 +29,28 @@ h2 {
 }
 
 h2.fp-h2 {
-    color: #333;
     font-size: 1.5rem;
 }
 
 h3 {
-    color: #333;
     font-size: 1.4rem;
     line-height: 1.6rem;
 }
 h3.fp-h3 {
-    font-size: .9rem;
+    font-size: 1.2rem;
     margin-bottom: 0;
 }
 
 h4 {
-    color: #444;
+    font-size: 1.3rem;
+}
+
+p + h2, pre + h2,
+p + h3, pre + h3,
+p + h4, pre + h4,
+p + h5, pre + h5,
+p + h6, pre + h6 {
+    margin-top: 50px;
 }
 
 p, li {
@@ -61,7 +65,7 @@ p:last-child, li:last-child {
 }
 
 a {
-    color: rgb(0, 95, 255);
+    color: rgb(33 131 255);
     text-decoration: none;
 }
 
