@@ -365,7 +365,15 @@
     <lastmod>2022-05-17</lastmod>
  </url>
   <url>
+    <loc>https://notes.eatonphil.com/2022-06-11-year-in-review.html</loc>
+    <lastmod>2022-06-10</lastmod>
+ </url>
+  <url>
     <loc>https://notes.eatonphil.com/implementing-a-jq-clone-in-go.html</loc>
     <lastmod>2022-07-10</lastmod>
+ </url>
+  <url>
+    <loc>https://notes.eatonphil.com/2022-07-25-database-integration-testing.html</loc>
+    <lastmod>2022-07-25</lastmod>
  </url>
 </urlset>

@@ -26,9 +26,9 @@ TAG_PAGE = """
 """
 HOME_PAGE = """
 <div class="fp-section fp-section--about">
-  <h2 class="fp-h2">Welcome!</h2>
+  <h2 class="fp-h2">Hey hey hey!</h2>
   <p>
-    Hey! I'm Phil. In the past 10 years I've been a developer or
+    I'm Phil. In the past 10 years I've been a developer or
     manager or founder, at startups and Oracle. I'm currently <a
     href="mailto:phil@eatonphil.com">on the job market</a>! I don't
     have a CS degree and I'd be happy to chat except for at places
@@ -41,9 +41,9 @@ HOME_PAGE = """
     where I build <a
     href="https://github.com/multiprocessio">open-source data
     tools</a> like <a
-    href="https://datastation.multiprocess.io">DataStation (2.3k+
+    href="https://datastation.multiprocess.io">DataStation (2.4k+
     stars)</a>, an open-source data IDE for developers, and <a
-    href="https://github.com/multiprocessio/dsq">dsq (2.5k+
+    href="https://github.com/multiprocessio/dsq">dsq (2.6k+
     stars)</a>, a commandline tool for running SQL queries against
     JSON, CSV, Parquet, Excel and more.
   </p>
@@ -55,7 +55,7 @@ HOME_PAGE = """
   <p>
     I host a <a href="https://discord.multiprocess.io">hacker Discord
     (~900 members)</a> and a monthly virtual Meetup, <a
-    href="https://www.meetup.com/hackernights/">Hacker Nights (300+
+    href="https://www.meetup.com/hackernights/">Hacker Nights (400+
     members)</a>, that has featured talks by the founder of <a
     href="bit.io">bit.io</a>, the creator of <a
     href="https://github.com/rqlite/rqlite">rqlite</a>, the author of

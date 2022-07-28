@@ -1,5 +1,10 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 13 Jul 2022 12:55:25 +0000</lastBuildDate><item><title>Implementing a simple jq clone in Go, and basics of Go memory profiling</title><link>http://notes.eatonphil.com/implementing-a-jq-clone-in-go.html</link><description>&lt;p&gt;In this post we'll build a basic jq clone in Go. It will only be able
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 28 Jul 2022 16:43:13 +0000</lastBuildDate><item><title>Container scheduling strategies for integration testing 14 different databases in Github Actions</title><link>http://notes.eatonphil.com/2022-07-25-database-integration-testing.html</link><description>&lt;head&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2022-07-25-database-integration-testing.html'" /&gt;
+&lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
+&lt;a href="https://datastation.multiprocess.io/blog/2022-07-25-database-integration-testing.html"&gt;here&lt;/a&gt;
+if you are not redirected.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/2022-07-25-database-integration-testing.html</guid><pubDate>Mon, 25 Jul 2022 00:00:00 +0000</pubDate></item><item><title>Implementing a simple jq clone in Go, and basics of Go memory profiling</title><link>http://notes.eatonphil.com/implementing-a-jq-clone-in-go.html</link><description>&lt;p&gt;In this post we'll build a basic jq clone in Go. It will only be able
 to pull a single path out of each object it reads. It won't be able to
 do filters, mapping, etc.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ cat large-file.json | head -n2 | ./jqgo &amp;#39;.repo.url&amp;#39;
@@ -1419,7 +1424,12 @@ and memory usage. For me it's still a lot of poking around and trying
 different things. But after a few years of trying to get better at
 profiling Go programs I think I'm starting to get the hang of it.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;I wrote a new blog post on implementing a simple jq clone from scratch in Go. This post explores partial/fuzzy parsing again and finishes with my approach to debugging memory/CPU usage in Go programs. It&amp;#39;s a bit of a long post but hopefully worthwhile! :)&lt;a href="https://t.co/DxilIVaUBa"&gt;https://t.co/DxilIVaUBa&lt;/a&gt; &lt;a href="https://t.co/as3Sr5I2G0"&gt;pic.twitter.com/as3Sr5I2G0&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1546470283334270977?ref_src=twsrc%5Etfw"&gt;July 11, 2022&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
-</description><guid isPermaLink="false">http://notes.eatonphil.com/implementing-a-jq-clone-in-go.html</guid><pubDate>Sun, 10 Jul 2022 00:00:00 +0000</pubDate></item><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
+</description><guid isPermaLink="false">http://notes.eatonphil.com/implementing-a-jq-clone-in-go.html</guid><pubDate>Sun, 10 Jul 2022 00:00:00 +0000</pubDate></item><item><title>One year as a solo dev building open-source data tools without funding</title><link>http://notes.eatonphil.com/2022-06-11-year-in-review.html</link><description>&lt;head&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2022-06-11-year-in-review.html'" /&gt;
+&lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
+&lt;a href="https://datastation.multiprocess.io/blog/2022-06-11-year-in-review.html"&gt;here&lt;/a&gt;
+if you are not redirected.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/2022-06-11-year-in-review.html</guid><pubDate>Fri, 10 Jun 2022 00:00:00 +0000</pubDate></item><item><title>Let's build a distributed Postgres proof of concept</title><link>http://notes.eatonphil.com/distributed-postgres.html</link><description>&lt;p&gt;What is CockroachDB under the hood? Take a look at
 &lt;a href="https://github.com/cockroachdb/cockroach/blob/master/go.mod"&gt;its go.mod&lt;/a&gt;
 and notice a number of dependencies that do a lot of work: &lt;a href="https://github.com/jackc/pgproto3"&gt;a
 PostgreSQL wire protocol
