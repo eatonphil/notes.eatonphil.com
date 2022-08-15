@@ -25,65 +25,6 @@ TAG_PAGE = """
 </div>
 """
 HOME_PAGE = """
-<div class="fp-section fp-section--about">
-  <h2 class="fp-h2">Hey hey hey!</h2>
-  <p>
-    I'm Phil. In the past 10 years I've been a developer or
-    manager or founder, at startups and Oracle. I'm currently <a
-    href="mailto:phil@eatonphil.com">on the job market</a>! I don't
-    have a CS degree and I'd be happy to chat except for at places
-    that ask me to implement easily-Googleable algorithms in an
-    interview. :)
-  </p>
-  <p>
-    I quit my job at Oracle in 2021 to start <a
-    href="https://multiprocess.io">Multiprocess Labs</a> (just me)
-    where I build <a
-    href="https://github.com/multiprocessio">open-source data
-    tools</a> like <a
-    href="https://datastation.multiprocess.io">DataStation (2.4k+
-    stars)</a>, an open-source data IDE for developers, and <a
-    href="https://github.com/multiprocessio/dsq">dsq (2.6k+
-    stars)</a>, a commandline tool for running SQL queries against
-    JSON, CSV, Parquet, Excel and more.
-  </p>
-  <p>
-    You can read about my experience doing this for a year <a
-    href="https://datastation.multiprocess.io/blog/2022-06-11-year-in-review.html">here</a>.
-  </p>
-  <h3 class="fp-h3">Hang out</h3>
-  <p>
-    I host a <a href="https://discord.multiprocess.io">hacker Discord
-    (~900 members)</a> and a monthly virtual Meetup, <a
-    href="https://www.meetup.com/hackernights/">Hacker Nights (400+
-    members)</a>, that has featured talks by the founder of <a
-    href="bit.io">bit.io</a>, the creator of <a
-    href="https://github.com/rqlite/rqlite">rqlite</a>, the author of
-    <a href="https://sirupsen.com/napkin">Napkin Math</a> and many
-    hobbyists hacking on cool tech for fun. Both the Meetup and the
-    Discord are designed to expose devs (and myself) to the internals
-    of databases, compilers, operating systems, browsers, emulators,
-    etc. And to provide a community around this kind of
-    exploration. You are very welcome to join either!
-  </p>
-  <h3 class="fp-h3">Elsewhere</h3>
-  <p>
-    You can find me on <a
-    href="https://github.com/eatonphil">Github</a>, <a
-    href="https://twitter.com/phil_eaton">Twitter</a>, <a
-    href="https://www.linkedin.com/in/phil-e-97a490178/">LinkedIn</a>,
-    and <a
-    href="https://www.goodreads.com/user/show/50930981-phil-eaton">Goodreads</a>.
-  </p>
-  <h3 class="fp-h3">Start here</h3>
-  <p>
-    Some of the most viewed posts on this site are about <a
-    href="/tags/compilers.html">compilers</a>, <a
-    href="/tags/databases.html">databases</a>, <a
-    href="/tags/parsing.html">parsers</a> and <a
-    href="/tags/emulators.html">emulators</a>.
-  </p>
-</div>
 <div class="fp-section fp-section--tags">
   <h2 class="fp-h2">Frequent</h2>
   <div class="tags">
@@ -93,6 +34,7 @@ HOME_PAGE = """
     <a href="/tags/">View all</a>
   </p>
 </div>
+
 <div class="fp-section fp-section--notes">
   <h2 class="fp-h2">Archive</h2>
   {notes}
@@ -156,6 +98,8 @@ def get_html_tags(all_tags):
     return ''
 
 
+showfeedback = "<style>.feedback{display:initial;}</style>"
+
 def main():
     all_tags = {}
     post_data = []
@@ -164,7 +108,13 @@ def main():
         print('Processing ' + post)
         out_file = post[len('posts/'):]
         output, title = get_post_data(post)
-        header, date, tags_raw = title[1], title[2], title.get(6, "")
+        try:
+            header, date, tags_raw = title[1], title[2], title.get(6, "")
+        except:
+            t = out_file.split('.')[0].title()
+            with open('docs/' + out_file, 'w') as f:
+                f.write(TEMPLATE.format(post=output, meta="", tag=t, subtitle="", title="", tags="", frequent_tags=""))
+            continue
 
         tags = tags_raw.split(",")
         tags_html = get_html_tags(tags)
@@ -185,7 +135,6 @@ def main():
         frequent_tags.append(f'<a href="/tags/{tag.replace(" ", "-").replace("/", "-")}.html" class="tag">{tag} ({count})</a>')
     frequent_tags = "".join(frequent_tags)
 
-    showfeedback = "<style>.feedback{display:initial;}</style>"
     for (out_file, title, date, _, output, tags_html) in post_data:
         with open('docs/' + out_file, 'w') as f:
             f.write(TEMPLATE.format(post=output+showfeedback, title=title, subtitle=date, tag=title, tags=tags_html, meta="", frequent_tags=frequent_tags))

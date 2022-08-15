@@ -66,7 +66,6 @@ p:last-child, li:last-child {
 
 a {
     color: rgb(0 95 255);
-    text-decoration: none;
 }
 
 .code-caption {
@@ -188,7 +187,6 @@ aside p {
 
 .subtitle {
     color: #555;
-    text-decoration: none;
     font-variant: small-caps;
     font-weight: 500;
 }
@@ -207,6 +205,13 @@ aside p {
     font-size: .9rem;
 }
 
+.about img {
+    float: left;
+    height: 200px;
+    width: 200px;
+    margin-right: 15px;
+}
+
 .summary .tags {
     padding: 5px 0;
 }
@@ -216,8 +221,7 @@ aside p {
 }
 
 .fp-project, .summary {
-    margin: 0 -32px 0 -32px;
-    padding: 15px 32px;
+    margin-bottom: 30px;
 }
 
 .summary-subtitle {
@@ -229,7 +233,6 @@ aside p {
     display: inline-block;
     padding: 10px 0;
     padding-right: 15px;
-    color: #333;
     font-size: small;
 }
 
