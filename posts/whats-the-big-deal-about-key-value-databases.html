@@ -174,19 +174,21 @@ Missing a database? Let me know!
 
 There is a different kind of key-value store that is a standalone app
 designed for distributed data. This list includes
-[Consul](https://www.consul.io/), likely
-[ZippyDB](https://engineering.fb.com/2021/08/06/core-data/zippydb/),
-and [etcd](https://etcd.io/docs/v3.4/learning/why/). (There's a nice
-comparison table about these databases on etcd page).
-
-It is possibly how [Snowflake uses
-FoundationDB](https://www.snowflake.com/blog/how-foundationdb-powers-snowflake-metadata-forward/)
-but I'm not 100% sure.
+[Consul](https://www.consul.io/),
+[etcd](https://etcd.io/docs/v3.4/learning/why/), likely
+[FoundationDB](https://www.foundationdb.org/), and likely
+[ZippyDB](https://engineering.fb.com/2021/08/06/core-data/zippydb/). (There's
+a nice comparison table about some of these databases on the etcd
+page).
 
 These systems are designed to be used sort of like Redis except for
 that they are persistant and reliable stores. They are designed to
 always be up. For that reason they form the data storage backbone of
 core infrastructure like Kubernetes.
+
+It is possibly how [Snowflake uses
+FoundationDB](https://www.snowflake.com/blog/how-foundationdb-powers-snowflake-metadata-forward/)
+but I'm not 100% sure.
 
 ### Conclusion
 

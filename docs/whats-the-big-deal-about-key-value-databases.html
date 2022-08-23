@@ -163,17 +163,19 @@ TiKV but they mostly seem unmaintained.</p>
 <p>Missing a database? Let me know!</p>
 <h4 id="separately,-distributed-key-value-stores">Separately, distributed key-value stores</h4><p>There is a different kind of key-value store that is a standalone app
 designed for distributed data. This list includes
-<a href="https://www.consul.io/">Consul</a>, likely
-<a href="https://engineering.fb.com/2021/08/06/core-data/zippydb/">ZippyDB</a>,
-and <a href="https://etcd.io/docs/v3.4/learning/why/">etcd</a>. (There's a nice
-comparison table about these databases on etcd page).</p>
-<p>It is possibly how <a href="https://www.snowflake.com/blog/how-foundationdb-powers-snowflake-metadata-forward/">Snowflake uses
-FoundationDB</a>
-but I'm not 100% sure.</p>
+<a href="https://www.consul.io/">Consul</a>,
+<a href="https://etcd.io/docs/v3.4/learning/why/">etcd</a>, likely
+<a href="https://www.foundationdb.org/">FoundationDB</a>, and likely
+<a href="https://engineering.fb.com/2021/08/06/core-data/zippydb/">ZippyDB</a>. (There's
+a nice comparison table about some of these databases on the etcd
+page).</p>
 <p>These systems are designed to be used sort of like Redis except for
 that they are persistant and reliable stores. They are designed to
 always be up. For that reason they form the data storage backbone of
 core infrastructure like Kubernetes.</p>
+<p>It is possibly how <a href="https://www.snowflake.com/blog/how-foundationdb-powers-snowflake-metadata-forward/">Snowflake uses
+FoundationDB</a>
+but I'm not 100% sure.</p>
 <h3 id="conclusion">Conclusion</h3><p>So in this post we saw that databases are extensible. Storage engines
 are often swappable. Dedicated embedded key-value stores allow
 database developers to hand off data storage to a dedicated

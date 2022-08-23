@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 23 Aug 2022 16:43:14 +0000</lastBuildDate><item><title>What's the big deal about embedded key-value databases like RocksDB?</title><link>http://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html</link><description>&lt;p&gt;Let's assume you're familiar with basic SQL databases like PostgreSQL
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 23 Aug 2022 16:45:54 +0000</lastBuildDate><item><title>What's the big deal about embedded key-value databases like RocksDB?</title><link>http://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html</link><description>&lt;p&gt;Let's assume you're familiar with basic SQL databases like PostgreSQL
 and MySQL, and document databases like MongoDB and Elasticsearch. You
 probably know Redis too.&lt;/p&gt;
 &lt;p&gt;But you're hearing more and more about embedded key-value stores like
@@ -113,17 +113,19 @@ TiKV but they mostly seem unmaintained.&lt;/p&gt;
 &lt;p&gt;Missing a database? Let me know!&lt;/p&gt;
 &lt;h4 id="separately,-distributed-key-value-stores"&gt;Separately, distributed key-value stores&lt;/h4&gt;&lt;p&gt;There is a different kind of key-value store that is a standalone app
 designed for distributed data. This list includes
-&lt;a href="https://www.consul.io/"&gt;Consul&lt;/a&gt;, likely
-&lt;a href="https://engineering.fb.com/2021/08/06/core-data/zippydb/"&gt;ZippyDB&lt;/a&gt;,
-and &lt;a href="https://etcd.io/docs/v3.4/learning/why/"&gt;etcd&lt;/a&gt;. (There's a nice
-comparison table about these databases on etcd page).&lt;/p&gt;
-&lt;p&gt;It is possibly how &lt;a href="https://www.snowflake.com/blog/how-foundationdb-powers-snowflake-metadata-forward/"&gt;Snowflake uses
-FoundationDB&lt;/a&gt;
-but I'm not 100% sure.&lt;/p&gt;
+&lt;a href="https://www.consul.io/"&gt;Consul&lt;/a&gt;,
+&lt;a href="https://etcd.io/docs/v3.4/learning/why/"&gt;etcd&lt;/a&gt;, likely
+&lt;a href="https://www.foundationdb.org/"&gt;FoundationDB&lt;/a&gt;, and likely
+&lt;a href="https://engineering.fb.com/2021/08/06/core-data/zippydb/"&gt;ZippyDB&lt;/a&gt;. (There's
+a nice comparison table about some of these databases on the etcd
+page).&lt;/p&gt;
 &lt;p&gt;These systems are designed to be used sort of like Redis except for
 that they are persistant and reliable stores. They are designed to
 always be up. For that reason they form the data storage backbone of
 core infrastructure like Kubernetes.&lt;/p&gt;
+&lt;p&gt;It is possibly how &lt;a href="https://www.snowflake.com/blog/how-foundationdb-powers-snowflake-metadata-forward/"&gt;Snowflake uses
+FoundationDB&lt;/a&gt;
+but I'm not 100% sure.&lt;/p&gt;
 &lt;h3 id="conclusion"&gt;Conclusion&lt;/h3&gt;&lt;p&gt;So in this post we saw that databases are extensible. Storage engines
 are often swappable. Dedicated embedded key-value stores allow
 database developers to hand off data storage to a dedicated
