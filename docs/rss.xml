@@ -1,5 +1,144 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 23 Aug 2022 00:08:49 +0000</lastBuildDate><item><title>SQLite has pretty limited builtin functions</title><link>http://notes.eatonphil.com/2022-08-21-sqlite-limited-builtin-functions.html</link><description>&lt;head&gt;
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 23 Aug 2022 15:54:20 +0000</lastBuildDate><item><title>What's the big deal about embedded key-value databases like FoundationDB ands RocksDB?</title><link>http://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html</link><description>&lt;p&gt;Let's assume you're familiar with basic SQL databases like PostgreSQL
+and MySQL, and document databases like MongoDB and Elasticsearch. You
+probably know Redis too.&lt;/p&gt;
+&lt;p&gt;But you're hearing more and more about embedded key-value stores like
+&lt;a href="http://rocksdb.org/"&gt;RocksDB&lt;/a&gt;,
+&lt;a href="https://github.com/google/leveldb"&gt;LevelDB&lt;/a&gt;,
+&lt;a href="https://github.com/cockroachdb/pebble"&gt;PebbleDB&lt;/a&gt;,
+&lt;a href="https://www.foundationdb.org/"&gt;FoundationDB&lt;/a&gt;,
+&lt;a href="https://tikv.org/"&gt;TiKV&lt;/a&gt;, and so on.&lt;/p&gt;
+&lt;p&gt;What's the big deal? Aren't these just the equivalent of Redis or
+Java's ConcurrentHashMap?&lt;/p&gt;
+&lt;p&gt;Let's take a look.&lt;/p&gt;
+&lt;h3 id="extensible-databases"&gt;Extensible databases&lt;/h3&gt;&lt;p&gt;Over the last 10 years or so (at least), databases have become more
+extensible. MySQL has around &lt;a href="https://dev.mysql.com/doc/refman/8.0/en/storage-engines.html"&gt;10 different open-source storage
+engines&lt;/a&gt;. More
+surely exist in the wild.&lt;/p&gt;
+&lt;p&gt;Mongo supports &lt;a href="https://www.mongodb.com/docs/manual/core/storage-engines/"&gt;multiple storage
+engines&lt;/a&gt;. Relatively
+late, PostgreSQL version 12 added support for &lt;a href="https://www.postgresql.org/docs/current/tableam.html"&gt;pluggable storage
+engines&lt;/a&gt;.&lt;/p&gt;
+&lt;p class="note"&gt;
+  &lt;a href="https://github.com/orioledb/orioledb"&gt;OrioleDB&lt;/a&gt;
+  and &lt;a href="https://www.citusdata.com/blog/2021/03/06/citus-10-columnar-compression-for-postgres/"&gt;Citus
+  10's columnar compression&lt;/a&gt; are two particularly interesting
+  databases making use of PostgreSQL's pluggable storage engine. But
+  since neither use an embedded key-value store, I won't talk about
+  them more in this post.
+&lt;/p&gt;&lt;p&gt;And so on.&lt;/p&gt;
+&lt;h4 id="but-why?"&gt;But why?&lt;/h4&gt;&lt;p&gt;Swapping out storage engines allows you to tune the performance of
+your database. It can allow you to swap out row-oriented storage for
+column-oriented storage (useful for analytics workloads).&lt;/p&gt;
+&lt;p&gt;It can allow you to swap B-Trees (traditional choice) for &lt;a href="http://www.benstopford.com/2015/02/14/log-structured-merge-trees/"&gt;LSM
+Trees&lt;/a&gt;
+(new hotness) as the underlying storage method (useful for optimizing
+write-heavy workloads).&lt;/p&gt;
+&lt;p&gt;And since some storage engines themselves are built on distributed
+consensus (like &lt;a href="https://github.com/apple/foundationdb"&gt;FoundationDB&lt;/a&gt;
+and &lt;a href="https://github.com/tikv/tikv"&gt;TiKV&lt;/a&gt;), it may even allow you to
+turn a non-distributed database into a distributed database.&lt;/p&gt;
+&lt;h3 id="mapping-sql-to-key-value-storage"&gt;Mapping SQL to key-value storage&lt;/h3&gt;&lt;p&gt;But how the heck do you turn SQL, row-oriented data, into key-value
+data?&lt;/p&gt;
+&lt;p&gt;CockroachDB is a SQL database built on &lt;a href="https://www.cockroachlabs.com/blog/pebble-rocksdb-kv-store/"&gt;RocksDB originally and now
+their own LevelDB-inspired
+database&lt;/a&gt;
+called &lt;a href="https://github.com/cockroachdb/pebble"&gt;PebbleDB&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;The reason I mention that here is because they maintain a great doc
+about &lt;a href="https://github.com/cockroachdb/cockroach/blob/master/docs/tech-notes/encoding.md"&gt;their method of encoding rows to key-value
+form&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;To simplify that doc though you can imagine mapping each row
+to a key-value form like this:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs javascript"&gt;${TABLE_IDENTIFIER}_${PRIMARY_KEY}_${ROW_IDENTIFIER}: ${ENCODED_VALUE}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Embedded key-value stores almost always support efficient scanning of
+rows by a key-prefix. This means that you can efficiently grab all rows
+within a table by prefix-scanning on the table identifier. If you also
+include a primary key value along with the table identifier prefix,
+you get efficient primary key lookup.&lt;/p&gt;
+&lt;p&gt;Even though the key space is flat.&lt;/p&gt;
+&lt;p&gt;For the encoded value you can pick any encoding scheme; as
+inefficient as JSON or as efficient as some binary scheme like
+Protocol Buffers or Parquet.&lt;/p&gt;
+&lt;p class="note"&gt;
+  Thanks to &lt;a href="https://twitter.com/justinjaffray"&gt;Justin Jaffray&lt;/a&gt; for
+  pointing me at the CockroachDB doc and confirming some of my thoughts
+  on encoding strategies.
+&lt;/p&gt;&lt;h4 id="tutorials"&gt;Tutorials&lt;/h4&gt;&lt;p&gt;I've written a couple of tutorials on building a database. They build on
+top of embedded key-value stores. If you're interested in seeing
+minimal code walkthroughs of how this process can work, check these
+posts out:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://notes.eatonphil.com/distributed-postgres.html"&gt;Let's build a distributed Postgres proof of concept&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://notes.eatonphil.com/documentdb.html"&gt;Writing a document database from scratch in Go: Lucene-like filters and indexes&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id="major-aspects-of-key-value-stores"&gt;Major aspects of key-value stores&lt;/h3&gt;&lt;p&gt;Now that you understand how a database can map to a key-value store,
+let's take a look at the particular properties that distinguish all
+these key-value stores from systems like Redis and Memcached.&lt;/p&gt;
+&lt;h4 id="reliable-storage"&gt;Reliable storage&lt;/h4&gt;&lt;p&gt;Maybe the single most important thing a storage system does is actual
+store data reliably. You can't just &lt;code&gt;open()&lt;/code&gt; and &lt;code&gt;write()&lt;/code&gt;. To quote
+Dan Luu, &lt;a href="https://wiki.postgresql.org/wiki/Fsync_Errors"&gt;files a
+hard&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Deferring storage correctness to a dedicated system means database
+developers can worry about other aspects of database development.&lt;/p&gt;
+&lt;h4 id="embeddable"&gt;Embeddable&lt;/h4&gt;&lt;p&gt;Along with reliable storage is the fact that the storage needs to run
+in process. Redis, for example, is not embeddable. There are many
+other things on top of the storage that need to happen in a high-level
+database and RPC calls between processes for storage is an unnecessary
+overhead.&lt;/p&gt;
+&lt;h4 id="efficient-prefix-scans"&gt;Efficient prefix scans&lt;/h4&gt;&lt;p&gt;As mentioned above, support for scans is pretty important for how
+indexes and namespaces (tables in SQL) get mapped to key-value
+queries.&lt;/p&gt;
+&lt;p&gt;You shouldn't need to look through all tables in the flat key space to
+find the rows for one table.&lt;/p&gt;
+&lt;h4 id="additional-aspects"&gt;Additional aspects&lt;/h4&gt;&lt;p&gt;Different stores provide different useful aspects like performance,
+builtin distributed consensus, builtin transactions, and so on.&lt;/p&gt;
+&lt;h3 id="survey-of-databases-built-on-embedded-key-value-stores"&gt;Survey of databases built on embedded key-value stores&lt;/h3&gt;&lt;p&gt;Lastly, let's take a look at a few databases that build on top of
+embedded key-value stores.&lt;/p&gt;
+&lt;h4 id="document-databases-built-on-key-value-stores"&gt;Document databases built on key-value stores&lt;/h4&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://www.percona.com/doc/percona-server-for-mongodb/3.4/mongorocks.html"&gt;MongoRocks&lt;/a&gt; (Mongo on RocksDB)&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://surrealdb.com/"&gt;SurrealDB&lt;/a&gt; (TiKV)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id="sql-databases-built-on-key-value-stores"&gt;SQL databases built on key-value stores&lt;/h4&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="http://myrocks.io/"&gt;MyRocks&lt;/a&gt; (MySQL on RocksDB)&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.cockroachlabs.com"&gt;CockroachDB&lt;/a&gt; (RocksDB originally, now their own PebbleDB)&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://en.pingcap.com/"&gt;TiDB&lt;/a&gt; (TiKV)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id="other-databases-built-on-key-value-stores"&gt;Other databases built on key-value stores&lt;/h4&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://engineering.fb.com/2021/08/06/core-data/zippydb/"&gt;ZippyDB&lt;/a&gt; (Redis-compatible database on RocksDB)&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://thenewstack.io/instagram-supercharges-cassandra-pluggable-rocksdb-storage-engine/"&gt;Rocksandra&lt;/a&gt; (Cassandra on RocksDB)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;a href="https://tikv.org/"&gt;TiKV&lt;/a&gt; lists a few more database built on top of
+TiKV but they mostly seem unmaintained.&lt;/p&gt;
+&lt;p&gt;Missing a database? Let me know!&lt;/p&gt;
+&lt;h4 id="separately,-distributed-key-value-stores"&gt;Separately, distributed key-value stores&lt;/h4&gt;&lt;p&gt;There is a different kind of key-value store that is a standalone app
+designed for distributed data. This list includes
+&lt;a href="https://www.consul.io/"&gt;Consul&lt;/a&gt;, likely
+&lt;a href="https://engineering.fb.com/2021/08/06/core-data/zippydb/"&gt;ZippyDB&lt;/a&gt;,
+and &lt;a href="https://etcd.io/docs/v3.4/learning/why/"&gt;etcd&lt;/a&gt;. (There's a nice
+comparison table about these databases on etcd page).&lt;/p&gt;
+&lt;p&gt;It is possibly how &lt;a href="https://www.snowflake.com/blog/how-foundationdb-powers-snowflake-metadata-forward/"&gt;Snowflake uses
+FoundationDB&lt;/a&gt;
+but I'm not 100% sure.&lt;/p&gt;
+&lt;p&gt;These systems are designed to be used sort of like Redis except for
+that they are persistant and reliable stores. They are designed to
+always be up. For that reason they form the data storage backbone of
+core infrastructure like Kubernetes.&lt;/p&gt;
+&lt;h3 id="conclusion"&gt;Conclusion&lt;/h3&gt;&lt;p&gt;So in this post we saw that databases are extensible. Storage engines
+are often swappable. Dedicated embedded key-value stores allow
+database developers to hand off data storage to a dedicated
+library. Different key-value stores have different performance
+characteristics that help developers and operators tune a database for
+their workload.&lt;/p&gt;
+&lt;p&gt;Embedded key-value stores are a great foundation for all kinds of
+databases; SQL databases like CockroachDB, document databases like
+Mongo, wide-store databases like Cassandra, and metadata databases
+like (how some people use) FoundationDB.&lt;/p&gt;
+&lt;p&gt;This is a complex topic with many, many variations of
+systems. Hopefully this was a useful introduction.&lt;/p&gt;
+&lt;p&gt;Did I get something wrong? Or miss something important? Let me
+know. :)&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html</guid><pubDate>Tue, 23 Aug 2022 00:00:00 +0000</pubDate></item><item><title>SQLite has pretty limited builtin functions</title><link>http://notes.eatonphil.com/2022-08-21-sqlite-limited-builtin-functions.html</link><description>&lt;head&gt;
     &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2022-08-21-sqlite-limited-builtin-functions.html'" /&gt;
 &lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
 &lt;a href="https://datastation.multiprocess.io/blog/2022-08-21-sqlite-limited-builtin-functions.html"&gt;here&lt;/a&gt;

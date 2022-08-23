@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>What's the big deal about embedded key-value databases like FoundationDB ands RocksDB? | notes.eatonphil.com</title>
+    <meta name="description" content="What's the big deal about embedded key-value databases like FoundationDB ands RocksDB?" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <div class="row">
+	    <a href="/about.html" class="sm-link">
+              About
+            </a>
+	    <a href="/favorites.html" class="sm-link">
+              Favorites
+            </a>
+	    <a href="/" class="sm-link">
+              Archive
+            </a>
+	    <a href="/rss.xml" class="sm-link">
+              RSS
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+
+          <h2>August 23, 2022</h2>
+          <h1>What's the big deal about embedded key-value databases like FoundationDB ands RocksDB?</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/databases.html" class="tag">databases</a><a href="/tags/postgres.html" class="tag">postgres</a><a href="/tags/mysql.html" class="tag">mysql</a></div>
+          </div>
+	</div>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="col-6">
+        <p>Let's assume you're familiar with basic SQL databases like PostgreSQL
+and MySQL, and document databases like MongoDB and Elasticsearch. You
+probably know Redis too.</p>
+<p>But you're hearing more and more about embedded key-value stores like
+<a href="http://rocksdb.org/">RocksDB</a>,
+<a href="https://github.com/google/leveldb">LevelDB</a>,
+<a href="https://github.com/cockroachdb/pebble">PebbleDB</a>,
+<a href="https://www.foundationdb.org/">FoundationDB</a>,
+<a href="https://tikv.org/">TiKV</a>, and so on.</p>
+<p>What's the big deal? Aren't these just the equivalent of Redis or
+Java's ConcurrentHashMap?</p>
+<p>Let's take a look.</p>
+<h3 id="extensible-databases">Extensible databases</h3><p>Over the last 10 years or so (at least), databases have become more
+extensible. MySQL has around <a href="https://dev.mysql.com/doc/refman/8.0/en/storage-engines.html">10 different open-source storage
+engines</a>. More
+surely exist in the wild.</p>
+<p>Mongo supports <a href="https://www.mongodb.com/docs/manual/core/storage-engines/">multiple storage
+engines</a>. Relatively
+late, PostgreSQL version 12 added support for <a href="https://www.postgresql.org/docs/current/tableam.html">pluggable storage
+engines</a>.</p>
+<p class="note">
+  <a href="https://github.com/orioledb/orioledb">OrioleDB</a>
+  and <a href="https://www.citusdata.com/blog/2021/03/06/citus-10-columnar-compression-for-postgres/">Citus
+  10's columnar compression</a> are two particularly interesting
+  databases making use of PostgreSQL's pluggable storage engine. But
+  since neither use an embedded key-value store, I won't talk about
+  them more in this post.
+</p><p>And so on.</p>
+<h4 id="but-why?">But why?</h4><p>Swapping out storage engines allows you to tune the performance of
+your database. It can allow you to swap out row-oriented storage for
+column-oriented storage (useful for analytics workloads).</p>
+<p>It can allow you to swap B-Trees (traditional choice) for <a href="http://www.benstopford.com/2015/02/14/log-structured-merge-trees/">LSM
+Trees</a>
+(new hotness) as the underlying storage method (useful for optimizing
+write-heavy workloads).</p>
+<p>And since some storage engines themselves are built on distributed
+consensus (like <a href="https://github.com/apple/foundationdb">FoundationDB</a>
+and <a href="https://github.com/tikv/tikv">TiKV</a>), it may even allow you to
+turn a non-distributed database into a distributed database.</p>
+<h3 id="mapping-sql-to-key-value-storage">Mapping SQL to key-value storage</h3><p>But how the heck do you turn SQL, row-oriented data, into key-value
+data?</p>
+<p>CockroachDB is a SQL database built on <a href="https://www.cockroachlabs.com/blog/pebble-rocksdb-kv-store/">RocksDB originally and now
+their own LevelDB-inspired
+database</a>
+called <a href="https://github.com/cockroachdb/pebble">PebbleDB</a>.</p>
+<p>The reason I mention that here is because they maintain a great doc
+about <a href="https://github.com/cockroachdb/cockroach/blob/master/docs/tech-notes/encoding.md">their method of encoding rows to key-value
+form</a>.</p>
+<p>To simplify that doc though you can imagine mapping each row
+to a key-value form like this:</p>
+<pre><code class="hljs javascript">${TABLE_IDENTIFIER}_${PRIMARY_KEY}_${ROW_IDENTIFIER}: ${ENCODED_VALUE}
+</code></pre>
+<p>Embedded key-value stores almost always support efficient scanning of
+rows by a key-prefix. This means that you can efficiently grab all rows
+within a table by prefix-scanning on the table identifier. If you also
+include a primary key value along with the table identifier prefix,
+you get efficient primary key lookup.</p>
+<p>Even though the key space is flat.</p>
+<p>For the encoded value you can pick any encoding scheme; as
+inefficient as JSON or as efficient as some binary scheme like
+Protocol Buffers or Parquet.</p>
+<p class="note">
+  Thanks to <a href="https://twitter.com/justinjaffray">Justin Jaffray</a> for
+  pointing me at the CockroachDB doc and confirming some of my thoughts
+  on encoding strategies.
+</p><h4 id="tutorials">Tutorials</h4><p>I've written a couple of tutorials on building a database. They build on
+top of embedded key-value stores. If you're interested in seeing
+minimal code walkthroughs of how this process can work, check these
+posts out:</p>
+<ul>
+<li><a href="https://notes.eatonphil.com/distributed-postgres.html">Let's build a distributed Postgres proof of concept</a></li>
+<li><a href="https://notes.eatonphil.com/documentdb.html">Writing a document database from scratch in Go: Lucene-like filters and indexes</a></li>
+</ul>
+<h3 id="major-aspects-of-key-value-stores">Major aspects of key-value stores</h3><p>Now that you understand how a database can map to a key-value store,
+let's take a look at the particular properties that distinguish all
+these key-value stores from systems like Redis and Memcached.</p>
+<h4 id="reliable-storage">Reliable storage</h4><p>Maybe the single most important thing a storage system does is actual
+store data reliably. You can't just <code>open()</code> and <code>write()</code>. To quote
+Dan Luu, <a href="https://wiki.postgresql.org/wiki/Fsync_Errors">files a
+hard</a>.</p>
+<p>Deferring storage correctness to a dedicated system means database
+developers can worry about other aspects of database development.</p>
+<h4 id="embeddable">Embeddable</h4><p>Along with reliable storage is the fact that the storage needs to run
+in process. Redis, for example, is not embeddable. There are many
+other things on top of the storage that need to happen in a high-level
+database and RPC calls between processes for storage is an unnecessary
+overhead.</p>
+<h4 id="efficient-prefix-scans">Efficient prefix scans</h4><p>As mentioned above, support for scans is pretty important for how
+indexes and namespaces (tables in SQL) get mapped to key-value
+queries.</p>
+<p>You shouldn't need to look through all tables in the flat key space to
+find the rows for one table.</p>
+<h4 id="additional-aspects">Additional aspects</h4><p>Different stores provide different useful aspects like performance,
+builtin distributed consensus, builtin transactions, and so on.</p>
+<h3 id="survey-of-databases-built-on-embedded-key-value-stores">Survey of databases built on embedded key-value stores</h3><p>Lastly, let's take a look at a few databases that build on top of
+embedded key-value stores.</p>
+<h4 id="document-databases-built-on-key-value-stores">Document databases built on key-value stores</h4><ul>
+<li><a href="https://www.percona.com/doc/percona-server-for-mongodb/3.4/mongorocks.html">MongoRocks</a> (Mongo on RocksDB)</li>
+<li><a href="https://surrealdb.com/">SurrealDB</a> (TiKV)</li>
+</ul>
+<h4 id="sql-databases-built-on-key-value-stores">SQL databases built on key-value stores</h4><ul>
+<li><a href="http://myrocks.io/">MyRocks</a> (MySQL on RocksDB)</li>
+<li><a href="https://www.cockroachlabs.com">CockroachDB</a> (RocksDB originally, now their own PebbleDB)</li>
+<li><a href="https://en.pingcap.com/">TiDB</a> (TiKV)</li>
+</ul>
+<h4 id="other-databases-built-on-key-value-stores">Other databases built on key-value stores</h4><ul>
+<li><a href="https://engineering.fb.com/2021/08/06/core-data/zippydb/">ZippyDB</a> (Redis-compatible database on RocksDB)</li>
+<li><a href="https://thenewstack.io/instagram-supercharges-cassandra-pluggable-rocksdb-storage-engine/">Rocksandra</a> (Cassandra on RocksDB)</li>
+</ul>
+<p><a href="https://tikv.org/">TiKV</a> lists a few more database built on top of
+TiKV but they mostly seem unmaintained.</p>
+<p>Missing a database? Let me know!</p>
+<h4 id="separately,-distributed-key-value-stores">Separately, distributed key-value stores</h4><p>There is a different kind of key-value store that is a standalone app
+designed for distributed data. This list includes
+<a href="https://www.consul.io/">Consul</a>, likely
+<a href="https://engineering.fb.com/2021/08/06/core-data/zippydb/">ZippyDB</a>,
+and <a href="https://etcd.io/docs/v3.4/learning/why/">etcd</a>. (There's a nice
+comparison table about these databases on etcd page).</p>
+<p>It is possibly how <a href="https://www.snowflake.com/blog/how-foundationdb-powers-snowflake-metadata-forward/">Snowflake uses
+FoundationDB</a>
+but I'm not 100% sure.</p>
+<p>These systems are designed to be used sort of like Redis except for
+that they are persistant and reliable stores. They are designed to
+always be up. For that reason they form the data storage backbone of
+core infrastructure like Kubernetes.</p>
+<h3 id="conclusion">Conclusion</h3><p>So in this post we saw that databases are extensible. Storage engines
+are often swappable. Dedicated embedded key-value stores allow
+database developers to hand off data storage to a dedicated
+library. Different key-value stores have different performance
+characteristics that help developers and operators tune a database for
+their workload.</p>
+<p>Embedded key-value stores are a great foundation for all kinds of
+databases; SQL databases like CockroachDB, document databases like
+Mongo, wide-store databases like Cassandra, and metadata databases
+like (how some people use) FoundationDB.</p>
+<p>This is a complex topic with many, many variations of
+systems. Hopefully this was a useful introduction.</p>
+<p>Did I get something wrong? Or miss something important? Let me
+know. :)</p>
+<style>.feedback{display:initial;}</style>
+	<div class="feedback">
+	  <h4>Feedback</h4>
+	  <p><small>As always,
+	  please <a href="mailto:phil@eatonphil.com">email</a>
+	  or <a href="https://twitter.com/phil_eaton">tweet me</a>
+	    with questions, corrections, or ideas!</small></p>
+	</div>
+      </div>
+    </div>
+
+    <footer>
+      <div class="container">
+	<div>
+	  <div class="row">
+	    <a href="/about.html" class="sm-link">
+              About
+            </a>
+	    <a href="/favorites.html" class="sm-link">
+              Favorites
+            </a>
+	    <a href="/" class="sm-link">
+              Archive
+            </a>
+	    <a href="/rss.xml" class="sm-link">
+              RSS
+            </a>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+	  <div class="feedback">
+	    <p>Frequent Topics</p>
+	    <div class="tags"><a href="/tags/javascript.html" class="tag">javascript (24)</a><a href="/tags/parsing.html" class="tag">parsing (18)</a><a href="/tags/postgres.html" class="tag">postgres (13)</a><a href="/tags/golang.html" class="tag">golang (13)</a><a href="/tags/compilers.html" class="tag">compilers (13)</a><a href="/tags/databases.html" class="tag">databases (12)</a><a href="/tags/sql.html" class="tag">sql (9)</a><a href="/tags/python.html" class="tag">python (8)</a><a href="/tags/management.html" class="tag">management (8)</a><a href="/tags/lisp.html" class="tag">lisp (8)</a><a href="/tags/interpreters.html" class="tag">interpreters (8)</a><a href="/tags/json.html" class="tag">json (7)</a><a href="/tags/go.html" class="tag">go (6)</a><a href="/tags/books.html" class="tag">books (6)</a><a href="/tags/x86-amd64.html" class="tag">x86/amd64 (5)</a><a href="/tags/typescript.html" class="tag">typescript (5)</a><a href="/tags/linux.html" class="tag">linux (5)</a><a href="/tags/communication.html" class="tag">communication (5)</a><a href="/tags/scheme.html" class="tag">scheme (4)</a><a href="/tags/learning.html" class="tag">learning (4)</a></div>
+	  </div>
+	</div>
+      </div>
+    </footer>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>
