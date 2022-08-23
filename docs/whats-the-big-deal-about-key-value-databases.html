@@ -3,8 +3,8 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     
-    <title>What's the big deal about embedded key-value databases like RocksDB? | notes.eatonphil.com</title>
-    <meta name="description" content="What's the big deal about embedded key-value databases like RocksDB?" />
+    <title>What's the big deal about key-value databases like FoundationDB and RocksDB? | notes.eatonphil.com</title>
+    <meta name="description" content="What's the big deal about key-value databases like FoundationDB and RocksDB?" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
@@ -39,7 +39,7 @@
 	  </div>
 
           <h2>August 23, 2022</h2>
-          <h1>What's the big deal about embedded key-value databases like RocksDB?</h1>
+          <h1>What's the big deal about key-value databases like FoundationDB and RocksDB?</h1>
           <div class="row" style="padding-bottom: 5px">
             <div class="tags"><a href="/tags/databases.html" class="tag">databases</a><a href="/tags/postgres.html" class="tag">postgres</a><a href="/tags/mysql.html" class="tag">mysql</a></div>
           </div>
@@ -55,8 +55,10 @@ probably know Redis too.</p>
 <p>But you're hearing more and more about embedded key-value stores like
 <a href="http://rocksdb.org/">RocksDB</a>,
 <a href="https://github.com/google/leveldb">LevelDB</a>,
-<a href="https://github.com/cockroachdb/pebble">PebbleDB</a>,
-<a href="https://tikv.org/">TiKV</a>, and so on.</p>
+<a href="https://github.com/cockroachdb/pebble">PebbleDB</a>, and so on. And
+you're hearing about distributed key-value databases like
+<a href="https://www.foundationdb.org/">FoundationDB</a> and
+<a href="https://tikv.org/">TiKV</a>.</p>
 <p>What's the big deal? Aren't these just the equivalent of Redis or
 Java's ConcurrentHashMap?</p>
 <p>Let's take a look.</p>
@@ -144,22 +146,22 @@ find the rows for one table.</p>
 builtin distributed consensus, builtin transactions, and so on.</p>
 <h3 id="survey-of-databases-built-on-embedded-key-value-stores">Survey of databases built on embedded key-value stores</h3><p>Lastly, let's take a look at a few databases that build on top of
 embedded key-value stores.</p>
+<p>Note that some of them are not the primary version of the database
+(e.g. MyRocks vs MySQL, MongoRocks vs Mongo). Some of them are the
+primary version (e.g. CockroachDB, YugabyteDB).</p>
 <h4 id="document-databases-built-on-key-value-stores">Document databases built on key-value stores</h4><ul>
 <li><a href="https://www.percona.com/doc/percona-server-for-mongodb/3.4/mongorocks.html">MongoRocks</a> (Mongo on RocksDB)</li>
-<li><a href="https://surrealdb.com/">SurrealDB</a> (TiKV)</li>
 </ul>
 <h4 id="sql-databases-built-on-key-value-stores">SQL databases built on key-value stores</h4><ul>
 <li><a href="http://myrocks.io/">MyRocks</a> (MySQL on RocksDB)</li>
 <li><a href="https://www.cockroachlabs.com">CockroachDB</a> (RocksDB originally, now their own PebbleDB)</li>
-<li><a href="https://en.pingcap.com/">TiDB</a> (TiKV)</li>
+<li><a href="https://www.yugabyte.com/blog/how-we-built-a-high-performance-document-store-on-rocksdb/">YugabyteDB</a> (on DocDB on RocksDB)</li>
 </ul>
 <h4 id="other-databases-built-on-key-value-stores">Other databases built on key-value stores</h4><ul>
 <li><a href="https://engineering.fb.com/2021/08/06/core-data/zippydb/">ZippyDB</a> (Redis-compatible database on RocksDB)</li>
 <li><a href="https://thenewstack.io/instagram-supercharges-cassandra-pluggable-rocksdb-storage-engine/">Rocksandra</a> (Cassandra on RocksDB)</li>
 <li><a href="https://redis.com/blog/hood-redis-enterprise-flash-database-architecture/">Redis Enterprise Flash</a> (Redis on RocksDB)</li>
 </ul>
-<p><a href="https://tikv.org/">TiKV</a> lists a few more database built on top of
-TiKV but they mostly seem unmaintained.</p>
 <p>Missing a database? Let me know!</p>
 <h4 id="separately,-distributed-key-value-stores">Separately, distributed key-value stores</h4><p>There is a different kind of key-value store that is a standalone app
 designed for distributed data. This list includes
@@ -176,6 +178,11 @@ core infrastructure like Kubernetes.</p>
 <p>It is possibly how <a href="https://www.snowflake.com/blog/how-foundationdb-powers-snowflake-metadata-forward/">Snowflake uses
 FoundationDB</a>
 but I'm not 100% sure.</p>
+<p>TiKV is not an embedded key-value database but it's not being used the
+same way etcd/consul are as far as I can tell.</p>
+<p>Maybe FoundationDB and TiKV deserve their own new category.</p>
+<p>But in general these databases have an RPC API that you communicate
+with over TCP. They are not generally embedded.</p>
 <h3 id="conclusion">Conclusion</h3><p>So in this post we saw that databases are extensible. Storage engines
 are often swappable. Dedicated embedded key-value stores allow
 database developers to hand off data storage to a dedicated
@@ -188,12 +195,16 @@ Mongo, wide-store databases like Cassandra, and caching databases like
 ZippyDB or Redis Enterprise Flash.</p>
 <p>This is a complex topic with many, many variations of
 systems. Hopefully this was a useful introduction.</p>
+<p>Overall if you're not a database developer and you're not running
+databases at a massive scale, you can probably ignore the details of
+the storage layer.</p>
 <p>Did I get something wrong? Or miss something important? Let me
 know. :)</p>
 <h3 id="corrections">Corrections</h3><ul>
 <li>An earlier version of this post suggested that FoundationDB was
 embedded. It is not. Thanks <a href="https://lobste.rs/s/avljlh/what_s_big_deal_about_embedded_key_value#c_rx0oid">adaszko on Lobsters for
 correcting</a>.</li>
+<li>An earlier version of this post suggested that TiKV was embedded. It is not. Thanks <a href="https://news.ycombinator.com/user?id=eis">eis on Hacker News</a>.</li>
 </ul>
 <p><blockquote class="twitter-tweet"><p lang="en" dir="ltr">What&#39;s the big deal about embedded key-value databases like FoundationDB ands RocksDB?<br><br>I wrote a new blog post that might give a little context. :)<a href="https://t.co/kNFM1hVGx6">https://t.co/kNFM1hVGx6</a> <a href="https://t.co/H4SouStZHk">pic.twitter.com/H4SouStZHk</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1562106582544039937?ref_src=twsrc%5Etfw">August 23, 2022</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
 <style>.feedback{display:initial;}</style>

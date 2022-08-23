@@ -1,4 +1,4 @@
-# What's the big deal about embedded key-value databases like RocksDB?
+# What's the big deal about key-value databases like FoundationDB and RocksDB?
 ## August 23, 2022
 ###### databases,postgres,mysql
 
@@ -9,8 +9,10 @@ probably know Redis too.
 But you're hearing more and more about embedded key-value stores like
 [RocksDB](http://rocksdb.org/),
 [LevelDB](https://github.com/google/leveldb),
-[PebbleDB](https://github.com/cockroachdb/pebble),
-[TiKV](https://tikv.org/), and so on.
+[PebbleDB](https://github.com/cockroachdb/pebble), and so on. And
+you're hearing about distributed key-value databases like
+[FoundationDB](https://www.foundationdb.org/) and
+[TiKV](https://tikv.org/).
 
 What's the big deal? Aren't these just the equivalent of Redis or
 Java's ConcurrentHashMap?
@@ -148,25 +150,25 @@ builtin distributed consensus, builtin transactions, and so on.
 Lastly, let's take a look at a few databases that build on top of
 embedded key-value stores.
 
+Note that some of them are not the primary version of the database
+(e.g. MyRocks vs MySQL, MongoRocks vs Mongo). Some of them are the
+primary version (e.g. CockroachDB, YugabyteDB).
+
 #### Document databases built on key-value stores
 
 * [MongoRocks](https://www.percona.com/doc/percona-server-for-mongodb/3.4/mongorocks.html) (Mongo on RocksDB)
-* [SurrealDB](https://surrealdb.com/) (TiKV)
 
 #### SQL databases built on key-value stores
 
 * [MyRocks](http://myrocks.io/) (MySQL on RocksDB)
 * [CockroachDB](https://www.cockroachlabs.com) (RocksDB originally, now their own PebbleDB)
-* [TiDB](https://en.pingcap.com/) (TiKV)
+* [YugabyteDB](https://www.yugabyte.com/blog/how-we-built-a-high-performance-document-store-on-rocksdb/) (on DocDB on RocksDB)
 
 #### Other databases built on key-value stores
 
 * [ZippyDB](https://engineering.fb.com/2021/08/06/core-data/zippydb/) (Redis-compatible database on RocksDB)
 * [Rocksandra](https://thenewstack.io/instagram-supercharges-cassandra-pluggable-rocksdb-storage-engine/) (Cassandra on RocksDB)
 * [Redis Enterprise Flash](https://redis.com/blog/hood-redis-enterprise-flash-database-architecture/) (Redis on RocksDB)
-
-[TiKV](https://tikv.org/) lists a few more database built on top of
-TiKV but they mostly seem unmaintained.
 
 Missing a database? Let me know!
 
@@ -190,6 +192,14 @@ It is possibly how [Snowflake uses
 FoundationDB](https://www.snowflake.com/blog/how-foundationdb-powers-snowflake-metadata-forward/)
 but I'm not 100% sure.
 
+TiKV is not an embedded key-value database but it's not being used the
+same way etcd/consul are as far as I can tell.
+
+Maybe FoundationDB and TiKV deserve their own new category.
+
+But in general these databases have an RPC API that you communicate
+with over TCP. They are not generally embedded.
+
 ### Conclusion
 
 So in this post we saw that databases are extensible. Storage engines
@@ -207,6 +217,10 @@ ZippyDB or Redis Enterprise Flash.
 This is a complex topic with many, many variations of
 systems. Hopefully this was a useful introduction.
 
+Overall if you're not a database developer and you're not running
+databases at a massive scale, you can probably ignore the details of
+the storage layer.
+
 Did I get something wrong? Or miss something important? Let me
 know. :)
 
@@ -215,5 +229,6 @@ know. :)
 * An earlier version of this post suggested that FoundationDB was
 embedded. It is not. Thanks [adaszko on Lobsters for
 correcting](https://lobste.rs/s/avljlh/what_s_big_deal_about_embedded_key_value#c_rx0oid).
+* An earlier version of this post suggested that TiKV was embedded. It is not. Thanks [eis on Hacker News](https://news.ycombinator.com/user?id=eis).
 
 <blockquote class="twitter-tweet"><p lang="en" dir="ltr">What&#39;s the big deal about embedded key-value databases like FoundationDB ands RocksDB?<br><br>I wrote a new blog post that might give a little context. :)<a href="https://t.co/kNFM1hVGx6">https://t.co/kNFM1hVGx6</a> <a href="https://t.co/H4SouStZHk">pic.twitter.com/H4SouStZHk</a></p>&mdash; Phil Eaton (@phil_eaton) <a href="https://twitter.com/phil_eaton/status/1562106582544039937?ref_src=twsrc%5Etfw">August 23, 2022</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
