@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 23 Aug 2022 16:20:19 +0000</lastBuildDate><item><title>What's the big deal about embedded key-value databases like RocksDB?</title><link>http://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html</link><description>&lt;p&gt;Let's assume you're familiar with basic SQL databases like PostgreSQL
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 23 Aug 2022 16:23:46 +0000</lastBuildDate><item><title>What's the big deal about embedded key-value databases like RocksDB?</title><link>http://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html</link><description>&lt;p&gt;Let's assume you're familiar with basic SQL databases like PostgreSQL
 and MySQL, and document databases like MongoDB and Elasticsearch. You
 probably know Redis too.&lt;/p&gt;
 &lt;p&gt;But you're hearing more and more about embedded key-value stores like
@@ -137,6 +137,11 @@ like (how some people use) FoundationDB.&lt;/p&gt;
 systems. Hopefully this was a useful introduction.&lt;/p&gt;
 &lt;p&gt;Did I get something wrong? Or miss something important? Let me
 know. :)&lt;/p&gt;
+&lt;h3 id="corrections"&gt;Corrections&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;An earlier version of this post suggested that FoundationDB was
+embedded. It is not. Thanks &lt;a href="https://lobste.rs/s/avljlh/what_s_big_deal_about_embedded_key_value#c_rx0oid"&gt;adaszko on Lobsters for
+correcting&lt;/a&gt;.&lt;/li&gt;
+&lt;/ul&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;What&amp;#39;s the big deal about embedded key-value databases like FoundationDB ands RocksDB?&lt;br&gt;&lt;br&gt;I wrote a new blog post that might give a little context. :)&lt;a href="https://t.co/kNFM1hVGx6"&gt;https://t.co/kNFM1hVGx6&lt;/a&gt; &lt;a href="https://t.co/H4SouStZHk"&gt;pic.twitter.com/H4SouStZHk&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1562106582544039937?ref_src=twsrc%5Etfw"&gt;August 23, 2022&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html</guid><pubDate>Tue, 23 Aug 2022 00:00:00 +0000</pubDate></item><item><title>SQLite has pretty limited builtin functions</title><link>http://notes.eatonphil.com/2022-08-21-sqlite-limited-builtin-functions.html</link><description>&lt;head&gt;
     &lt;meta http-equiv="refresh" content="4;URL='https://datastation.multiprocess.io/blog/2022-08-21-sqlite-limited-builtin-functions.html'" /&gt;
