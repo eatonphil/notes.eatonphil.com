@@ -137,13 +137,17 @@ As mentioned above, support for scans is pretty important for how
 indexes and namespaces (tables in SQL) get mapped to key-value
 queries.
 
-You shouldn't need to look through all tables in the flat key space to
+You shouldn't need to look through all table rows in the flat key space to
 find the rows for one table.
 
 #### Additional aspects
 
-Different stores provide different useful aspects like performance,
-builtin distributed consensus, builtin transactions, and so on.
+The above isn't a complete list. Different stores provide different
+useful aspects like improved performance on certain workloads/in
+certain environments, builtin transactions, and so on.
+
+And sometimes it's helpful just to have an embedded store in your
+language rather than going through a foreign-function interface.
 
 ### Survey of databases built on embedded key-value stores
 
@@ -163,12 +167,16 @@ primary version (e.g. CockroachDB, YugabyteDB).
 * [MyRocks](http://myrocks.io/) (MySQL on RocksDB)
 * [CockroachDB](https://www.cockroachlabs.com) (RocksDB originally, now their own PebbleDB)
 * [YugabyteDB](https://www.yugabyte.com/blog/how-we-built-a-high-performance-document-store-on-rocksdb/) (on DocDB on RocksDB)
+* [Apache Ignite](https://www.gridgain.com/resources/blog/apache-ignite-3-alpha-3-apache-calcite-raft-and-lsm-tree) (Calcite on RocksDB)
+
+#### Redis-compatible databases built on key-value stores
+
+* [ZippyDB](https://engineering.fb.com/2021/08/06/core-data/zippydb/) (Redis-compatible database on RocksDB)
+* [Redis Enterprise Flash](https://redis.com/blog/hood-redis-enterprise-flash-database-architecture/) (Redis on RocksDB)
 
 #### Other databases built on key-value stores
 
-* [ZippyDB](https://engineering.fb.com/2021/08/06/core-data/zippydb/) (Redis-compatible database on RocksDB)
 * [Rocksandra](https://thenewstack.io/instagram-supercharges-cassandra-pluggable-rocksdb-storage-engine/) (Cassandra on RocksDB)
-* [Redis Enterprise Flash](https://redis.com/blog/hood-redis-enterprise-flash-database-architecture/) (Redis on RocksDB)
 
 Missing a database? Let me know!
 
@@ -185,20 +193,23 @@ page).
 
 These systems are designed to be used sort of like Redis except for
 that they are persistant and reliable stores. They are designed to
-always be up. For that reason they form the data storage backbone of
-core infrastructure like Kubernetes.
+always be up and always correct. For that reason they form the data
+storage backbone of core infrastructure like Kubernetes.
 
 It is possibly how [Snowflake uses
 FoundationDB](https://www.snowflake.com/blog/how-foundationdb-powers-snowflake-metadata-forward/)
 but I'm not 100% sure.
 
 TiKV is not an embedded key-value database but it's not being used the
-same way etcd/consul are as far as I can tell.
+same way etcd/consul are as far as I can tell since it forms the
+backbone of [TiDB](https://en.pingcap.com/) an HTAP (hybrid OLAP/OLTP)
+SQL database.
 
 Maybe FoundationDB and TiKV deserve their own new category.
 
 But in general these databases have an RPC API that you communicate
-with over TCP. They are not generally embedded.
+with over TCP. They are not generally embedded. You manage their
+process(es) separately.
 
 ### Conclusion
 
