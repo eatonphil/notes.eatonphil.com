@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 23 Aug 2022 16:23:46 +0000</lastBuildDate><item><title>What's the big deal about embedded key-value databases like RocksDB?</title><link>http://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html</link><description>&lt;p&gt;Let's assume you're familiar with basic SQL databases like PostgreSQL
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 23 Aug 2022 16:41:32 +0000</lastBuildDate><item><title>What's the big deal about embedded key-value databases like RocksDB?</title><link>http://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html</link><description>&lt;p&gt;Let's assume you're familiar with basic SQL databases like PostgreSQL
 and MySQL, and document databases like MongoDB and Elasticsearch. You
 probably know Redis too.&lt;/p&gt;
 &lt;p&gt;But you're hearing more and more about embedded key-value stores like
@@ -76,7 +76,7 @@ let's take a look at the particular properties that distinguish all
 these key-value stores from systems like Redis and Memcached.&lt;/p&gt;
 &lt;h4 id="reliable-storage"&gt;Reliable storage&lt;/h4&gt;&lt;p&gt;Maybe the single most important thing a storage system does is actual
 store data reliably. You can't just &lt;code&gt;open()&lt;/code&gt; and &lt;code&gt;write()&lt;/code&gt;. To quote
-Dan Luu, &lt;a href="https://wiki.postgresql.org/wiki/Fsync_Errors"&gt;files a
+Dan Luu, &lt;a href="https://danluu.com/file-consistency/"&gt;files are
 hard&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;Deferring storage correctness to a dedicated system means database
 developers can worry about other aspects of database development.&lt;/p&gt;
@@ -106,6 +106,7 @@ embedded key-value stores.&lt;/p&gt;
 &lt;h4 id="other-databases-built-on-key-value-stores"&gt;Other databases built on key-value stores&lt;/h4&gt;&lt;ul&gt;
 &lt;li&gt;&lt;a href="https://engineering.fb.com/2021/08/06/core-data/zippydb/"&gt;ZippyDB&lt;/a&gt; (Redis-compatible database on RocksDB)&lt;/li&gt;
 &lt;li&gt;&lt;a href="https://thenewstack.io/instagram-supercharges-cassandra-pluggable-rocksdb-storage-engine/"&gt;Rocksandra&lt;/a&gt; (Cassandra on RocksDB)&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://redis.com/blog/hood-redis-enterprise-flash-database-architecture/"&gt;Redis on Flash&lt;/a&gt; (Redis on RocksDB)&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;&lt;a href="https://tikv.org/"&gt;TiKV&lt;/a&gt; lists a few more database built on top of
 TiKV but they mostly seem unmaintained.&lt;/p&gt;
