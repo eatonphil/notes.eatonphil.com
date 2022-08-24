@@ -260,7 +260,7 @@ def lex_null(string):
 
     if string_len &gt;= NULL_LEN and \
        string[:NULL_LEN] == &#39;null&#39;:
-        return True, string[NULL_LEN]
+        return True, string[NULL_LEN:]
 
     return None, string
 </code></pre>
