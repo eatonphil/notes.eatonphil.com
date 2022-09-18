@@ -1,0 +1,54 @@
+# A minimal distributed key-value store with Hashicorp's Raft library
+## go,raft,databases
+###### September 17, 2022
+
+When I wrote the "[build a distributed PostgreSQL proof of
+concept](/distributed-postgres.html)" post I first had to figure out
+how to use [Hashicorp's Raft
+implementation](https://github.com/hashicorp/raft).
+
+There weren't any examples (I could find) in the Hashicorp repo
+itself. And the only example I *could* find was Philip O'Toole's
+[hraftd](https://github.com/otoolep/hraftd) which is a minimal
+distributed key-value store.
+
+However, I have a hard time following multi-file examples. So I built
+my own [single-file
+example](https://github.com/eatonphil/raft-example). We'll walk
+through that code, 300 lines of Go, in this post.
+
+The key-value store will only be able to set keys, not delete
+them. But it will be able to overwrite existing entries. And it will
+expose this distributed key-value store over an HTTP API.
+
+### Plugging into a Raft implementation
+
+Raft is an algorithm for managing a replicated (basically append-only)
+log over a cluster of nodes. When you combine this with a finite state
+machine you get a stateful, distributed application. Log entries act
+as commands for the state machine. When a node in the Raft cluster
+crashes, it is brought up to date by sending all commands in the log
+through the state machine.
+
+This can be made more efficient by implementing an
+application-specific concept of state snapshots. But since snapshots
+are just an optimization, we'll skip it entirely to keep this
+application simple.
+
+So in our distributed key-value store commands will be a serialized
+struct with a key and a value. The state machine will take each struct
+and set the key to the value in memory. Thus after replaying the
+entire log (and continuing to apply future log entries), each node
+will have an in-memory key-value store that is up to date with all
+other nodes in the cluster.
+
+### The state machine
+
+There are three operations this Raft library wants us to implement on our state machine struct:
+
+#### Apply
+
+The Apply operation is sent to basically up-to-date nodes to keep it
+up to date. An Apply call is made for each new log the leader commits.
+
+Each of our nodes will a key-value store in memory. So the Apply 
