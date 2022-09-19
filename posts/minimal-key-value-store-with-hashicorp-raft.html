@@ -222,15 +222,16 @@ func (kf *kvFsm) Snapshot() (raft.FSMSnapshot, error) {
   I <em>think</em> this is a correct noop. If we implemented a real
   snapshot we'd serialize the current key-value state, and <code>raft.SnapshotSink.Write()</code> it
   to the <code>raft.SnapshotSink</code>. That sink, in turn, is what is passed (as
-  an <code>io.ReadCloder</code>) to the <code>Restore</code> method above.
+  an <code>io.ReadCloser</code>) to the <code>Restore</code> method above.
   <br />
   <br />
   So it must be that when we do not call <code>raft.SnapshotSink.Close()</code>, <a href="https://pkg.go.dev/github.com/hashicorp/raft#FSMSnapshot">as the docs suggest</a>,
   no snapshot gets recorded.
   <br />
   <br />
-  In this case, the Raft library must be doing its own serialization,
-  writing each message's bytes directly to some sink.
+  Since we aren't implementing snapshots, the Raft
+  library must be doing its own serialization, writing each message's
+  bytes directly to some sink.
   <br />
   <br />
   If I'm wrong, <a href="mailto:phil@eatonphil.com">feel free to correct me</a>.
@@ -248,7 +249,7 @@ nodes in the same cluster.
 
 Each node starts out in a single-node cluster where it is the
 leader. Only when told to (and given the address of other nodes) does
-it start the leader-election process for a multi-node cluster.
+there become a multi-node cluster.
 
 Each node also needs a permanent store for the append-only log. The
 Hashicorp Raft library suggests
@@ -307,7 +308,7 @@ Now let's dig into how nodes learn about each other.
 
 This key-value store application will have an HTTP API serving two purposes:
 
-* Cluster management: telling nodes to join other nodes in a cluster
+* Cluster management: telling a leader to add followers
 * Key-value storage: setting and getting keys
 
 ```go
@@ -383,14 +384,14 @@ func (hs httpServer) setHandler(w http.ResponseWriter, r *http.Request) {
     }
 
     future := hs.r.Apply(bs, 500*time.Millisecond)
-    
+
     // Blocks until completion
     if err := future.Error(); err != nil {
         log.Printf("Could not write key-value: %s", err)
         http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
         return
     }
-    
+
     e := future.Response()
     if e != nil {
         log.Printf("Could not write key-value, application: %s", e)
@@ -407,7 +408,7 @@ func (hs httpServer) setHandler(w http.ResponseWriter, r *http.Request) {
   called from inside the `future.Error()` error block. You
   can <a href="https://pkg.go.dev/github.com/hashicorp/raft#ApplyFuture">see
   the docs</a> for yourself.
-</a>
+</p>
 
 ##### Get
 

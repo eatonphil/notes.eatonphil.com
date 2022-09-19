@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 19 Sep 2022 00:47:49 +0000</lastBuildDate><item><title>A minimal distributed key-value database with Hashicorp's Raft library</title><link>http://notes.eatonphil.com/minimal-key-value-store-with-hashicorp-raft.html</link><description>&lt;p&gt;When I wrote the "&lt;a href="/distributed-postgres.html"&gt;build a distributed PostgreSQL proof of
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 19 Sep 2022 13:08:12 +0000</lastBuildDate><item><title>A minimal distributed key-value database with Hashicorp's Raft library</title><link>http://notes.eatonphil.com/minimal-key-value-store-with-hashicorp-raft.html</link><description>&lt;p&gt;When I wrote the "&lt;a href="/distributed-postgres.html"&gt;build a distributed PostgreSQL proof of
 concept&lt;/a&gt;" post I first had to figure out
 how to use &lt;a href="https://github.com/hashicorp/raft"&gt;Hashicorp's Raft
 implementation&lt;/a&gt;.&lt;/p&gt;
@@ -159,15 +159,16 @@ func (kf *kvFsm) Snapshot() (raft.FSMSnapshot, error) {
   I &lt;em&gt;think&lt;/em&gt; this is a correct noop. If we implemented a real
   snapshot we'd serialize the current key-value state, and &lt;code&gt;raft.SnapshotSink.Write()&lt;/code&gt; it
   to the &lt;code&gt;raft.SnapshotSink&lt;/code&gt;. That sink, in turn, is what is passed (as
-  an &lt;code&gt;io.ReadCloder&lt;/code&gt;) to the &lt;code&gt;Restore&lt;/code&gt; method above.
+  an &lt;code&gt;io.ReadCloser&lt;/code&gt;) to the &lt;code&gt;Restore&lt;/code&gt; method above.
   &lt;br /&gt;
   &lt;br /&gt;
   So it must be that when we do not call &lt;code&gt;raft.SnapshotSink.Close()&lt;/code&gt;, &lt;a href="https://pkg.go.dev/github.com/hashicorp/raft#FSMSnapshot"&gt;as the docs suggest&lt;/a&gt;,
   no snapshot gets recorded.
   &lt;br /&gt;
   &lt;br /&gt;
-  In this case, the Raft library must be doing its own serialization,
-  writing each message's bytes directly to some sink.
+  Since we aren't implementing snapshots, the Raft
+  library must be doing its own serialization, writing each message's
+  bytes directly to some sink.
   &lt;br /&gt;
   &lt;br /&gt;
   If I'm wrong, &lt;a href="mailto:phil@eatonphil.com"&gt;feel free to correct me&lt;/a&gt;.
@@ -178,7 +179,7 @@ whole bunch of boilerplate for Raft library initialization.&lt;/p&gt;
 nodes in the same cluster.&lt;/p&gt;
 &lt;p&gt;Each node starts out in a single-node cluster where it is the
 leader. Only when told to (and given the address of other nodes) does
-it start the leader-election process for a multi-node cluster.&lt;/p&gt;
+there become a multi-node cluster.&lt;/p&gt;
 &lt;p&gt;Each node also needs a permanent store for the append-only log. The
 Hashicorp Raft library suggests
 &lt;a href="https://github.com/hashicorp/raft-boltdb"&gt;boltdb&lt;/a&gt;.&lt;/p&gt;
@@ -230,7 +231,7 @@ Hashicorp Raft library suggests
 &lt;p&gt;Now let's dig into how nodes learn about each other.&lt;/p&gt;
 &lt;h3 id="an-http-api"&gt;An HTTP API&lt;/h3&gt;&lt;p&gt;This key-value store application will have an HTTP API serving two purposes:&lt;/p&gt;
 &lt;ul&gt;
-&lt;li&gt;Cluster management: telling nodes to join other nodes in a cluster&lt;/li&gt;
+&lt;li&gt;Cluster management: telling a leader to add followers&lt;/li&gt;
 &lt;li&gt;Key-value storage: setting and getting keys&lt;/li&gt;
 &lt;/ul&gt;
 &lt;pre&gt;&lt;code class="hljs go"&gt;type httpServer struct {
@@ -306,13 +307,12 @@ this process going.&lt;/p&gt;
     w.WriteHeader(http.StatusOK)
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;p class="note"&gt;
-  I'm not completely sure if &lt;code&gt;future.Response()&lt;/code&gt; is supposed to be
-  called from inside the &lt;code&gt;future.Error()&lt;/code&gt; error block. You
+&lt;p class="note"&gt;
+  I'm not completely sure if `future.Response()` is supposed to be
+  called from inside the `future.Error()` error block. You
   can &lt;a href="https://pkg.go.dev/github.com/hashicorp/raft#ApplyFuture"&gt;see
   the docs&lt;/a&gt; for yourself.
-&amp;lt;/a&amp;gt;&lt;/p&gt;
-&lt;h5 id="get"&gt;Get&lt;/h5&gt;&lt;p&gt;If we wanted to be completely consistent we would need to pass a
+&lt;/p&gt;&lt;h5 id="get"&gt;Get&lt;/h5&gt;&lt;p&gt;If we wanted to be completely consistent we would need to pass a
 &lt;code&gt;read&lt;/code&gt; message through to the Raft cluster and check its result for a
 key's value. We'd need to implement that &lt;code&gt;read&lt;/code&gt; message in the state
 machine.&lt;/p&gt;
