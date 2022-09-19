@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    
+    <title>A minimal distributed key-value database with Hashicorp's Raft library | notes.eatonphil.com</title>
+    <meta name="description" content="A minimal distributed key-value database with Hashicorp's Raft library" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
+    
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div>
+          <div class="row">
+	    <div>
+	      <a href="/about.html" class="sm-link">
+		About
+              </a>
+	      <a href="/favorites.html" class="sm-link">
+		Popular
+              </a>
+	      <a href="/" class="sm-link">
+		Archive
+              </a>
+	      <a href="/discord.html" class="sm-link">
+		Discord
+              </a>
+	      <a href="/rss.xml" class="sm-link">
+		RSS
+              </a>
+	    </div>
+	    
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+
+          <h2>September 17, 2022</h2>
+          <h1>A minimal distributed key-value database with Hashicorp's Raft library</h1>
+          <div class="row" style="padding-bottom: 5px">
+            <div class="tags"><a href="/tags/go.html" class="tag">go</a><a href="/tags/raft.html" class="tag">raft</a><a href="/tags/databases.html" class="tag">databases</a></div>
+          </div>
+	</div>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="col-6">
+        <p>When I wrote the "<a href="/distributed-postgres.html">build a distributed PostgreSQL proof of
+concept</a>" post I first had to figure out
+how to use <a href="https://github.com/hashicorp/raft">Hashicorp's Raft
+implementation</a>.</p>
+<p>There weren't any examples I could find in the Hashicorp repo
+itself. And the only example I <em>could</em> find was Philip O'Toole's
+<a href="https://github.com/otoolep/hraftd">hraftd</a>. It's great! However, I
+have a hard time following multi-file examples in general.</p>
+<p>So I built my own <a href="https://github.com/eatonphil/raft-example">single-file
+example</a>. It's not perfect
+but it helped me get started and may help you too. We'll walk through
+that code, ~260 lines of Go, in this post.</p>
+<p>The key-value database will only be able to set keys, not delete
+them. But it will be able to overwrite existing entries. And it will
+expose this distributed key-value database over an HTTP API.</p>
+<p>Here's a sample interaction it will be able to support.</p>
+<p>Terminal 1:</p>
+<pre><code class="hljs bash">$ ./raft-example --node-id node1 --raft-port 2222 --http-port 8222
+</code></pre>
+<p>Terminal 2:</p>
+<pre><code class="hljs bash">$ ./raft-example --node-id node2 --raft-port 2223 --http-port 8223
+</code></pre>
+<p>Terminal 3, tell 1 to have 2 follow it:</p>
+<pre><code class="hljs bash">$ curl &#39;localhost:8222/join?followerAddr=localhost:2223&amp;followerId=node2&#39;
+</code></pre>
+<p>Terminal 3, now add a key:</p>
+<pre><code class="hljs bash">$ curl -X POST &#39;localhost:8222/set&#39; -d &#39;{&quot;key&quot;: &quot;x&quot;, &quot;value&quot;: &quot;23&quot;}&#39; -H &#39;content-type: application/json&#39;
+</code></pre>
+<p>Terminal 3, now get the key from either server:</p>
+<pre><code class="hljs bash">$ curl &#39;localhost:8222/get?key=x&#39;
+{&quot;data&quot;:&quot;23&quot;}
+$ curl &#39;localhost:8223/get?key=x&#39;
+{&quot;data&quot;:&quot;23&quot;}
+</code></pre>
+<p>Let's make it happen!</p>
+<h3 id="eine-kleine-background">Eine kleine background</h3><p>Raft is an algorithm for managing a replicated (basically append-only)
+log over a cluster of nodes. When you combine this with a state
+machine you get a stateful, distributed application. Log entries act
+as commands for the state machine. When a node in the Raft cluster
+crashes, it is brought up to date by sending (also called "replaying")
+all commands in the log through the state machine.</p>
+<p>This can be made more efficient by implementing an
+application-specific concept of state snapshots. But since snapshots
+are just an optimization, we'll skip it entirely to keep this
+application simple.</p>
+<p>If you want the details, just <a href="https://raft.github.io/raft.pdf">read the Raft
+paper</a>! It is surprisingly
+accessible, especially as a user.</p>
+<h3 id="our-app">Our app</h3><p>In our distributed key-value application, commands will be a
+serialized struct with a key and a value. The state machine will take
+each struct and set the key to the value in memory. Thus after
+replaying the entire log (and continuing to apply future log entries),
+each node will have an in-memory key-value store that is up to date
+with all other nodes in the cluster.</p>
+<p>Note that although each node's key-value store will only be in memory,
+it will be backed by the durable append-only log! So with, Raft each
+in-memory key-value store will still be durable.</p>
+<p>Let's get things set up in a file, <code>main.go</code>.</p>
+<pre><code class="hljs go">package main
+
+import (
+    &quot;encoding/json&quot;
+    &quot;fmt&quot;
+    &quot;io&quot;
+    &quot;log&quot;
+    &quot;net&quot;
+    &quot;net/http&quot;
+    &quot;os&quot;
+    &quot;path&quot;
+    &quot;sync&quot;
+    &quot;time&quot;
+
+    &quot;github.com/hashicorp/raft&quot;
+    &quot;github.com/hashicorp/raft-boltdb&quot;
+)
+</code></pre>
+<h3 id="the-state-machine">The state machine</h3><p>The state machine acts on an in-memory key-value store.</p>
+<pre><code class="hljs go">type kvFsm struct {
+    db *sync.Map
+}
+</code></pre>
+<p>There are three operations this Raft library wants us to implement on
+our state machine struct.</p>
+<h4 id="apply">Apply</h4><p>The Apply operation is sent to basically-up-to-date nodes to keep them
+up to date. An Apply call is made for each new log the leader commits.</p>
+<p>Each log message will contain a key and value to store in the
+in-memory key-value store.</p>
+<pre><code class="hljs go">type setPayload struct {
+    Key   string
+    Value string
+}
+
+func (kf *kvFsm) Apply(log *raft.Log) any {
+    switch log.Type {
+    case raft.LogCommand:
+        var sp setPayload
+        err := json.Unmarshal(log.Data, &amp;sp)
+        if err != nil {
+            return fmt.Errorf(&quot;Could not parse payload: %s&quot;, err)
+        }
+
+        kf.db.Store(sp.Key, sp.Value)
+    default:
+        return fmt.Errorf(&quot;Unknown raft log type: %#v&quot;, log.Type)
+    }
+
+    return nil
+}
+</code></pre>
+<p>Here we're reading a log in a custom format. Later on down in the HTTP
+server we'll write the part that submits that log in this custom
+format.</p>
+<p>The Raft library just cares that logs are (opaque) bytes. Whatever
+format works.</p>
+<h4 id="restore">Restore</h4><p>The Restore operation reads all logs and applies them to the state
+machine.</p>
+<p>It looks very similar to the <code>Apply</code> function we just wrote except for
+that this operates on an <code>io.ReadCloser</code> of serialized log data rather
+than the high-level <code>raft.Log</code> struct.</p>
+<p>And most importantly, and unlike the <code>Apply</code> function, <code>Restore</code> must
+reset all local state.</p>
+<pre><code class="hljs go">func (kf *kvFsm) Restore(rc io.ReadCloser) error {
+    // Must always restore from a clean state!!
+    kf.db.Range(func(key any, _ any) bool {
+        kf.db.Delete(key)
+        return true
+    })
+
+    decoder := json.NewDecoder(rc)
+
+    for decoder.More() {
+        var sp setPayload
+        err := decoder.Decode(&amp;sp)
+        if err != nil {
+            return fmt.Errorf(&quot;Could not decode payload: %s&quot;, err)
+        }
+
+        kf.db.Store(sp.Key, sp.Value)
+    }
+
+    return rc.Close()
+}
+</code></pre>
+<p>The <code>io.ReadCloser</code> represents the latest snapshot or the beginning of
+time if there are no snapshots.</p>
+<h4 id="snapshot">Snapshot</h4><p>We won't implement this. But to satisfy the Go interface we must have
+empty some functions.</p>
+<pre><code class="hljs go">type snapshotNoop struct{}
+
+func (sn snapshotNoop) Persist(_ raft.SnapshotSink) error { return nil }
+func (sn snapshotNoop) Release()                          {}
+
+func (kf *kvFsm) Snapshot() (raft.FSMSnapshot, error) {
+    return snapshotNoop{}, nil
+}
+</code></pre>
+<p class="note">
+  I <em>think</em> this is a correct noop. If we implemented a real
+  snapshot we'd serialize the current key-value state, and <code>raft.SnapshotSink.Write()</code> it
+  to the <code>raft.SnapshotSink</code>. That sink, in turn, is what is passed (as
+  an <code>io.ReadCloder</code>) to the <code>Restore</code> method above.
+  <br />
+  <br />
+  So it must be that when we do not call <code>raft.SnapshotSink.Close()</code>, <a href="https://pkg.go.dev/github.com/hashicorp/raft#FSMSnapshot">as the docs suggest</a>,
+  no snapshot gets recorded.
+  <br />
+  <br />
+  In this case, the Raft library must be doing its own serialization,
+  writing each message's bytes directly to some sink.
+  <br />
+  <br />
+  If I'm wrong, <a href="mailto:phil@eatonphil.com">feel free to correct me</a>.
+</p><p>That's it for the state machine!</p>
+<h3 id="raft-node-initialization">Raft node initialization</h3><p>In order to start the Raft library behavior for each node, we need a
+whole bunch of boilerplate for Raft library initialization.</p>
+<p>Each Raft node needs a TCP port that it uses to communicate with other
+nodes in the same cluster.</p>
+<p>Each node starts out in a single-node cluster where it is the
+leader. Only when told to (and given the address of other nodes) does
+it start the leader-election process for a multi-node cluster.</p>
+<p>Each node also needs a permanent store for the append-only log. The
+Hashicorp Raft library suggests
+<a href="https://github.com/hashicorp/raft-boltdb">boltdb</a>.</p>
+<pre><code class="hljs go">func setupRaft(dir, nodeId, raftAddress string, kf *kvFsm) (*raft.Raft, error) {
+    os.MkdirAll(dir, os.ModePerm)
+
+    store, err := raftboltdb.NewBoltStore(path.Join(dir, &quot;bolt&quot;))
+    if err != nil {
+        return nil, fmt.Errorf(&quot;Could not create bolt store: %s&quot;, err)
+    }
+
+    snapshots, err := raft.NewFileSnapshotStore(path.Join(dir, &quot;snapshot&quot;), 2, os.Stderr)
+    if err != nil {
+        return nil, fmt.Errorf(&quot;Could not create snapshot store: %s&quot;, err)
+    }
+
+    tcpAddr, err := net.ResolveTCPAddr(&quot;tcp&quot;, raftAddress)
+    if err != nil {
+        return nil, fmt.Errorf(&quot;Could not resolve address: %s&quot;, err)
+    }
+
+    transport, err := raft.NewTCPTransport(raftAddress, tcpAddr, 10, time.Second*10, os.Stderr)
+    if err != nil {
+        return nil, fmt.Errorf(&quot;Could not create tcp transport: %s&quot;, err)
+    }
+
+    raftCfg := raft.DefaultConfig()
+    raftCfg.LocalID = raft.ServerID(nodeId)
+
+    r, err := raft.NewRaft(raftCfg, kf, store, store, snapshots, transport)
+    if err != nil {
+        return nil, fmt.Errorf(&quot;Could not create raft instance: %s&quot;, err)
+    }
+
+    // Cluster consists of unjoined leaders. Picking a leader and
+    // creating a real cluster is done manually after startup.
+    r.BootstrapCluster(raft.Configuration{
+        Servers: []raft.Server{
+            {
+                ID:      raft.ServerID(nodeId),
+                Address: transport.LocalAddr(),
+            },
+        },
+    })
+
+    return r, nil
+}
+</code></pre>
+<p>Now let's dig into how nodes learn about each other.</p>
+<h3 id="an-http-api">An HTTP API</h3><p>This key-value store application will have an HTTP API serving two purposes:</p>
+<ul>
+<li>Cluster management: telling nodes to join other nodes in a cluster</li>
+<li>Key-value storage: setting and getting keys</li>
+</ul>
+<pre><code class="hljs go">type httpServer struct {
+    r  *raft.Raft
+    db *sync.Map
+}
+</code></pre>
+<h4 id="cluster-management">Cluster management</h4><p>In this library, the leader is told to add other nodes as its
+follower. (This feels backwards to me, but it is what it is!)</p>
+<p>For this, the library requires a node ID and its internal TCP port for
+Raft messages.</p>
+<p>These will both be parameters we give each node later on when the node
+process is started.</p>
+<pre><code>func (hs httpServer) joinHandler(w http.ResponseWriter, r *http.Request) {
+    followerId := r.URL.Query().Get("followerId")
+    followerAddr := r.URL.Query().Get("followerAddr")
+
+    if hs.r.State() != raft.Leader {
+        json.NewEncoder(w).Encode(struct {
+            Error string `json:"error"`
+        }{
+            "Not the leader",
+        })
+        http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+        return
+    }
+
+    err := hs.r.AddVoter(raft.ServerID(followerId), raft.ServerAddress(followerAddr), 0, 0).Error()
+    if err != nil {
+        log.Printf("Failed to add follower: %s", err)
+        http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+    }
+
+    w.WriteHeader(http.StatusOK)
+}
+</code></pre>
+<h4 id="key-value-storage">Key-value storage</h4><p>This part of the HTTP API exposes setting and getting.</p>
+<h5 id="set">Set</h5><p>Setting is where, instead of modifying the local database directly, we
+pass a message to the Raft cluster to store a log that contains the
+key and value.</p>
+<p>Since we read log messages in <code>kvFsm.Apply</code> and <code>kvFsm.Restore</code> as a
+JSON encoding of the <code>setPayload</code> struct we created, we must write log
+messages like so as well. Or, specifically in this case, we just
+expect that the user passes a JSON body that matches the <code>setPayload</code>
+struct.</p>
+<p>Then we call <code>Apply</code> on the Raft instance with the log message to get
+this process going.</p>
+<pre><code class="hljs go">func (hs httpServer) setHandler(w http.ResponseWriter, r *http.Request) {
+    defer r.Body.Close()
+    bs, err := io.ReadAll(r.Body)
+    if err != nil {
+        log.Printf(&quot;Could not read key-value in http request: %s&quot;, err)
+        http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+        return
+    }
+
+    future := hs.r.Apply(bs, 500*time.Millisecond)
+
+    // Blocks until completion
+    if err := future.Error(); err != nil {
+        log.Printf(&quot;Could not write key-value: %s&quot;, err)
+        http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+        return
+    }
+
+    e := future.Response()
+    if e != nil {
+        log.Printf(&quot;Could not write key-value, application: %s&quot;, e)
+        http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+        return
+    }
+
+    w.WriteHeader(http.StatusOK)
+}
+</code></pre>
+<p><p class="note">
+  I'm not completely sure if <code>future.Response()</code> is supposed to be
+  called from inside the <code>future.Error()</code> error block. You
+  can <a href="https://pkg.go.dev/github.com/hashicorp/raft#ApplyFuture">see
+  the docs</a> for yourself.
+&lt;/a&gt;</p>
+<h5 id="get">Get</h5><p>If we wanted to be completely consistent we would need to pass a
+<code>read</code> message through to the Raft cluster and check its result for a
+key's value. We'd need to implement that <code>read</code> message in the state
+machine.</p>
+<p>But if we don't care strongly about consistency for reads we can just
+read the local in-memory store, skipping the Raft cluster.</p>
+<pre><code class="hljs go">func (hs httpServer) getHandler(w http.ResponseWriter, r *http.Request) {
+    key := r.URL.Query().Get(&quot;key&quot;)
+    value, _ := hs.db.Load(key)
+    if value == nil {
+        value = &quot;&quot;
+    }
+
+    rsp := struct {
+        Data string `json:&quot;data&quot;`
+    }{value.(string)}
+    err := json.NewEncoder(w).Encode(rsp)
+    if err != nil {
+        log.Printf(&quot;Could not encode key-value in http response: %s&quot;, err)
+        http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+    }
+}
+</code></pre>
+<p>And that's it for the server!</p>
+<h3 id="configuration">Configuration</h3><p>Let's throw together a quick helper for grabbing configuration from
+the CLI.</p>
+<p>When the process is started, each node must be configured
+with a Raft-level TCP address, a Raft-level unique node ID, and an
+HTTP address (for our application).</p>
+<pre><code class="hljs go">type config struct {
+    id       string
+    httpPort string
+    raftPort string
+}
+
+func getConfig() config {
+    cfg := config{}
+    for i, arg := range os.Args[1:] {
+        if arg == &quot;--node-id&quot; {
+            cfg.id = os.Args[i+2]
+            i++
+            continue
+        }
+
+        if arg == &quot;--http-port&quot; {
+            cfg.httpPort = os.Args[i+2]
+            i++
+            continue
+        }
+
+        if arg == &quot;--raft-port&quot; {
+            cfg.raftPort = os.Args[i+2]
+            i++
+            continue
+        }
+    }
+
+    if cfg.id == &quot;&quot; {
+        log.Fatal(&quot;Missing required parameter: --node-id&quot;)
+    }
+
+    if cfg.raftPort == &quot;&quot; {
+        log.Fatal(&quot;Missing required parameter: --raft-port&quot;)
+    }
+
+    if cfg.httpPort == &quot;&quot; {
+        log.Fatal(&quot;Missing required parameter: --http-port&quot;)
+    }
+
+    return cfg
+}
+</code></pre>
+<p>And finally, the <code>main()</code> that brings it all together.</p>
+<h3 id="main">main</h3><pre><code class="hljs go">func main() {
+    cfg := getConfig()
+
+    db := &amp;sync.Map{}
+    kf := &amp;kvFsm{db}
+
+    dataDir := &quot;data&quot;
+    err := os.MkdirAll(dataDir, os.ModePerm)
+    if err != nil {
+        log.Fatalf(&quot;Could not create data directory: %s&quot;, err)
+    }
+
+    r, err := setupRaft(path.Join(dataDir, &quot;raft&quot;+cfg.id), cfg.id, &quot;localhost:&quot;+cfg.raftPort, kf)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    hs := httpServer{r, db}
+
+    http.HandleFunc(&quot;/set&quot;, hs.setHandler)
+    http.HandleFunc(&quot;/get&quot;, hs.getHandler)
+    http.HandleFunc(&quot;/join&quot;, hs.joinHandler)
+    http.ListenAndServe(&quot;:&quot;+cfg.httpPort, nil)
+}
+</code></pre>
+<p>Build it.</p>
+<pre><code class="hljs go">$ go mod init raft-example
+$ go mod tidy
+$ go build
+</code></pre>
+<p>And give it a shot. :)</p>
+<p>Terminal 1:</p>
+<pre><code class="hljs bash">$ ./raft-example --node-id node1 --raft-port 2222 --http-port 8222
+</code></pre>
+<p>Terminal 2:</p>
+<pre><code class="hljs bash">$ ./raft-example --node-id node2 --raft-port 2223 --http-port 8223
+</code></pre>
+<p>Terminal 3, tell 1 to have 2 follow it:</p>
+<pre><code class="hljs bash">$ curl &#39;localhost:8222/join?followerAddr=localhost:2223&amp;followerId=node2&#39;
+</code></pre>
+<p>Terminal 3, now add a key:</p>
+<pre><code class="hljs bash">$ curl -X POST &#39;localhost:8222/set&#39; -d &#39;{&quot;key&quot;: &quot;x&quot;, &quot;value&quot;: &quot;23&quot;}&#39; -H &#39;content-type: application/json&#39;
+</code></pre>
+<p>Terminal 3, now get the key from either server:</p>
+<pre><code class="hljs bash">$ curl &#39;localhost:8222/get?key=x&#39;
+{&quot;data&quot;:&quot;23&quot;}
+$ curl &#39;localhost:8223/get?key=x&#39;
+{&quot;data&quot;:&quot;23&quot;}
+</code></pre>
+<p>And we're golden!</p>
+<style>.feedback{display:initial;}</style>
+	<div class="feedback">
+	  <h4>Feedback</h4>
+	  <p><small>As always,
+	  please <a href="mailto:phil@eatonphil.com">email</a>
+	  or <a href="https://twitter.com/phil_eaton">tweet me</a>
+	    with questions, corrections, or ideas!</small></p>
+	</div>
+      </div>
+    </div>
+
+    <footer>
+      <div class="container">
+	<div>
+	  <div class="row">
+	    <div>
+	      <a href="/about.html" class="sm-link">
+		About
+              </a>
+	      <a href="/favorites.html" class="sm-link">
+		Popular
+              </a>
+	      <a href="/" class="sm-link">
+		Archive
+              </a>
+	      <a href="/discord.html" class="sm-link">
+		Discord
+              </a>
+	      <a href="/rss.xml" class="sm-link">
+		RSS
+              </a>
+	    </div>
+
+	    <div class="subscribe">
+              <a href="https://docs.google.com/forms/d/e/1FAIpQLSchaYjB6mq0SHmFL_J1wbB7E4SwUk23Dja2K7mfjtYH5o48fw/viewform?usp=sf_link">
+		Subscribe
+              </a>
+	    </div>
+	  </div>
+	  <div class="feedback">
+	    <p>Frequent Topics</p>
+	    <div class="tags"><a href="/tags/javascript.html" class="tag">javascript (24)</a><a href="/tags/parsing.html" class="tag">parsing (18)</a><a href="/tags/postgres.html" class="tag">postgres (13)</a><a href="/tags/golang.html" class="tag">golang (13)</a><a href="/tags/databases.html" class="tag">databases (13)</a><a href="/tags/compilers.html" class="tag">compilers (13)</a><a href="/tags/sql.html" class="tag">sql (9)</a><a href="/tags/python.html" class="tag">python (8)</a><a href="/tags/management.html" class="tag">management (8)</a><a href="/tags/lisp.html" class="tag">lisp (8)</a><a href="/tags/interpreters.html" class="tag">interpreters (8)</a><a href="/tags/json.html" class="tag">json (7)</a><a href="/tags/go.html" class="tag">go (7)</a><a href="/tags/books.html" class="tag">books (6)</a><a href="/tags/x86-amd64.html" class="tag">x86/amd64 (5)</a><a href="/tags/typescript.html" class="tag">typescript (5)</a><a href="/tags/linux.html" class="tag">linux (5)</a><a href="/tags/communication.html" class="tag">communication (5)</a><a href="/tags/scheme.html" class="tag">scheme (4)</a><a href="/tags/learning.html" class="tag">learning (4)</a></div>
+	  </div>
+	</div>
+      </div>
+    </footer>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-58109156-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-58109156-2');
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>
