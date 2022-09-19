@@ -384,4 +384,8 @@
     <loc>https://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html</loc>
     <lastmod>2022-08-23</lastmod>
  </url>
+  <url>
+    <loc>https://notes.eatonphil.com/minimal-key-value-store-with-hashicorp-raft.html</loc>
+    <lastmod>2022-09-17</lastmod>
+ </url>
 </urlset>
