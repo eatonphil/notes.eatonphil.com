@@ -1,5 +1,481 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 31 Oct 2022 00:05:35 +0000</lastBuildDate><item><title>A minimal distributed key-value database with Hashicorp's Raft library</title><link>http://notes.eatonphil.com/minimal-key-value-store-with-hashicorp-raft.html</link><description>&lt;p&gt;When I wrote the "&lt;a href="/distributed-postgres.html"&gt;build a distributed PostgreSQL proof of
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 31 Oct 2022 02:28:11 +0000</lastBuildDate><item><title>A minimal RocksDB example with Zig</title><link>http://notes.eatonphil.com/zigrocks.html</link><description>&lt;p&gt;I mostly programmed in Go the last few years. So every time I
+wanted an embedded key-value database, I reached for Cockroach's
+&lt;a href="https://github.com/cockroachdb/pebble"&gt;Pebble&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Pebble is great for Go programming but Go does not embed well into
+other languages. Pebble was inspired by
+&lt;a href="https://github.com/facebook/rocksdb"&gt;RocksDB&lt;/a&gt; (and its predecessor,
+&lt;a href="https://github.com/google/leveldb"&gt;LevelDB&lt;/a&gt;). Both were written in
+C++ which can more easily be embedded into any language with a C
+foreign function interface. Pebble also has some interesting
+limitations that RocksDB does not,
+&lt;a href="https://github.com/facebook/rocksdb/wiki/Transactions"&gt;transactions&lt;/a&gt;
+for example.&lt;/p&gt;
+&lt;p&gt;So I've been wanting to get familiar with RocksDB. And I've been
+learning Zig, so I set out to write a simple Zig program that embeds
+RocksDB.  (If you see weird things in my Zig code and have
+suggestions, &lt;a href="mailto:phil@eatonphil.com"&gt;send me a note&lt;/a&gt;!)&lt;/p&gt;
+&lt;p&gt;This post is going to be a mix of RocksDB explanations and Zig
+explanations. By the end we'll have a simple CLI over a durable store
+that is able to set keys, get keys, and list all key-value pairs
+(optionally filtered on a key prefix).&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ ./kv set x 1
+$ ./kv get x
+1
+$ ./kv set y 22
+$ ./kv list x
+x = 1
+$ ./kv list y
+y = 22
+$ ./kv list
+x = 1
+y = 22
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Basic stuff!&lt;/p&gt;
+&lt;p&gt;You can find the code for this post in the &lt;a href="https://github.com/eatonphil/zigrocks"&gt;rocksdb.zig file on
+Github&lt;/a&gt;. To simplify things,
+this code is only going to work on Linux. And it will require Zig
+master (or Zig 0.10.0 once it comes out).&lt;/p&gt;
+&lt;h3 id="rocksdb"&gt;RocksDB&lt;/h3&gt;&lt;p&gt;RocksDB is written in C++. But most languages cannot interface with
+C++. (Zig cannot either, as far as I understand). So most C++
+libraries expose a C API that is easier for other programming
+languages to interact with. RocksDB does this. Great!&lt;/p&gt;
+&lt;p&gt;Now RocksDB's &lt;a href="https://github.com/facebook/rocksdb/wiki"&gt;C++
+documentation&lt;/a&gt; is
+phenomenal, especially among C++ libraries. But if there is
+documentation for the C API, I couldn't find it. Instead you must
+trawl through the &lt;a href="https://github.com/facebook/rocksdb/blob/main/include/rocksdb/c.h"&gt;C header
+file&lt;/a&gt;,
+the &lt;a href="https://github.com/facebook/rocksdb/blob/main/db/c.cc"&gt;C wrapper
+implementation&lt;/a&gt;,
+and the &lt;a href="https://github.com/facebook/rocksdb/blob/main/db/c_test.c"&gt;C
+tests&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;There was also a &lt;a href="https://gist.github.com/nitingupta910/4640638be7e7ad39c41e"&gt;great gist showing a minimal RocksDB C
+example&lt;/a&gt;. But
+it didn't cover the iterator API for fetching a range of keys with a
+prefix. But with the C tests file I was able to figure it out, I
+think.&lt;/p&gt;
+&lt;p&gt;Let's dig in!&lt;/p&gt;
+&lt;h3 id="creating,-opening-and-closing-a-rocksdb-database"&gt;Creating, opening and closing a RocksDB database&lt;/h3&gt;&lt;p&gt;First we need to import the C header so that Zig can compile-time
+verify the foreign functions we call. We'll also import the standard
+library that we'll use later.&lt;/p&gt;
+&lt;p&gt;Aside from &lt;code&gt;build.zig&lt;/code&gt; below, all code should be in &lt;code&gt;main.zig&lt;/code&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;const std = @import(&amp;quot;std&amp;quot;);
+
+const rdb = @cImport(@cInclude(&amp;quot;rocksdb/c.h&amp;quot;));
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p class="note"&gt;
+  Builtin compile time functions in Zig are prefixed with `@`. Don't
+  read anything into the `@` other than that this denotes the function
+  result is resolved at compile time. It's used for imports, casting, and
+  other metaprogramming.
+&lt;/p&gt;&lt;p&gt;Now we can build our wrapper. It will be a Zig struct that contains a
+pointer to the RocksDB instance.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;const RocksDB = struct {
+    db: *rdb.rocksdb_t,
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;To open a database we'll call &lt;code&gt;rocksdb_open()&lt;/code&gt; with a directory name
+for RocksDB to store data. And we'll tell RocksDB to create the
+database if it doesn't already exist.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    fn open(dir: []const u8) struct { val: ?RocksDB, err: ?[]u8 } {
+        var options: ?*rdb.rocksdb_options_t = rdb.rocksdb_options_create();
+        rdb.rocksdb_options_set_create_if_missing(options, 1);
+        var err: ?[*:0]u8 = null;
+        var db: ?*rdb.rocksdb_t = rdb.rocksdb_open(options, dir.ptr, &amp;amp;err);
+        if (err != null) {
+            return .{ .val = null, .err = std.mem.span(err) };
+        }
+        return .{ .val = RocksDB{ .db = db.? }, .err = null };
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Finally, we close with &lt;code&gt;rocksdb_close()&lt;/code&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    fn close(self: RocksDB) void {
+        rdb.rocksdb_close(self.db);
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The RocksDB aspect of this is easy. But there's a bunch of
+Zig-specific details I should (try to) explain.&lt;/p&gt;
+&lt;h4 id="return-types"&gt;Return types&lt;/h4&gt;&lt;p&gt;Zig has a cool
+&lt;a href="https://ziglang.org/documentation/master/#Errors"&gt;&lt;code&gt;error&lt;/code&gt;&lt;/a&gt;
+type. &lt;code&gt;try&lt;/code&gt;/&lt;code&gt;catch&lt;/code&gt; in Zig work only with this &lt;code&gt;error&lt;/code&gt; type and
+subsets of it you can create. &lt;code&gt;error&lt;/code&gt; is an enum. But Zig doesn't have
+ML-style tagged unions (yet?). That is, you cannot both return an
+error and some dynamic information about the error. So the usefulness
+of &lt;code&gt;error&lt;/code&gt; is limited. It mostly only works if the errors are a finite
+set without dynamic aspects.&lt;/p&gt;
+&lt;p&gt;Zig also doesn't have multiple return values. But it does have
+optional types (denoted with &lt;code&gt;?&lt;/code&gt;) and it has anonymous structs.&lt;/p&gt;
+&lt;p&gt;So we can do a slightly less safe, but more informational, error type
+by returning a struct with an optional success value and an optional
+error.&lt;/p&gt;
+&lt;p&gt;That's how we get the return type &lt;code&gt;struct { val: ?RocksDB, err: ?u8[] }&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;This is not very different from Go, certainly no less safe, and I'm
+probably biased to use this as a Go programmer.&lt;/p&gt;
+&lt;h4 id="optional-pointers"&gt;Optional pointers&lt;/h4&gt;&lt;p&gt;The next thing you may notice is &lt;code&gt;?*rdb.rocksdb_options_t&lt;/code&gt; and
+&lt;code&gt;?*rdb.rocksdb_t&lt;/code&gt;. This is to work with Zig's type system. Zig expects
+that pointers are not null. By adding &lt;code&gt;?&lt;/code&gt; we are telling Zig that this
+value can be null. That way the Zig type system will force us to
+handle the null condition if we try to access fields on the value.&lt;/p&gt;
+&lt;p&gt;In the options case, it doesn't really matter if the result is &lt;code&gt;null&lt;/code&gt;
+or not. In the database case, we handle null-ness it by checking the
+error value &lt;code&gt;if (err) |errStr|&lt;/code&gt;. If this condition is &lt;em&gt;not&lt;/em&gt; met, we
+know the database is not null. So we use &lt;code&gt;db.?&lt;/code&gt; to assert and return a
+value that, in the type system, is not null.&lt;/p&gt;
+&lt;h4 id="zig-strings,-c-strings"&gt;Zig strings, C strings&lt;/h4&gt;&lt;p&gt;Another thing you may notice is &lt;code&gt;var err:
+?[*:0]u8 = null;&lt;/code&gt;. Zig strings are expressed as byte arrays or byte
+slices. &lt;code&gt;[]u8&lt;/code&gt; and &lt;code&gt;[]const u8&lt;/code&gt; are slices that keep track of the
+number of items. &lt;code&gt;[*:0]u8&lt;/code&gt; is &lt;em&gt;not&lt;/em&gt; a byte slice. It has no length and
+is only null-delimited. To go from the null-delimited array that the C
+API returns to the &lt;code&gt;[]u8&lt;/code&gt; (slice that contains length) in our
+function's return signature we use
+&lt;a href="https://github.com/ziglang/zig/blob/30b8b29f88362d18ea6523a859b29f7bc6dec622/lib/std/mem.zig"&gt;&lt;code&gt;std.mem.span&lt;/code&gt;&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://stackoverflow.com/questions/72736997/how-to-pass-a-c-string-into-a-zig-function-expecting-a-zig-string"&gt;This StackOverflow
+post&lt;/a&gt;
+was useful for understanding this.&lt;/p&gt;
+&lt;h4 id="structs"&gt;Structs&lt;/h4&gt;&lt;p&gt;Anonymous structs in Zig are prefixed with a &lt;code&gt;.&lt;/code&gt;. And all struct
+fields, anonymous or not, are prefixed with &lt;code&gt;.&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;So &lt;code&gt;.{.x = 1}&lt;/code&gt; instantiates an anonymous struct that has one field
+&lt;code&gt;x&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;Struct fields in Zig cannot &lt;em&gt;not&lt;/em&gt; be instantiated, even if they are
+nullable. And when you initialize a nullable value you don't need to
+wrap it in a &lt;code&gt;Some()&lt;/code&gt; like you might do in an ML.&lt;/p&gt;
+&lt;p&gt;One thing I found surprising about Zig anonymous structs is that
+instances of the anonymous &lt;em&gt;type&lt;/em&gt; are created per function and two
+anonymous structs that are structurally identical but referenced in
+different functions are not actually type-equal.&lt;/p&gt;
+&lt;p&gt;So this doesn't compile:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;$ cat test.zig
+fn doA() struct { y: u8 } {
+  return .{.y = 1};
+}
+
+fn doB() struct { y: u8 } {
+  return doA();
+}
+
+pub fn main() !void {
+  _ = doB();
+}
+$ zig build-exe test.zig
+test.zig:5:15: error: expected type &amp;#39;test.doB__struct_2890&amp;#39;, found &amp;#39;test.doA__struct_3878&amp;#39;
+    return doA();
+           ~~~^~
+test.zig:1:10: note: struct declared here
+fn doA() struct { y: u8 } {
+         ^~~~~~~~~~~~~~~~
+test.zig:4:10: note: struct declared here
+fn doB() struct { y: u8 } {
+         ^~~~~~~~~~~~~~~~
+test.zig:4:10: note: function return type declared here
+fn doB() struct { y: u8 } {
+         ^~~~~~~~~~~~~~~~
+referenced by:
+    main: test.zig:8:9
+    callMain: /whatever/lib/std/start.zig:606:32
+    remaining reference traces hidden; use &amp;#39;-freference-trace&amp;#39; to see all reference traces
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You would need to instantiate a new anonymous struct in the second function.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;$ cat test.zig
+fn doA() struct { y: u8 } {
+  return .{.y = 1};
+}
+
+fn doB() struct { y: u8 } {
+  return .{ .y = doA() };
+}
+
+pub fn main() !void {
+  _ = doB();
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="uniform-function-call-syntax"&gt;Uniform function call syntax&lt;/h4&gt;&lt;p&gt;Zig seems to support something like &lt;a href="https://en.wikipedia.org/wiki/Uniform_Function_Call_Syntax"&gt;uniform function call
+syntax&lt;/a&gt;
+where you can either call a function with arguments or you can omit
+the first argument by prefixing the function call with
+&lt;code&gt;firstargument.&lt;/code&gt;. I.e. &lt;code&gt;x.add(y)&lt;/code&gt; and &lt;code&gt;add(x, y)&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;In the case of this code it would be &lt;code&gt;RocksDB.close(db)&lt;/code&gt; vs
+&lt;code&gt;db.close()&lt;/code&gt; assuming &lt;code&gt;db&lt;/code&gt; is an instance of the &lt;code&gt;RocksDB&lt;/code&gt; struct.&lt;/p&gt;
+&lt;p&gt;Like Python, the use of &lt;code&gt;self&lt;/code&gt; as the name of this first parameter of
+a struct's methods is purely convention. You can call it whatever.&lt;/p&gt;
+&lt;p&gt;The point is that we always expect the user to &lt;code&gt;var db = RocksDB.open()&lt;/code&gt; for
+&lt;code&gt;open()&lt;/code&gt; and allow the user to do &lt;code&gt;db.close()&lt;/code&gt; for &lt;code&gt;close()&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;Let's move on!&lt;/p&gt;
+&lt;h3 id="setting-a-key-value-pair"&gt;Setting a key-value pair&lt;/h3&gt;&lt;p&gt;We set a pair by calling &lt;code&gt;rocksdb_put&lt;/code&gt; with the database instance,
+some options (we'll leave to defaults), and the key and value strings
+as C strings.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    fn set(self: RocksDB, key: [:0]const u8, value: [:0]const u8) ?[]u8 {
+        var writeOptions = rdb.rocksdb_writeoptions_create();
+        var err: ?[*:0]u8 = null;
+        rdb.rocksdb_put(
+            self.db,
+            writeOptions,
+            key.ptr,
+            key.len,
+            value.ptr,
+            value.len,
+            &amp;amp;err,
+        );
+        if (err) |errStr| {
+            return std.mem.span(errStr);
+        }
+
+        return null;
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The only special Zig thing is there is &lt;code&gt;key.ptr&lt;/code&gt; to satisfy the Zig /
+C type system. The type signature &lt;code&gt;key: [:0]const u8&lt;/code&gt; and &lt;code&gt;value:
+[:0]const u8&lt;/code&gt; makes sure that the user passes in a null-delimited
+byte slice, which is what the RocksDB API expects.&lt;/p&gt;
+&lt;h3 id="getting-a-value-from-a-key"&gt;Getting a value from a key&lt;/h3&gt;&lt;p&gt;We set a pair by calling &lt;code&gt;rocksdb_get&lt;/code&gt; with the database instance,
+some options (we'll again leave to defaults), and the key as a C
+string.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    fn get(self: RocksDB, key: [:0]const u8) struct { val: ?[]u8, err: ?[]u8 } {
+        var readOptions = rdb.rocksdb_readoptions_create();
+        var valueLength: usize = 0;
+        var err: ?[*:0]u8 = null;
+        var v = rdb.rocksdb_get(
+            self.db,
+            readOptions,
+            key.ptr,
+            key.len,
+            &amp;amp;valueLength,
+            &amp;amp;err,
+        );
+        if (err) |errStr| {
+            return .{ .val = null, .err = std.mem.span(errStr) };
+        }
+        if (v == 0) {
+            return .{ .val = null, .err = null };
+        }
+
+        return .{ .val = v[0..valueLength], .err = null };
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;One thing in there to call out is that we can go from a null-delimited
+value &lt;code&gt;v&lt;/code&gt; to a standard Zig slice &lt;code&gt;[]u8&lt;/code&gt; by slicing from &lt;code&gt;0&lt;/code&gt; to the
+length of the value returned by the C API.&lt;/p&gt;
+&lt;p&gt;Also, &lt;code&gt;rocksdb_get&lt;/code&gt; is only used for getting a single key-value
+pair. We'll handle key-value pair iteration next.&lt;/p&gt;
+&lt;h3 id="iterating-over-key-value-pairs"&gt;Iterating over key-value pairs&lt;/h3&gt;&lt;p&gt;The basic structure of RocksDB's iterator API is that you first create
+an iterator instance with &lt;code&gt;rocksdb_create_iterator()&lt;/code&gt;. Then you either
+&lt;code&gt;rocksdb_iter_seek_to_first()&lt;/code&gt; or &lt;code&gt;rocksdb_iter_seek()&lt;/code&gt; (with a
+prefix) to get the iterator ready. Then you get the current iterator
+entry's key with &lt;code&gt;rocksdb_iter_key()&lt;/code&gt; and value with
+&lt;code&gt;rocksdb_iter_value()&lt;/code&gt;. You move on to the next entry in the iterator
+with &lt;code&gt;rocksdb_iter_next()&lt;/code&gt; and check that the current iterator value
+is valid with &lt;code&gt;rocksdb_iter_valid()&lt;/code&gt;. When the iterator is no longer
+valid, or if you want to stop iterating early, you call
+&lt;code&gt;rocksdb_iter_destroy()&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;But we'd like to present a Zig-only interface to users of the
+&lt;code&gt;RocksDB&lt;/code&gt; Zig struct. So we'll create a &lt;code&gt;RocksDB.iter()&lt;/code&gt; function that
+returns a &lt;code&gt;RocksDB.Iter&lt;/code&gt; with an &lt;code&gt;RocksDB.Iter.next()&lt;/code&gt; function that
+will return an optional &lt;code&gt;RocksDB.IterEntry&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;We'll start backwards with that &lt;code&gt;RocksDB.Iter&lt;/code&gt; struct.&lt;/p&gt;
+&lt;h4 id="&lt;code&gt;rocksdb.iter&lt;/code&gt;"&gt;&lt;code&gt;RocksDB.Iter&lt;/code&gt;&lt;/h4&gt;&lt;p&gt;Each iterator instance will store a pointer to a RocksDB iterator
+instance. It will store the prefix requested (which is allowed to be
+an empty string). If the prefix is set though, we'll only iterate
+while the iterator key has the requested prefix.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;    const IterEntry = struct {
+        key: []const u8,
+        value: []const u8,
+    };
+
+    const Iter = struct {
+        iter: *rdb.rocksdb_iterator_t,
+        first: bool,
+        prefix: []const u8,
+
+        fn next(self: *Iter) ?IterEntry {
+            if (!self.first) {
+                rdb.rocksdb_iter_next(self.iter);
+            }
+
+            self.first = false;
+            if (rdb.rocksdb_iter_valid(self.iter) != 1) {
+                return null;
+            }
+
+            var keySize: usize = 0;
+            var key = rdb.rocksdb_iter_key(self.iter, &amp;amp;keySize);
+
+            // Make sure key is still within the prefix
+            if (self.prefix.len &amp;gt; 0) {
+                if (self.prefix.len &amp;gt; keySize or
+                    !std.mem.eql(u8, key[0..self.prefix.len], self.prefix))
+                {
+                    return null;
+                }
+            }
+
+            var valueSize: usize = 0;
+            var value = rdb.rocksdb_iter_value(self.iter, &amp;amp;valueSize);
+
+            return IterEntry{
+                .key = key[0..keySize],
+                .value = value[0..valueSize],
+            };
+        }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Finally we'll wrap the &lt;code&gt;rocksdb_iter_destroy()&lt;/code&gt; method:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;        fn close(self: Iter) void {
+            rdb.rocksdb_iter_destroy(self.iter);
+        }
+    };
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="&lt;code&gt;rocksdb.iter()&lt;/code&gt;"&gt;&lt;code&gt;RocksDB.iter()&lt;/code&gt;&lt;/h4&gt;&lt;p&gt;Now we can write the function that creates the &lt;code&gt;RocksDB.Iter&lt;/code&gt;. As
+previously mentioned we must first instantiate the RocksDB iterator
+and then &lt;code&gt;seek&lt;/code&gt; to either the first entry if the user doesn't request
+a prefix. Or if the user requests a prefix, we &lt;code&gt;seek&lt;/code&gt; until that
+prefix.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;fn iter(self: RocksDB, prefix: [:0]const u8) struct { val: ?Iter, err: ?[]const u8 } {
+        var readOptions = rdb.rocksdb_readoptions_create();
+        var it = Iter{
+            .iter = undefined,
+            .first = true,
+            .prefix = prefix,
+        };
+        if (rdb.rocksdb_create_iterator(self.db, readOptions)) |i| {
+            it.iter = i;
+        } else {
+            return .{ .val = null, .err = &amp;quot;Could not create iterator&amp;quot; };
+        }
+
+        if (prefix.len &amp;gt; 0) {
+            rdb.rocksdb_iter_seek(
+                it.iter,
+                prefix.ptr,
+                prefix.len,
+            );
+        } else {
+            rdb.rocksdb_iter_seek_to_first(it.iter);
+        }
+        return .{ .val = it, .err = null };
+    }
+};
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And now we're done a basic Zig wrapper for the RocksDB API!&lt;/p&gt;
+&lt;h3 id="&lt;code&gt;main&lt;/code&gt;"&gt;&lt;code&gt;main&lt;/code&gt;&lt;/h3&gt;&lt;p&gt;Next we write a simple command-line entrypoint that uses the RocksDB
+wrapper we built. This is not the prettiest code but it gets the job
+done.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;pub fn main() !void {
+    var openRes = RocksDB.open(&amp;quot;/tmp/db&amp;quot;);
+    if (openRes.err) |err| {
+        std.debug.print(&amp;quot;Failed to open: {s}.\n&amp;quot;, .{err});
+    }
+    var db = openRes.val.?;
+    defer db.close();
+
+    var args = std.process.args();
+    _ = args.next();
+    var key: [:0]const u8 = &amp;quot;&amp;quot;;
+    var value: [:0]const u8 = &amp;quot;&amp;quot;;
+    var command = &amp;quot;get&amp;quot;;
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, &amp;quot;set&amp;quot;)) {
+            command = &amp;quot;set&amp;quot;;
+            key = args.next().?;
+            value = args.next().?;
+        } else if (std.mem.eql(u8, arg, &amp;quot;get&amp;quot;)) {
+            command = &amp;quot;get&amp;quot;;
+            key = args.next().?;
+        } else if (std.mem.eql(u8, arg, &amp;quot;list&amp;quot;)) {
+            command = &amp;quot;lst&amp;quot;;
+            if (args.next()) |argNext| {
+                key = argNext;
+            }
+        } else {
+            std.debug.print(&amp;quot;Must specify command (get, set, or list). Got: &amp;#39;{s}&amp;#39;.\n&amp;quot;, .{arg});
+            return;
+        }
+    }
+
+    if (std.mem.eql(u8, command, &amp;quot;set&amp;quot;)) {
+        var setErr = db.set(key, value);
+        if (setErr) |err| {
+            std.debug.print(&amp;quot;Error setting key: {s}.\n&amp;quot;, .{err});
+            return;
+        }
+    } else if (std.mem.eql(u8, command, &amp;quot;get&amp;quot;)) {
+        var getRes = db.get(key);
+        if (getRes.err) |err| {
+            std.debug.print(&amp;quot;Error getting key: {s}.\n&amp;quot;, .{err});
+            return;
+        }
+
+        if (getRes.val) |v| {
+            std.debug.print(&amp;quot;{s}\n&amp;quot;, .{v});
+        } else {
+            std.debug.print(&amp;quot;Key not found.\n&amp;quot;, .{});
+        }
+    } else {
+        var prefix = key;
+        var iterRes = db.iter(prefix);
+        if (iterRes.err) |err| {
+            std.debug.print(&amp;quot;Error getting iterator: {s}.\n&amp;quot;, .{err});
+        }
+        var iter = iterRes.val.?;
+        defer iter.close();
+        while (iter.next()) |entry| {
+            std.debug.print(&amp;quot;{s} = {s}\n&amp;quot;, .{ entry.key, entry.value });
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Notably, the &lt;code&gt;main&lt;/code&gt; function must be marked &lt;code&gt;pub&lt;/code&gt;. The struct and
+struct methods we wrote would need to be marked &lt;code&gt;pub&lt;/code&gt; if we wanted
+them accessible from other files. But since this is a single file,
+&lt;code&gt;pub&lt;/code&gt; doesn't matter. Except for &lt;code&gt;main&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;Now we can get into building.&lt;/p&gt;
+&lt;h3 id="building"&gt;Building&lt;/h3&gt;&lt;p&gt;First we need to compile the RocksDB library. To do this we simply
+&lt;code&gt;git clone&lt;/code&gt; RocksDB and run &lt;code&gt;make shared_libs&lt;/code&gt;.&lt;/p&gt;
+&lt;h4 id="compiling-rocksdb"&gt;Compiling RocksDB&lt;/h4&gt;&lt;pre&gt;&lt;code class="hljs bash"&gt;$ git clone https://github.com/facebook/rocksdb
+$ ( cd rocksdb &amp;amp;&amp;amp; make shared_lib -j8 )
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This may take a while, sorry.&lt;/p&gt;
+&lt;h4 id="&lt;code&gt;build.zig&lt;/code&gt;"&gt;&lt;code&gt;build.zig&lt;/code&gt;&lt;/h4&gt;&lt;p&gt;Next we need to write a &lt;code&gt;build.zig&lt;/code&gt; script that tells Zig about this
+external library. This was one of the harder parts of the process, but
+building and linking against foreign libraries is almost always hard.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;$ cat build.zig
+const version = @import(&amp;quot;builtin&amp;quot;).zig_version;
+const std = @import(&amp;quot;std&amp;quot;);
+
+pub fn build(b: *std.build.Builder) void {
+    const exe = b.addExecutable(&amp;quot;main&amp;quot;, &amp;quot;main.zig&amp;quot;);
+    exe.linkLibC();
+    exe.linkSystemLibraryName(&amp;quot;rocksdb&amp;quot;);
+
+    exe.addLibraryPath(&amp;quot;./rocksdb&amp;quot;);
+    exe.addIncludePath(&amp;quot;./rocksdb/include&amp;quot;);
+
+    exe.setOutputDir(&amp;quot;.&amp;quot;);
+    exe.install();
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Felix Queißner's &lt;a href="https://zig.news/xq/zig-build-explained-part-3-1ima"&gt;zig build
+explained&lt;/a&gt; series
+was quite helpful.&lt;/p&gt;
+&lt;p&gt;Now we just:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ zig build
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And run!&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ ./main list
+$ ./main set x 12
+$ ./main set xy 300
+$ ./main list
+x = 12
+xy = 300
+$ ./main get xy
+300
+$ ./main list xy
+xy = 300
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Not bad!&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/zigrocks.html</guid><pubDate>Sun, 30 Oct 2022 00:00:00 +0000</pubDate></item><item><title>A Database Without Dynamic Memory Allocation</title><link>http://notes.eatonphil.com/a-database-without-dynamic-memory.html</link><description>&lt;head&gt;
+    &lt;meta http-equiv="refresh" content="4;URL='https://tigerbeetle.com/blog/a-database-without-dynamic-memory/'" /&gt;
+&lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
+&lt;a href="https://tigerbeetle.com/blog/a-database-without-dynamic-memory/"&gt;here&lt;/a&gt;
+if you are not redirected.&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/a-database-without-dynamic-memory.html</guid><pubDate>Wed, 12 Oct 2022 00:00:00 +0000</pubDate></item><item><title>A minimal distributed key-value database with Hashicorp's Raft library</title><link>http://notes.eatonphil.com/minimal-key-value-store-with-hashicorp-raft.html</link><description>&lt;p&gt;When I wrote the "&lt;a href="/distributed-postgres.html"&gt;build a distributed PostgreSQL proof of
 concept&lt;/a&gt;" post I first had to figure out
 how to use &lt;a href="https://github.com/hashicorp/raft"&gt;Hashicorp's Raft
 implementation&lt;/a&gt;.&lt;/p&gt;
