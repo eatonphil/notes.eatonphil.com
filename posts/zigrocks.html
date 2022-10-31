@@ -6,10 +6,13 @@ I mostly programmed in Go the last few years. So every time I
 wanted an embedded key-value database, I reached for Cockroach's
 [Pebble](https://github.com/cockroachdb/pebble).
 
-Pebble is great for Go programming but Go does not embed well into other languages. Pebble was inspired by [RocksDB](https://github.com/facebook/rocksdb)
-(and its predecessor,
-[LevelDB](https://github.com/google/leveldb)). Both were written in C++ which can more easily be embedded into any language with a C foreign function interface. Pebble also has some
-interesting limitations that RocksDB does not,
+Pebble is great for Go programming but Go does not embed well into
+other languages. Pebble was inspired by
+[RocksDB](https://github.com/facebook/rocksdb) (and its predecessor,
+[LevelDB](https://github.com/google/leveldb)). Both were written in
+C++ which can more easily be embedded into any language with a C
+foreign function interface. Pebble also has some interesting
+limitations that RocksDB does not,
 [transactions](https://github.com/facebook/rocksdb/wiki/Transactions)
 for example.
 
@@ -146,7 +149,7 @@ So we can do a slightly less safe, but more informational, error type
 by returning a struct with an optional success value and an optional
 error.
 
-That's how we get the return type `struct { val: ?RocksDB, ?u8[] }`
+That's how we get the return type `struct { val: ?RocksDB, err: ?u8[] }`.
 
 This is not very different from Go, certainly no less safe, and I'm
 probably biased to use this as a Go programmer.
@@ -188,12 +191,12 @@ fields, anonymous or not, are prefixed with `.`.
 So `.{.x = 1}` instantiates an anonymous struct that has one field
 `x`.
 
-Struct fields in Zig cannot not be instantiated, even if they are
+Struct fields in Zig cannot *not* be instantiated, even if they are
 nullable. And when you initialize a nullable value you don't need to
 wrap it in a `Some()` like you might do in an ML.
 
 One thing I found surprising about Zig anonymous structs is that
-instances of the *anonymous type* are created per function and two
+instances of the anonymous *type* are created per function and two
 anonymous structs that are structurally identical but referenced in
 different functions are not actually type-equal.
 
@@ -248,10 +251,9 @@ pub fn main() !void {
 }
 ```
 
-#### Method receivers
+#### Uniform function call syntax
 
-The last thing to call out is (what Go calls) "method receivers". Zig
-seems to support something like [uniform function call
+Zig seems to support something like [uniform function call
 syntax](https://en.wikipedia.org/wiki/Uniform_Function_Call_Syntax)
 where you can either call a function with arguments or you can omit
 the first argument by prefixing the function call with
@@ -263,7 +265,7 @@ In the case of this code it would be `RocksDB.close(db)` vs
 Like Python, the use of `self` as the name of this first parameter of
 a struct's methods is purely convention. You can call it whatever.
 
-The point is that we always expect `var db = RocksDB.open()` for
+The point is that we always expect the user to `var db = RocksDB.open()` for
 `open()` and allow the user to do `db.close()` for `close()`.
 
 Let's move on!
@@ -298,7 +300,7 @@ as C strings.
 The only special Zig thing is there is `key.ptr` to satisfy the Zig /
 C type system. The type signature `key: [:0]const u8` and `value:
 [:0]const u8` makes sure that the user passes in a null-delimited
-string, which is what the RocksDB API expects.
+byte slice, which is what the RocksDB API expects.
 
 ### Getting a value from a key
 
@@ -528,7 +530,7 @@ pub fn main() !void {
 
 Notably, the `main` function must be marked `pub`. The struct and
 struct methods we wrote would need to be marked `pub` if we wanted
-them accessible from other files. But since this is a single file
+them accessible from other files. But since this is a single file,
 `pub` doesn't matter. Except for `main`.
 
 Now we can get into building.

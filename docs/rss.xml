@@ -1,11 +1,14 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 31 Oct 2022 02:20:23 +0000</lastBuildDate><item><title>A minimal RocksDB example with Zig</title><link>http://notes.eatonphil.com/zigrocks.html</link><description>&lt;p&gt;I mostly programmed in Go the last few years. So every time I
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 31 Oct 2022 02:26:14 +0000</lastBuildDate><item><title>A minimal RocksDB example with Zig</title><link>http://notes.eatonphil.com/zigrocks.html</link><description>&lt;p&gt;I mostly programmed in Go the last few years. So every time I
 wanted an embedded key-value database, I reached for Cockroach's
 &lt;a href="https://github.com/cockroachdb/pebble"&gt;Pebble&lt;/a&gt;.&lt;/p&gt;
-&lt;p&gt;Pebble is great for Go programming but Go does not embed well into other languages. Pebble was inspired by &lt;a href="https://github.com/facebook/rocksdb"&gt;RocksDB&lt;/a&gt;
-(and its predecessor,
-&lt;a href="https://github.com/google/leveldb"&gt;LevelDB&lt;/a&gt;). Both were written in C++ which can more easily be embedded into any language with a C foreign function interface. Pebble also has some
-interesting limitations that RocksDB does not,
+&lt;p&gt;Pebble is great for Go programming but Go does not embed well into
+other languages. Pebble was inspired by
+&lt;a href="https://github.com/facebook/rocksdb"&gt;RocksDB&lt;/a&gt; (and its predecessor,
+&lt;a href="https://github.com/google/leveldb"&gt;LevelDB&lt;/a&gt;). Both were written in
+C++ which can more easily be embedded into any language with a C
+foreign function interface. Pebble also has some interesting
+limitations that RocksDB does not,
 &lt;a href="https://github.com/facebook/rocksdb/wiki/Transactions"&gt;transactions&lt;/a&gt;
 for example.&lt;/p&gt;
 &lt;p&gt;So I've been wanting to get familiar with RocksDB. And I've been
@@ -105,7 +108,7 @@ optional types (denoted with &lt;code&gt;?&lt;/code&gt;) and it has anonymous st
 &lt;p&gt;So we can do a slightly less safe, but more informational, error type
 by returning a struct with an optional success value and an optional
 error.&lt;/p&gt;
-&lt;p&gt;That's how we get the return type &lt;code&gt;struct { val: ?RocksDB, ?u8[] }&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;That's how we get the return type &lt;code&gt;struct { val: ?RocksDB, err: ?u8[] }&lt;/code&gt;.&lt;/p&gt;
 &lt;p&gt;This is not very different from Go, certainly no less safe, and I'm
 probably biased to use this as a Go programmer.&lt;/p&gt;
 &lt;h4 id="optional-pointers"&gt;Optional pointers&lt;/h4&gt;&lt;p&gt;The next thing you may notice is &lt;code&gt;?*rdb.rocksdb_options_t&lt;/code&gt; and
@@ -133,11 +136,11 @@ was useful for understanding this.&lt;/p&gt;
 fields, anonymous or not, are prefixed with &lt;code&gt;.&lt;/code&gt;.&lt;/p&gt;
 &lt;p&gt;So &lt;code&gt;.{.x = 1}&lt;/code&gt; instantiates an anonymous struct that has one field
 &lt;code&gt;x&lt;/code&gt;.&lt;/p&gt;
-&lt;p&gt;Struct fields in Zig cannot not be instantiated, even if they are
+&lt;p&gt;Struct fields in Zig cannot &lt;em&gt;not&lt;/em&gt; be instantiated, even if they are
 nullable. And when you initialize a nullable value you don't need to
 wrap it in a &lt;code&gt;Some()&lt;/code&gt; like you might do in an ML.&lt;/p&gt;
 &lt;p&gt;One thing I found surprising about Zig anonymous structs is that
-instances of the &lt;em&gt;anonymous type&lt;/em&gt; are created per function and two
+instances of the anonymous &lt;em&gt;type&lt;/em&gt; are created per function and two
 anonymous structs that are structurally identical but referenced in
 different functions are not actually type-equal.&lt;/p&gt;
 &lt;p&gt;So this doesn't compile:&lt;/p&gt;
@@ -185,8 +188,7 @@ pub fn main() !void {
   _ = doB();
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;h4 id="method-receivers"&gt;Method receivers&lt;/h4&gt;&lt;p&gt;The last thing to call out is (what Go calls) "method receivers". Zig
-seems to support something like &lt;a href="https://en.wikipedia.org/wiki/Uniform_Function_Call_Syntax"&gt;uniform function call
+&lt;h4 id="uniform-function-call-syntax"&gt;Uniform function call syntax&lt;/h4&gt;&lt;p&gt;Zig seems to support something like &lt;a href="https://en.wikipedia.org/wiki/Uniform_Function_Call_Syntax"&gt;uniform function call
 syntax&lt;/a&gt;
 where you can either call a function with arguments or you can omit
 the first argument by prefixing the function call with
@@ -195,7 +197,7 @@ the first argument by prefixing the function call with
 &lt;code&gt;db.close()&lt;/code&gt; assuming &lt;code&gt;db&lt;/code&gt; is an instance of the &lt;code&gt;RocksDB&lt;/code&gt; struct.&lt;/p&gt;
 &lt;p&gt;Like Python, the use of &lt;code&gt;self&lt;/code&gt; as the name of this first parameter of
 a struct's methods is purely convention. You can call it whatever.&lt;/p&gt;
-&lt;p&gt;The point is that we always expect &lt;code&gt;var db = RocksDB.open()&lt;/code&gt; for
+&lt;p&gt;The point is that we always expect the user to &lt;code&gt;var db = RocksDB.open()&lt;/code&gt; for
 &lt;code&gt;open()&lt;/code&gt; and allow the user to do &lt;code&gt;db.close()&lt;/code&gt; for &lt;code&gt;close()&lt;/code&gt;.&lt;/p&gt;
 &lt;p&gt;Let's move on!&lt;/p&gt;
 &lt;h3 id="setting-a-key-value-pair"&gt;Setting a key-value pair&lt;/h3&gt;&lt;p&gt;We set a pair by calling &lt;code&gt;rocksdb_put&lt;/code&gt; with the database instance,
@@ -223,7 +225,7 @@ as C strings.&lt;/p&gt;
 &lt;p&gt;The only special Zig thing is there is &lt;code&gt;key.ptr&lt;/code&gt; to satisfy the Zig /
 C type system. The type signature &lt;code&gt;key: [:0]const u8&lt;/code&gt; and &lt;code&gt;value:
 [:0]const u8&lt;/code&gt; makes sure that the user passes in a null-delimited
-string, which is what the RocksDB API expects.&lt;/p&gt;
+byte slice, which is what the RocksDB API expects.&lt;/p&gt;
 &lt;h3 id="getting-a-value-from-a-key"&gt;Getting a value from a key&lt;/h3&gt;&lt;p&gt;We set a pair by calling &lt;code&gt;rocksdb_get&lt;/code&gt; with the database instance,
 some options (we'll again leave to defaults), and the key as a C
 string.&lt;/p&gt;
@@ -421,7 +423,7 @@ done.&lt;/p&gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Notably, the &lt;code&gt;main&lt;/code&gt; function must be marked &lt;code&gt;pub&lt;/code&gt;. The struct and
 struct methods we wrote would need to be marked &lt;code&gt;pub&lt;/code&gt; if we wanted
-them accessible from other files. But since this is a single file
+them accessible from other files. But since this is a single file,
 &lt;code&gt;pub&lt;/code&gt; doesn't matter. Except for &lt;code&gt;main&lt;/code&gt;.&lt;/p&gt;
 &lt;p&gt;Now we can get into building.&lt;/p&gt;
 &lt;h3 id="building"&gt;Building&lt;/h3&gt;&lt;p&gt;First we need to compile the RocksDB library. To do this we simply
