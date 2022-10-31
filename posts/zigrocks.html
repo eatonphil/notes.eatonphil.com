@@ -134,7 +134,7 @@ Zig-specific details I should (try to) explain.
 Zig has a cool
 [`error`](https://ziglang.org/documentation/master/#Errors)
 type. `try`/`catch` in Zig work only with this `error` type and
-subsets of it you can create. `error` is an enum. But Zig doesn't have
+subsets of it you can create. `error` is an enum. But Zig `error`s are not
 ML-style tagged unions (yet?). That is, you cannot both return an
 error and some dynamic information about the error. So the usefulness
 of `error` is limited. It mostly only works if the errors are a finite
@@ -147,10 +147,18 @@ So we can do a slightly less safe, but more informational, error type
 by returning a struct with an optional success value and an optional
 error.
 
-That's how we get the return type `struct { val: ?RocksDB, err: ?u8[] }`.
+That's how we get the return type `struct { val: ?RocksDB, err: ?[]u8 }`.
 
 This is not very different from Go, certainly no less safe, and I'm
 probably biased to use this as a Go programmer.
+
+<p class="note">
+  Felix Queißner points out to me that there are tagged unions in Zig
+  that would be more safe here. Instead of <code>struct { val:
+  ?RocksDB, err: ?[]u8 }</code> I could do <code>union(enum) { val:
+  RocksDB, err: []u8 }</code>. When I get a chance to play with that
+  syntax I'll modify this post.
+</p>
 
 #### Optional pointers
 

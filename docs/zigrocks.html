@@ -151,7 +151,7 @@ Zig-specific details I should (try to) explain.</p>
 <h4 id="return-types">Return types</h4><p>Zig has a cool
 <a href="https://ziglang.org/documentation/master/#Errors"><code>error</code></a>
 type. <code>try</code>/<code>catch</code> in Zig work only with this <code>error</code> type and
-subsets of it you can create. <code>error</code> is an enum. But Zig doesn't have
+subsets of it you can create. <code>error</code> is an enum. But Zig <code>error</code>s are not
 ML-style tagged unions (yet?). That is, you cannot both return an
 error and some dynamic information about the error. So the usefulness
 of <code>error</code> is limited. It mostly only works if the errors are a finite
@@ -161,10 +161,16 @@ optional types (denoted with <code>?</code>) and it has anonymous structs.</p>
 <p>So we can do a slightly less safe, but more informational, error type
 by returning a struct with an optional success value and an optional
 error.</p>
-<p>That's how we get the return type <code>struct { val: ?RocksDB, err: ?u8[] }</code>.</p>
+<p>That's how we get the return type <code>struct { val: ?RocksDB, err: ?[]u8 }</code>.</p>
 <p>This is not very different from Go, certainly no less safe, and I'm
 probably biased to use this as a Go programmer.</p>
-<h4 id="optional-pointers">Optional pointers</h4><p>The next thing you may notice is <code>?*rdb.rocksdb_options_t</code> and
+<p class="note">
+  Felix Queißner points out to me that there are tagged unions in Zig
+  that would be more safe here. Instead of <code>struct { val:
+  ?RocksDB, err: ?[]u8 }</code> I could do <code>union(enum) { val:
+  RocksDB, err: []u8 }</code>. When I get a chance to play with that
+  syntax I'll modify this post.
+</p><h4 id="optional-pointers">Optional pointers</h4><p>The next thing you may notice is <code>?*rdb.rocksdb_options_t</code> and
 <code>?*rdb.rocksdb_t</code>. This is to work with Zig's type system. Zig expects
 that pointers are not null. By adding <code>?</code> we are telling Zig that this
 value can be null. That way the Zig type system will force us to
