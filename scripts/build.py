@@ -7,6 +7,7 @@ from feedgen.feed import FeedGenerator
 
 POST_SUMMARY = """
 <div class="summary">
+  <!-- Test -->
   <a href="/{}">{}</a>
   {}
   <div class="summary-subtitle">{}</div>
