@@ -1,0 +1,24 @@
+# Porting a toy SQL database from Go to Zig
+## October 30, 2020
+###### databases,golang,parsing,sql,postgres,zig
+
+I learned a bit of Zig basics by implementing some programs for
+[tinyprograms.org](tinyprograms.org). And to continue my understanding
+of Zig I decided to try porting my [toy SQL database written in
+Go](https://github.com/eatonphil/gosql).
+
+Unlike some of my usual posts I'm not going to walk through the entire
+codebase since it really is a direct port of the original code and I
+feel like writing and reading that same post again would be boring.
+
+So instead I'm going to [point you at the
+codebase](https://github.com/eatonphil/zigrocks) and just talk a bit
+about what I thought was interesting coming from Go, JavaScript,
+Python, and (to a lesser degree) Rust.
+
+### Memory management
+
+First off, Zig doesn't come with a garbage collector. (However, while
+researching for this post I notice that [Mitchell Hashimoto published
+a Zig wrapper around Boehm
+GC](https://github.com/mitchellh/zig-libgc).
