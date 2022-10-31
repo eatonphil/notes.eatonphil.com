@@ -88,10 +88,8 @@ const rdb = @cImport(@cInclude("rocksdb/c.h"));
 ```
 
 <p class="note">
-  Builtin compile time functions in Zig are prefixed with `@`. Don't
-  read anything into the `@` other than that this denotes the function
-  result is resolved at compile time. It's used for imports, casting, and
-  other metaprogramming.
+  Don't read anything into the `@` other than that this is a compiler
+  builtin. It's used for imports, casting, and other metaprogramming.
 </p>
 
 Now we can build our wrapper. It will be a Zig struct that contains a
