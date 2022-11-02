@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Tue, 01 Nov 2022 14:54:21 +0000</lastBuildDate><item><title>A minimal RocksDB example with Zig</title><link>http://notes.eatonphil.com/zigrocks.html</link><description>&lt;p&gt;I mostly programmed in Go the last few years. So every time I
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 02 Nov 2022 01:34:38 +0000</lastBuildDate><item><title>A minimal RocksDB example with Zig</title><link>http://notes.eatonphil.com/zigrocks.html</link><description>&lt;p&gt;I mostly programmed in Go the last few years. So every time I
 wanted an embedded key-value database, I reached for Cockroach's
 &lt;a href="https://github.com/cockroachdb/pebble"&gt;Pebble&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;Pebble is great for Go programming but Go does not embed well into
@@ -185,7 +185,7 @@ fn doA() struct { y: u8 } {
 }
 
 fn doB() struct { y: u8 } {
-  return .{ .y = doA() };
+  return .{ .y = doA().y };
 }
 
 pub fn main() !void {

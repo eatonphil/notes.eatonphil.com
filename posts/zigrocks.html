@@ -249,7 +249,7 @@ fn doA() struct { y: u8 } {
 }
 
 fn doB() struct { y: u8 } {
-  return .{ .y = doA() };
+  return .{ .y = doA().y };
 }
 
 pub fn main() !void {
