@@ -1,0 +1,281 @@
+# Writing a SQL database, take two: Zig and RocksDB
+## November 13, 2022
+###### databases,zig,parsing,sql,rocksdb
+
+In this post, in ~1700 lines of code (yes, I'm sorry it's bigger than
+my usual), we'll create a basic embedded SQL database in Zig on top of
+RocksDB. Other than the RocksDB layer it will not use third-party
+libraries.
+
+Here are a few example interactions we'll support:
+
+```sql
+$ ./main --database data --script <(echo "CREATE TABLE y (year int, age int, name text)")
+echo "CREATE TABLE y (year int, age int, name text)"
+ok
+$ ./main --database data --script <(echo "INSERT INTO y VALUES (2010, 38, 'Gary')")
+echo "INSERT INTO y VALUES (2010, 38, 'Gary')"
+ok
+$ ./main --database data --script <(echo "INSERT INTO y VALUES (2021, 92, 'Teej')")
+echo "INSERT INTO y VALUES (2021, 92, 'Teej')"
+ok
+$ ./main --database data --script <(echo "INSERT INTO y VALUES (1994, 18, 'Mel')")
+echo "INSERT INTO y VALUES (1994, 18, 'Mel')"
+ok
+
+# Basic query
+$ ./main --database data --script <(echo "SELECT name, age, year FROM y")
+echo "SELECT name, age, year FROM y"
+| name          |age            |year           |
++ ====          +===            +====           +
+| Mel           |18             |1994           |
+| Gary          |38             |2010           |
+| Teej          |92             |2021           |
+
+# With WHERE
+$ ./main --database data --script <(echo "SELECT name, year, age FROM y WHERE age < 40")
+echo "SELECT name, year, age FROM y WHERE age < 40"
+| name          |year           |age            |
++ ====          +====           +===            +
+| Mel           |1994           |18             |
+| Gary          |2010           |38             |
+
+# With operations
+$ ./main --database data --script <(echo "SELECT 'Name: ' || name, year + 30, age FROM y WHERE age < 40")
+echo "SELECT 'Name: ' || name, year + 30, age FROM y WHERE age < 40"
+| unknown               |unknown                |age            |
++ =======               +=======                +===            +
+| Name: Mel             |2024           |18             |
+| Name: Gary            |2040           |38             |
+```
+
+This post is standalone (except for the RocksDB layer which [you can
+read about here](https://notes.eatonphil.com/)) but it builds on a
+number of ideas I've explored that you may be interested in:
+
+* [What's the big deal about key-value databases like FoundationDB and RocksDB?](https://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html)
+* [Let's build a distributed Postgres proof of concept](https://notes.eatonphil.com/distributed-postgres.html)
+* [Writing a document database from scratch in Go](https://notes.eatonphil.com/documentdb.html)
+* And the grandfather series, [Writing a SQL database from scratch in Go](https://notes.eatonphil.com/database-basics.html)
+
+This project is mostly a port of my [SQL database from scratch in
+Go](https://notes.eatonphil.com/database-basics.html) project, but
+unlike that series this project will have persistant storage via
+RocksDB.
+
+And unlike that post, this project is written in Zig!
+
+Let's get started. :)
+
+### Components
+
+We're going to split up the project into the following major
+components:
+
+* Lexing
+* Parsing
+* Storage
+  * RocksDB
+* Execution
+* Entrypoint (`main`)
+
+*Lexing* takes a query and breaks it into an array of tokens.
+
+*Parsing* takes the lexed array of tokens and pattern matches into a
+syntax tree (AST).
+
+*Storage* maps high-level SQL entities like tables and rows into bytes
+that can be easily stored on disk. And it handles recovering
+high-level tables and rows from bytes on disk.
+
+Invisible to users of the *Storage* component is *RocksDB*, which is how
+the bytes are actually stored on disk. RocksDB is a persistant store
+that maps arbitary byte keys to arbitrary byte values. We'll use it
+for storing and recovering both table metadata and actual row data.
+
+*Execution* takes a query AST and executes it against *Storage*.
+
+These terms are a vast simplification of real-world database
+design. But they are already extremely helpful to have in a project
+this small.
+
+Now that we've got the basic idea, we can start coding!
+
+### Lexing (`lex.zig`)
+
+Lexing turns a query string into an array of tokens.
+
+There are a few *kinds* of tokens we'll define:
+
+* Keywords (like `CREATE`)
+* Strings
+* Numbers (just integers for now)
+* Booleans
+* Identifiers
+* Syntax (commas, parentheses, operators, whatnot)
+
+And not listed there but important to *skip past* is whitespace.
+
+Let's turn this into a Zig struct!
+
+```zig
+const std = @import("std");
+
+const Error = @import("result.zig").Error;
+
+pub const Token = struct {
+    start: u64,
+    end: u64,
+    kind: Kind,
+    source: []const u8,
+
+    pub const Kind = enum {
+	    // Keywords
+        select_keyword,
+        create_table_keyword,
+        insert_keyword,
+        values_keyword,
+        from_keyword,
+        where_keyword,
+
+        // Operators
+        plus_operator,
+        equal_operator,
+        lt_operator,
+        concat_operator,
+
+        // Other syntax
+        left_paren_syntax,
+        right_paren_syntax,
+        comma_syntax,
+
+        // Literals
+        identifier,
+        numeric,
+        string,
+    };
+
+    pub fn string(self: Token) []const u8 {
+        return self.source[self.start..self.end];
+    }
+```
+
+Using an `enum` helps us with type safety. And since we're storing
+location in the token, we can build a nice debug function for when
+lexing or parsing fails.
+
+```zig
+    fn debug(self: Token, msg: []const u8) void {
+        var line: usize = 0;
+        var column: usize = 0;
+        var lineStartIndex: usize = 0;
+        var lineEndIndex: usize = 0;
+        var i: usize = 0;
+        var source = self.source;
+        while (i < source.len) {
+            if (source[i] == '\n') {
+                line = line + 1;
+                column = 0;
+                lineStartIndex = i;
+            } else {
+                column = column + 1;
+            }
+
+            if (i == self.start) {
+                // Find the end of the line
+                lineEndIndex = i;
+                while (source[lineEndIndex] != '\n') {
+                    lineEndIndex = lineEndIndex + 1;
+                }
+                break;
+            }
+
+            i = i + 1;
+        }
+
+        std.debug.print(
+            "{s}\nNear line {}, column {}.\n{s}\n",
+            .{ msg, line + 1, column, source[lineStartIndex..lineEndIndex] },
+        );
+        while (column - 1 > 0) {
+            std.debug.print(" ", .{});
+            column = column - 1;
+        }
+        std.debug.print("^ Near here\n\n", .{});
+    }
+};
+```
+
+And similarly, let's add a debug helper for when we're dealing with an
+array of tokens.
+
+```zig
+pub fn debug(tokens: []Token, preferredIndex: usize, msg: []const u8) void {
+    var i = preferredIndex;
+    while (i >= tokens.len) {
+        i = i - 0;
+    }
+
+    tokens[i].debug(msg);
+}
+```
+
+#### Token <> String Mapping
+
+Before we get too far from `Token` definition, let's define a mapping
+from the `Token.kind` enum to strings we can see in a query.
+
+```zig
+const Builtin = struct {
+    name: []const u8,
+    kind: Token.Kind,
+};
+
+// These must be sorted by length of the name text, descending, for lexKeyword.
+var BUILTINS = [_]Builtin{
+    .{ .name = "CREATE TABLE", .kind = Token.Kind.create_table_keyword },
+    .{ .name = "INSERT INTO", .kind = Token.Kind.insert_keyword },
+    .{ .name = "SELECT", .kind = Token.Kind.select_keyword },
+    .{ .name = "VALUES", .kind = Token.Kind.values_keyword },
+    .{ .name = "WHERE", .kind = Token.Kind.where_keyword },
+    .{ .name = "FROM", .kind = Token.Kind.from_keyword },
+    .{ .name = "||", .kind = Token.Kind.concat_operator },
+    .{ .name = "=", .kind = Token.Kind.equal_operator },
+    .{ .name = "+", .kind = Token.Kind.plus_operator },
+    .{ .name = "<", .kind = Token.Kind.lt_operator },
+    .{ .name = "(", .kind = Token.Kind.left_paren_syntax },
+    .{ .name = ")", .kind = Token.Kind.right_paren_syntax },
+    .{ .name = ",", .kind = Token.Kind.comma_syntax },
+};
+```
+
+#### Whitespace
+
+Outside of tokens, we need to be able to skip past whitespace.
+
+```zig
+
+fn eatWhitespace(source: []const u8, index: usize) usize {
+    var res = index;
+    while (source[res] == ' ' or
+        source[res] == '\n' or
+        source[res] == '\t' or
+        source[res] == '\r')
+    {
+        res = res + 1;
+        if (res == source.len) {
+            break;
+        }
+    }
+
+    return res;
+}
+```
+
+All lexing functions will look like this. They'll take the source as
+one argument and a cursor to the current index in the source as
+another.
+
+#### Keywords
+
+Let's handle lexing keyword tokens next.
