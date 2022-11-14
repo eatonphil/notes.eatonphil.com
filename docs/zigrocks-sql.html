@@ -498,10 +498,10 @@ pub fn lex(source: String, tokens: *std.ArrayList(Token)) ?Error {
             continue;
         }
 
-        const numericRes = lexNumeric(source, i);
-        if (numericRes.token) |token| {
-            tokens.append(token) catch return &quot;Failed to allocate space for numeric token&quot;;
-            i = numericRes.nextPosition;
+        const integerRes = lexInteger(source, i);
+        if (integerRes.token) |token| {
+            tokens.append(token) catch return &quot;Failed to allocate space for integer token&quot;;
+            i = integerRes.nextPosition;
             continue;
         }
 
@@ -1189,8 +1189,20 @@ serialize rows by concatenating all the values together.</p>
 key prefix that is the table name. And then we give it a random suffix
 to distinguish it from other rows in the table. A more intelligent
 design would use the table's primary key as the suffix but we don't
-support primary keys yet.</p>
-<pre><code class="hljs zig">    pub fn writeRow(self: Storage, table: String, row: Row) ?Error {
+support primary keys yet. (See also, the section on "Mapping SQL to
+key-value storage" in <a href="https://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html">What's the big deal about key-value databases
+like FoundationDB and
+RocksDB?</a>.)</p>
+<pre><code class="hljs zig">    fn generateId() ![]u8 {
+        const file = try std.fs.cwd().openFileZ(&quot;/dev/random&quot;, .{});
+        defer file.close();
+
+        var buf: [16]u8 = .{};
+        _ = try file.read(&amp;buf);
+        return buf[0..];
+    }
+
+    pub fn writeRow(self: Storage, table: String, row: Row) ?Error {
         // Table name prefix
         var key = std.ArrayList(u8).init(self.allocator);
         key.writer().print(&quot;row_{s}_&quot;, .{table}) catch return &quot;Could not allocate row key&quot;;
@@ -1347,6 +1359,8 @@ concatentations.</p>
 <p>And that's it for storage! Again, we're building on top of the
 <a href="https://notes.eatonphil.com/zigrocks.html">RocksDB layer</a> I already
 wrote about. If you want to see how that works, go for it!</p>
+<p>If you just want the <code>rocksdb.zig</code> file, grab it from
+<a href="https://github.com/eatonphil/zigrocks/blob/7831e390f4044bb999507fd6d0e23bb2475756f8/rocksdb.zig">here</a>.</p>
 <h3 id="execute-(<code>execute.zig</code>,-210-loc)">Execute (<code>execute.zig</code>, 210 LoC)</h3><p>Now that we've got a storage layer and an AST from our parser, we can
 execute the query on top of the storage!</p>
 <p>A better implementation might translate the AST to bytecode and
@@ -1759,7 +1773,6 @@ pub fn build(b: *std.build.Builder) void {
     exe.setOutputDir(&quot;.&quot;);
 
     if (exe.target.isDarwin()) {
-        b.installFile(&quot;./rocksdb/librocksdb.7.8.dylib&quot;, &quot;../librocksdb.7.8.dylib&quot;);
         exe.addRPath(&quot;.&quot;);
     }
 
@@ -1769,6 +1782,11 @@ pub fn build(b: *std.build.Builder) void {
 <p>Grab RocksDB, build it, and build our CLI.</p>
 <pre><code class="hljs bash">$ git clone https://github.com/facebook/rocksdb
 $ ( cd rocksdb &amp;&amp; make shared_lib -j8 )
+
+# ONLY IF YOU ARE ON A MAC
+$ cp rocksdb/*.dylib . # ONLY IF YOU ARE ON A MAC
+# DONE ONLY IF YOU ARE ON A MAC
+
 $ zig build
 </code></pre>
 <p>And give it a go. :)</p>

@@ -527,10 +527,10 @@ pub fn lex(source: String, tokens: *std.ArrayList(Token)) ?Error {
             continue;
         }
 
-        const numericRes = lexNumeric(source, i);
-        if (numericRes.token) |token| {
-            tokens.append(token) catch return "Failed to allocate space for numeric token";
-            i = numericRes.nextPosition;
+        const integerRes = lexInteger(source, i);
+        if (integerRes.token) |token| {
+            tokens.append(token) catch return "Failed to allocate space for integer token";
+            i = integerRes.nextPosition;
             continue;
         }
 
@@ -1308,9 +1308,21 @@ Since we must map to keys and values for RocksDB, we give each row a
 key prefix that is the table name. And then we give it a random suffix
 to distinguish it from other rows in the table. A more intelligent
 design would use the table's primary key as the suffix but we don't
-support primary keys yet.
+support primary keys yet. (See also, the section on "Mapping SQL to
+key-value storage" in [What's the big deal about key-value databases
+like FoundationDB and
+RocksDB?](https://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html).)
 
 ```zig
+    fn generateId() ![]u8 {
+        const file = try std.fs.cwd().openFileZ("/dev/random", .{});
+        defer file.close();
+
+        var buf: [16]u8 = .{};
+        _ = try file.read(&buf);
+        return buf[0..];
+    }
+
     pub fn writeRow(self: Storage, table: String, row: Row) ?Error {
         // Table name prefix
         var key = std.ArrayList(u8).init(self.allocator);
@@ -1490,6 +1502,9 @@ And the opposite for decoding.
 And that's it for storage! Again, we're building on top of the
 [RocksDB layer](https://notes.eatonphil.com/zigrocks.html) I already
 wrote about. If you want to see how that works, go for it!
+
+If you just want the `rocksdb.zig` file, grab it from
+[here](https://github.com/eatonphil/zigrocks/blob/7831e390f4044bb999507fd6d0e23bb2475756f8/rocksdb.zig).
 
 ### Execute (`execute.zig`, 210 LoC)
 
@@ -1977,7 +1992,6 @@ pub fn build(b: *std.build.Builder) void {
     exe.setOutputDir(".");
 
     if (exe.target.isDarwin()) {
-        b.installFile("./rocksdb/librocksdb.7.8.dylib", "../librocksdb.7.8.dylib");
         exe.addRPath(".");
     }
 
@@ -1990,6 +2004,11 @@ Grab RocksDB, build it, and build our CLI.
 ```bash
 $ git clone https://github.com/facebook/rocksdb
 $ ( cd rocksdb && make shared_lib -j8 )
+
+# ONLY IF YOU ARE ON A MAC
+$ cp rocksdb/*.dylib . # ONLY IF YOU ARE ON A MAC
+# DONE ONLY IF YOU ARE ON A MAC
+
 $ zig build
 ```
 

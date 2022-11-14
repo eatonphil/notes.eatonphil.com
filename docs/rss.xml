@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 14 Nov 2022 01:21:32 +0000</lastBuildDate><item><title>Writing a SQL database, take two: Zig and RocksDB</title><link>http://notes.eatonphil.com/zigrocks-sql.html</link><description>&lt;p&gt;In this post, in ~1700 lines of code (yes, I'm sorry it's bigger than
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 14 Nov 2022 01:55:14 +0000</lastBuildDate><item><title>Writing a SQL database, take two: Zig and RocksDB</title><link>http://notes.eatonphil.com/zigrocks-sql.html</link><description>&lt;p&gt;In this post, in ~1700 lines of code (yes, I'm sorry it's bigger than
 my usual), we'll create a basic embedded SQL database in Zig on top of
 RocksDB. Other than the RocksDB layer it will not use third-party
 libraries.&lt;/p&gt;
@@ -443,10 +443,10 @@ pub fn lex(source: String, tokens: *std.ArrayList(Token)) ?Error {
             continue;
         }
 
-        const numericRes = lexNumeric(source, i);
-        if (numericRes.token) |token| {
-            tokens.append(token) catch return &amp;quot;Failed to allocate space for numeric token&amp;quot;;
-            i = numericRes.nextPosition;
+        const integerRes = lexInteger(source, i);
+        if (integerRes.token) |token| {
+            tokens.append(token) catch return &amp;quot;Failed to allocate space for integer token&amp;quot;;
+            i = integerRes.nextPosition;
             continue;
         }
 
@@ -1134,8 +1134,20 @@ serialize rows by concatenating all the values together.&lt;/p&gt;
 key prefix that is the table name. And then we give it a random suffix
 to distinguish it from other rows in the table. A more intelligent
 design would use the table's primary key as the suffix but we don't
-support primary keys yet.&lt;/p&gt;
-&lt;pre&gt;&lt;code class="hljs zig"&gt;    pub fn writeRow(self: Storage, table: String, row: Row) ?Error {
+support primary keys yet. (See also, the section on "Mapping SQL to
+key-value storage" in &lt;a href="https://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html"&gt;What's the big deal about key-value databases
+like FoundationDB and
+RocksDB?&lt;/a&gt;.)&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    fn generateId() ![]u8 {
+        const file = try std.fs.cwd().openFileZ(&amp;quot;/dev/random&amp;quot;, .{});
+        defer file.close();
+
+        var buf: [16]u8 = .{};
+        _ = try file.read(&amp;amp;buf);
+        return buf[0..];
+    }
+
+    pub fn writeRow(self: Storage, table: String, row: Row) ?Error {
         // Table name prefix
         var key = std.ArrayList(u8).init(self.allocator);
         key.writer().print(&amp;quot;row_{s}_&amp;quot;, .{table}) catch return &amp;quot;Could not allocate row key&amp;quot;;
@@ -1292,6 +1304,8 @@ concatentations.&lt;/p&gt;
 &lt;p&gt;And that's it for storage! Again, we're building on top of the
 &lt;a href="https://notes.eatonphil.com/zigrocks.html"&gt;RocksDB layer&lt;/a&gt; I already
 wrote about. If you want to see how that works, go for it!&lt;/p&gt;
+&lt;p&gt;If you just want the &lt;code&gt;rocksdb.zig&lt;/code&gt; file, grab it from
+&lt;a href="https://github.com/eatonphil/zigrocks/blob/7831e390f4044bb999507fd6d0e23bb2475756f8/rocksdb.zig"&gt;here&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="execute-(&lt;code&gt;execute.zig&lt;/code&gt;,-210-loc)"&gt;Execute (&lt;code&gt;execute.zig&lt;/code&gt;, 210 LoC)&lt;/h3&gt;&lt;p&gt;Now that we've got a storage layer and an AST from our parser, we can
 execute the query on top of the storage!&lt;/p&gt;
 &lt;p&gt;A better implementation might translate the AST to bytecode and
@@ -1704,7 +1718,6 @@ pub fn build(b: *std.build.Builder) void {
     exe.setOutputDir(&amp;quot;.&amp;quot;);
 
     if (exe.target.isDarwin()) {
-        b.installFile(&amp;quot;./rocksdb/librocksdb.7.8.dylib&amp;quot;, &amp;quot;../librocksdb.7.8.dylib&amp;quot;);
         exe.addRPath(&amp;quot;.&amp;quot;);
     }
 
@@ -1714,6 +1727,11 @@ pub fn build(b: *std.build.Builder) void {
 &lt;p&gt;Grab RocksDB, build it, and build our CLI.&lt;/p&gt;
 &lt;pre&gt;&lt;code class="hljs bash"&gt;$ git clone https://github.com/facebook/rocksdb
 $ ( cd rocksdb &amp;amp;&amp;amp; make shared_lib -j8 )
+
+# ONLY IF YOU ARE ON A MAC
+$ cp rocksdb/*.dylib . # ONLY IF YOU ARE ON A MAC
+# DONE ONLY IF YOU ARE ON A MAC
+
 $ zig build
 &lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;And give it a go. :)&lt;/p&gt;
