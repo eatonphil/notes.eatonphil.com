@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 14 Nov 2022 13:27:15 +0000</lastBuildDate><item><title>Writing a SQL database, take two: Zig and RocksDB</title><link>http://notes.eatonphil.com/zigrocks-sql.html</link><description>&lt;p&gt;For my second project while learning Zig, I decided to port an
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 14 Nov 2022 13:31:39 +0000</lastBuildDate><item><title>Writing a SQL database, take two: Zig and RocksDB</title><link>http://notes.eatonphil.com/zigrocks-sql.html</link><description>&lt;p&gt;For my second project while learning Zig, I decided to port an
 old, minimal SQL database project from Go to Zig.&lt;/p&gt;
 &lt;p&gt;In this post, in ~1700 lines of code (yes, I'm sorry it's bigger than
 my usual), we'll create a basic embedded SQL database in Zig on top of
@@ -45,8 +45,8 @@ echo &amp;quot;SELECT &amp;#39;Name: &amp;#39; || name, year + 30, age FROM y WH
 | Name: Mel             |2024           |18             |
 | Name: Gary            |2040           |38             |
 &lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;This post is standalone (except for the RocksDB layer which &lt;a href="https://notes.eatonphil.com/zigrocks.html"&gt;you can
-read about here&lt;/a&gt;) but it builds on a
+&lt;p&gt;This post is standalone (except for the RocksDB layer which I &lt;a href="https://notes.eatonphil.com/zigrocks.html"&gt;wrote
+about here&lt;/a&gt;) but it builds on a
 number of ideas I've explored that you may be interested in:&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="https://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html"&gt;What's the big deal about key-value databases like FoundationDB and RocksDB?&lt;/a&gt;&lt;/li&gt;
