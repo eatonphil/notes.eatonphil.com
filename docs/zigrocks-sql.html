@@ -135,7 +135,7 @@ number of ideas I've explored that you may be interested in:</p>
 </ul>
 <p>This project is mostly a port of my <a href="https://notes.eatonphil.com/database-basics.html">SQL database from scratch in
 Go</a> project, but
-unlike that series this project will have persistant storage via
+unlike that series this project will have persistent storage via
 RocksDB.</p>
 <p>And unlike that post, this project is written in Zig!</p>
 <p>Let's get started. :)</p>
@@ -158,7 +158,7 @@ syntax tree (AST).</p>
 that can be easily stored on disk. And it handles recovering
 high-level tables and rows from bytes on disk.</p>
 <p>Invisible to users of the <em>Storage</em> component is <em>RocksDB</em>, which is how
-the bytes are actually stored on disk. <a href="http://rocksdb.org/">RocksDB</a> is a persistant store
+the bytes are actually stored on disk. <a href="http://rocksdb.org/">RocksDB</a> is a persistent store
 that maps arbitary byte keys to arbitrary byte values. We'll use it
 for storing and recovering both table metadata and actual row data.</p>
 <p><em>Execution</em> takes a query AST and executes it against <em>Storage</em>,
@@ -1212,7 +1212,7 @@ we can provide a few helper functions for getting cells by field name.</p>
     };
 </code></pre>
 <p>Since values are serialized with length prefixes, we can
-serialize rows by concatenating all the values together.</p>
+serialize a row by concatenating all the values together.</p>
 <p>Since we must map to keys and values for RocksDB, we give each row a
 key prefix that is the table name. And then we give it a random suffix
 to distinguish it from other rows in the table. A more intelligent
