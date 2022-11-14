@@ -1,5 +1,1794 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Wed, 02 Nov 2022 01:34:38 +0000</lastBuildDate><item><title>A minimal RocksDB example with Zig</title><link>http://notes.eatonphil.com/zigrocks.html</link><description>&lt;p&gt;I mostly programmed in Go the last few years. So every time I
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 14 Nov 2022 01:57:05 +0000</lastBuildDate><item><title>Writing a SQL database, take two: Zig and RocksDB</title><link>http://notes.eatonphil.com/zigrocks-sql.html</link><description>&lt;p&gt;As a second non-trivial post while learning Zig, I decided to port an
+old, minimal SQL database project from Go to Zig.&lt;/p&gt;
+&lt;p&gt;In this post, in ~1700 lines of code (yes, I'm sorry it's bigger than
+my usual), we'll create a basic embedded SQL database in Zig on top of
+RocksDB. Other than the RocksDB layer it will not use third-party
+libraries.&lt;/p&gt;
+&lt;p&gt;Here are a few example interactions we'll support:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs sql"&gt;$ ./main --database data --script &amp;lt;(echo &amp;quot;CREATE TABLE y (year int, age int, name text)&amp;quot;)
+echo &amp;quot;CREATE TABLE y (year int, age int, name text)&amp;quot;
+ok
+$ ./main --database data --script &amp;lt;(echo &amp;quot;INSERT INTO y VALUES (2010, 38, &amp;#39;Gary&amp;#39;)&amp;quot;)
+echo &amp;quot;INSERT INTO y VALUES (2010, 38, &amp;#39;Gary&amp;#39;)&amp;quot;
+ok
+$ ./main --database data --script &amp;lt;(echo &amp;quot;INSERT INTO y VALUES (2021, 92, &amp;#39;Teej&amp;#39;)&amp;quot;)
+echo &amp;quot;INSERT INTO y VALUES (2021, 92, &amp;#39;Teej&amp;#39;)&amp;quot;
+ok
+$ ./main --database data --script &amp;lt;(echo &amp;quot;INSERT INTO y VALUES (1994, 18, &amp;#39;Mel&amp;#39;)&amp;quot;)
+echo &amp;quot;INSERT INTO y VALUES (1994, 18, &amp;#39;Mel&amp;#39;)&amp;quot;
+ok
+
+# Basic query
+$ ./main --database data --script &amp;lt;(echo &amp;quot;SELECT name, age, year FROM y&amp;quot;)
+echo &amp;quot;SELECT name, age, year FROM y&amp;quot;
+| name          |age            |year           |
++ ====          +===            +====           +
+| Mel           |18             |1994           |
+| Gary          |38             |2010           |
+| Teej          |92             |2021           |
+
+# With WHERE
+$ ./main --database data --script &amp;lt;(echo &amp;quot;SELECT name, year, age FROM y WHERE age &amp;lt; 40&amp;quot;)
+echo &amp;quot;SELECT name, year, age FROM y WHERE age &amp;lt; 40&amp;quot;
+| name          |year           |age            |
++ ====          +====           +===            +
+| Mel           |1994           |18             |
+| Gary          |2010           |38             |
+
+# With operations
+$ ./main --database data --script &amp;lt;(echo &amp;quot;SELECT &amp;#39;Name: &amp;#39; || name, year + 30, age FROM y WHERE age &amp;lt; 40&amp;quot;)
+echo &amp;quot;SELECT &amp;#39;Name: &amp;#39; || name, year + 30, age FROM y WHERE age &amp;lt; 40&amp;quot;
+| unknown               |unknown                |age            |
++ =======               +=======                +===            +
+| Name: Mel             |2024           |18             |
+| Name: Gary            |2040           |38             |
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This post is standalone (except for the RocksDB layer which &lt;a href="https://notes.eatonphil.com/zigrocks.html"&gt;you can
+read about here&lt;/a&gt;) but it builds on a
+number of ideas I've explored that you may be interested in:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html"&gt;What's the big deal about key-value databases like FoundationDB and RocksDB?&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://notes.eatonphil.com/distributed-postgres.html"&gt;Let's build a distributed Postgres proof of concept&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://notes.eatonphil.com/documentdb.html"&gt;Writing a document database from scratch in Go&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;And the grandfather series, &lt;a href="https://notes.eatonphil.com/database-basics.html"&gt;Writing a SQL database from scratch in Go&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;This project is mostly a port of my &lt;a href="https://notes.eatonphil.com/database-basics.html"&gt;SQL database from scratch in
+Go&lt;/a&gt; project, but
+unlike that series this project will have persistant storage via
+RocksDB.&lt;/p&gt;
+&lt;p&gt;And unlike that post, this project is written in Zig!&lt;/p&gt;
+&lt;p&gt;Let's get started. :)&lt;/p&gt;
+&lt;h3 id="components"&gt;Components&lt;/h3&gt;&lt;p&gt;We're going to split up the project into the following major
+components:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Lexing&lt;/li&gt;
+&lt;li&gt;Parsing&lt;/li&gt;
+&lt;li&gt;Storage&lt;ul&gt;
+&lt;li&gt;RocksDB&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Execution&lt;/li&gt;
+&lt;li&gt;Entrypoint (&lt;code&gt;main&lt;/code&gt;)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;Lexing&lt;/em&gt; takes a query and breaks it into an array of tokens.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Parsing&lt;/em&gt; takes the lexed array of tokens and pattern matches into a
+syntax tree (AST).&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Storage&lt;/em&gt; maps high-level SQL entities like tables and rows into bytes
+that can be easily stored on disk. And it handles recovering
+high-level tables and rows from bytes on disk.&lt;/p&gt;
+&lt;p&gt;Invisible to users of the &lt;em&gt;Storage&lt;/em&gt; component is &lt;em&gt;RocksDB&lt;/em&gt;, which is how
+the bytes are actually stored on disk. RocksDB is a persistant store
+that maps arbitary byte keys to arbitrary byte values. We'll use it
+for storing and recovering both table metadata and actual row data.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Execution&lt;/em&gt; takes a query AST and executes it against &lt;em&gt;Storage&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;These terms are a vast simplification of real-world database
+design. But they are already extremely helpful to have in a project
+this small.&lt;/p&gt;
+&lt;h3 id="memory-management"&gt;Memory Management&lt;/h3&gt;&lt;p&gt;Zig doesn't have a garbage collector. Mitchell Hashimoto &lt;a href="https://github.com/mitchellh/zig-libgc"&gt;wrote
+bindings to Boehm GC&lt;/a&gt;, but Zig
+also has a &lt;a href="https://ziglang.org/documentation/master/#toc-Choosing-an-Allocator"&gt;builtin Arena
+allocator&lt;/a&gt;
+which is perfect for this simple project.&lt;/p&gt;
+&lt;p&gt;The &lt;code&gt;main&lt;/code&gt; function will create the arena and pass it to each
+component, where they can do allocations as they please. At the end of
+&lt;code&gt;main&lt;/code&gt;, the entire arena will be freed at once.&lt;/p&gt;
+&lt;p&gt;The only other place where we must do manual memory management is in
+the RocksDB wrapper. But &lt;a href="https://notes.eatonphil.com/zigrocks.html"&gt;I've already
+covered&lt;/a&gt; that in a separate
+post.&lt;/p&gt;
+&lt;h3 id="zig-specifics"&gt;Zig Specifics&lt;/h3&gt;&lt;p&gt;I'm not going to cover the basics of Zig syntax. If you are new to
+Zig, read &lt;a href="https://notes.eatonphil.com/zigrocks.html"&gt;this&lt;/a&gt; first!
+(It's short.)&lt;/p&gt;
+&lt;p&gt;Now that we've got the basic idea, we can start coding!&lt;/p&gt;
+&lt;h3 id="types-(&lt;code&gt;types.zig&lt;/code&gt;,-10-loc)"&gt;Types (&lt;code&gt;types.zig&lt;/code&gt;, 10 LoC)&lt;/h3&gt;&lt;p&gt;Let's create a few helper types that we'll use in the rest of the
+code.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;pub const String = []const u8;
+
+pub const Error = String;
+
+pub fn Result(comptime T: type) type {
+    return union(enum) {
+        val: T,
+        err: Error,
+    };
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That's it. :) Makes things a little more readable.&lt;/p&gt;
+&lt;h3 id="lexing-(&lt;code&gt;lex.zig&lt;/code&gt;,-308-loc)"&gt;Lexing (&lt;code&gt;lex.zig&lt;/code&gt;, 308 LoC)&lt;/h3&gt;&lt;p&gt;Lexing turns a query string into an array of tokens.&lt;/p&gt;
+&lt;p&gt;There are a few &lt;em&gt;kinds&lt;/em&gt; of tokens we'll define:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Keywords (like &lt;code&gt;CREATE&lt;/code&gt;, &lt;code&gt;true&lt;/code&gt;, &lt;code&gt;false&lt;/code&gt;, &lt;code&gt;null&lt;/code&gt;)&lt;ul&gt;
+&lt;li&gt;Syntax (commas, parentheses, operators, and all other builtin symbols)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Strings&lt;/li&gt;
+&lt;li&gt;Integers&lt;/li&gt;
+&lt;li&gt;Identifiers&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;And not listed there but important to &lt;em&gt;skip past&lt;/em&gt; is whitespace.&lt;/p&gt;
+&lt;p&gt;Let's turn this into a Zig struct!&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;const std = @import(&amp;quot;std&amp;quot;);
+
+const Error = @import(&amp;quot;types.zig&amp;quot;).Error;
+const String = @import(&amp;quot;types.zig&amp;quot;).String;
+
+pub const Token = struct {
+    start: u64,
+    end: u64,
+    kind: Kind,
+    source: String,
+
+    pub const Kind = enum {
+        // Keywords
+        select_keyword,
+        create_table_keyword,
+        insert_keyword,
+        values_keyword,
+        from_keyword,
+        where_keyword,
+
+        // Operators
+        plus_operator,
+        equal_operator,
+        lt_operator,
+        concat_operator,
+
+        // Other syntax
+        left_paren_syntax,
+        right_paren_syntax,
+        comma_syntax,
+
+        // Literals
+        identifier,
+        integer,
+        string,
+    };
+
+    pub fn string(self: Token) String {
+        return self.source[self.start..self.end];
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Using an &lt;code&gt;enum&lt;/code&gt; helps us with type safety. And since we're storing
+location in the token, we can build a nice debug function for when
+lexing or parsing fails.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    fn debug(self: Token, msg: String) void {
+        var line: usize = 0;
+        var column: usize = 0;
+        var lineStartIndex: usize = 0;
+        var lineEndIndex: usize = 0;
+        var i: usize = 0;
+        var source = self.source;
+        while (i &amp;lt; source.len) {
+            if (source[i] == &amp;#39;\n&amp;#39;) {
+                line = line + 1;
+                column = 0;
+                lineStartIndex = i;
+            } else {
+                column = column + 1;
+            }
+
+            if (i == self.start) {
+                // Find the end of the line
+                lineEndIndex = i;
+                while (source[lineEndIndex] != &amp;#39;\n&amp;#39;) {
+                    lineEndIndex = lineEndIndex + 1;
+                }
+                break;
+            }
+
+            i = i + 1;
+        }
+
+        std.debug.print(
+            &amp;quot;{s}\nNear line {}, column {}.\n{s}\n&amp;quot;,
+            .{ msg, line + 1, column, source[lineStartIndex..lineEndIndex] },
+        );
+        while (column - 1 &amp;gt; 0) {
+            std.debug.print(&amp;quot; &amp;quot;, .{});
+            column = column - 1;
+        }
+        std.debug.print(&amp;quot;^ Near here\n\n&amp;quot;, .{});
+    }
+};
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And similarly, let's add a debug helper for when we're dealing with an
+array of tokens.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;pub fn debug(tokens: []Token, preferredIndex: usize, msg: String) void {
+    var i = preferredIndex;
+    while (i &amp;gt;= tokens.len) {
+        i = i - 0;
+    }
+
+    tokens[i].debug(msg);
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="token-&amp;lt;&amp;gt;-string-mapping"&gt;Token &amp;lt;&amp;gt; String Mapping&lt;/h4&gt;&lt;p&gt;Before we get too far from &lt;code&gt;Token&lt;/code&gt; definition, let's define a mapping
+from the &lt;code&gt;Token.kind&lt;/code&gt; enum to strings we can see in a query.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;const Builtin = struct {
+    name: String,
+    kind: Token.Kind,
+};
+
+// These must be sorted by length of the name text, descending, for lexKeyword.
+var BUILTINS = [_]Builtin{
+    .{ .name = &amp;quot;CREATE TABLE&amp;quot;, .kind = Token.Kind.create_table_keyword },
+    .{ .name = &amp;quot;INSERT INTO&amp;quot;, .kind = Token.Kind.insert_keyword },
+    .{ .name = &amp;quot;SELECT&amp;quot;, .kind = Token.Kind.select_keyword },
+    .{ .name = &amp;quot;VALUES&amp;quot;, .kind = Token.Kind.values_keyword },
+    .{ .name = &amp;quot;WHERE&amp;quot;, .kind = Token.Kind.where_keyword },
+    .{ .name = &amp;quot;FROM&amp;quot;, .kind = Token.Kind.from_keyword },
+    .{ .name = &amp;quot;||&amp;quot;, .kind = Token.Kind.concat_operator },
+    .{ .name = &amp;quot;=&amp;quot;, .kind = Token.Kind.equal_operator },
+    .{ .name = &amp;quot;+&amp;quot;, .kind = Token.Kind.plus_operator },
+    .{ .name = &amp;quot;&amp;lt;&amp;quot;, .kind = Token.Kind.lt_operator },
+    .{ .name = &amp;quot;(&amp;quot;, .kind = Token.Kind.left_paren_syntax },
+    .{ .name = &amp;quot;)&amp;quot;, .kind = Token.Kind.right_paren_syntax },
+    .{ .name = &amp;quot;,&amp;quot;, .kind = Token.Kind.comma_syntax },
+};
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We'll use this in a few lexing functions below.&lt;/p&gt;
+&lt;h4 id="whitespace"&gt;Whitespace&lt;/h4&gt;&lt;p&gt;Outside of tokens, we need to be able to skip past whitespace.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;
+fn eatWhitespace(source: String, index: usize) usize {
+    var res = index;
+    while (source[res] == &amp;#39; &amp;#39; or
+        source[res] == &amp;#39;\n&amp;#39; or
+        source[res] == &amp;#39;\t&amp;#39; or
+        source[res] == &amp;#39;\r&amp;#39;)
+    {
+        res = res + 1;
+        if (res == source.len) {
+            break;
+        }
+    }
+
+    return res;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;All lexing functions will look like this. They'll take the source as
+one argument and a cursor to the current index in the source as
+another.&lt;/p&gt;
+&lt;h4 id="keywords"&gt;Keywords&lt;/h4&gt;&lt;p&gt;Let's handle lexing keyword tokens next. Keywords are case
+insensitive. I don't think there's a builtin case insensitive string
+comparison function in Zig. So let's write that first.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;fn asciiCaseInsensitiveEqual(left: String, right: String) bool {
+    var min = left;
+    if (right.len &amp;lt; left.len) {
+        min = right;
+    }
+
+    for (min) |_, i| {
+        var l = left[i];
+        if (l &amp;gt;= 97 and l &amp;lt;= 122) {
+            l = l - 32;
+        }
+
+        var r = right[i];
+        if (r &amp;gt;= 97 and r &amp;lt;= 122) {
+            r = r - 32;
+        }
+
+        if (l != r) {
+            return false;
+        }
+    }
+
+    return true;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Unfortunately it only supports ASCII for now.&lt;/p&gt;
+&lt;p&gt;Now we can write a simple longest matching substring function. It will
+be simple because the keyword mapping we set up above is ordered by
+length descending.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;fn lexKeyword(source: String, index: usize) struct { nextPosition: usize, token: ?Token } {
+    var longestLen: usize = 0;
+    var kind = Token.Kind.select_keyword;
+    for (BUILTINS) |builtin| {
+        if (index + builtin.name.len &amp;gt;= source.len) {
+            continue;
+        }
+
+        if (asciiCaseInsensitiveEqual(source[index .. index + builtin.name.len], builtin.name)) {
+            longestLen = builtin.name.len;
+            kind = builtin.kind;
+            // First match is the longest match
+            break;
+        }
+    }
+
+    if (longestLen == 0) {
+        return .{ .nextPosition = 0, .token = null };
+    }
+
+    return .{
+        .nextPosition = index + longestLen,
+        .token = Token{
+            .source = source,
+            .start = index,
+            .end = index + longestLen,
+            .kind = kind,
+        },
+    };
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That's it!&lt;/p&gt;
+&lt;h4 id="integers"&gt;Integers&lt;/h4&gt;&lt;p&gt;For integers we read through the source until we stop seeing
+decimal digits. Obviously this is a subset of what people consider
+integers, but it will do for now!&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;fn lexInteger(source: String, index: usize) struct { nextPosition: usize, token: ?Token } {
+    var start = index;
+    var end = index;
+    var i = index;
+    while (source[i] &amp;gt;= &amp;#39;0&amp;#39; and source[i] &amp;lt;= &amp;#39;9&amp;#39;) {
+        end = end + 1;
+        i = i + 1;
+    }
+
+    if (start == end) {
+        return .{ .nextPosition = 0, .token = null };
+    }
+
+    return .{
+        .nextPosition = end,
+        .token = Token{
+            .source = source,
+            .start = start,
+            .end = end,
+            .kind = Token.Kind.integer,
+        },
+    };
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="strings"&gt;Strings&lt;/h4&gt;&lt;p&gt;Strings are enclosed in single quotes.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;fn lexString(source: String, index: usize) struct { nextPosition: usize, token: ?Token } {
+    var i = index;
+    if (source[i] != &amp;#39;\&amp;#39;&amp;#39;) {
+        return .{ .nextPosition = 0, .token = null };
+    }
+    i = i + 1;
+
+    var start = i;
+    var end = i;
+    while (source[i] != &amp;#39;\&amp;#39;&amp;#39;) {
+        end = end + 1;
+        i = i + 1;
+    }
+
+    if (source[i] == &amp;#39;\&amp;#39;&amp;#39;) {
+        i = i + 1;
+    }
+
+    if (start == end) {
+        return .{ .nextPosition = 0, .token = null };
+    }
+
+    return .{
+        .nextPosition = i,
+        .token = Token{
+            .source = source,
+            .start = start,
+            .end = end,
+            .kind = Token.Kind.string,
+        },
+    };
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="identifiers"&gt;Identifiers&lt;/h4&gt;&lt;p&gt;Identifiers for this project are alphanumeric characters. We could
+support more by optionally checking for double quote enclosed
+strings. But I'll leave that as an exercise for the reader.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;fn lexIdentifier(source: String, index: usize) struct { nextPosition: usize, token: ?Token } {
+    var start = index;
+    var end = index;
+    var i = index;
+    while ((source[i] &amp;gt;= &amp;#39;a&amp;#39; and source[i] &amp;lt;= &amp;#39;z&amp;#39;) or
+        (source[i] &amp;gt;= &amp;#39;A&amp;#39; and source[i] &amp;lt;= &amp;#39;Z&amp;#39;) or
+        (source[i] == &amp;#39;*&amp;#39;))
+    {
+        end = end + 1;
+        i = i + 1;
+    }
+
+    if (start == end) {
+        return .{ .nextPosition = 0, .token = null };
+    }
+
+    return .{
+        .nextPosition = end,
+        .token = Token{
+            .source = source,
+            .start = start,
+            .end = end,
+            .kind = Token.Kind.identifier,
+        },
+    };
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="&lt;code&gt;lex&lt;/code&gt;"&gt;&lt;code&gt;lex&lt;/code&gt;&lt;/h4&gt;&lt;p&gt;Now we can pull together all these helper functions in a public
+entrypoint for lexing.&lt;/p&gt;
+&lt;p&gt;It will loop through a query string, eating whitespace and checking
+for tokens. It will continue until it hits the end of the query
+string. If it ever can't continue it fails.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;
+pub fn lex(source: String, tokens: *std.ArrayList(Token)) ?Error {
+    var i: usize = 0;
+    while (true) {
+        i = eatWhitespace(source, i);
+        if (i &amp;gt;= source.len) {
+            break;
+        }
+
+        const keywordRes = lexKeyword(source, i);
+        if (keywordRes.token) |token| {
+            tokens.append(token) catch return &amp;quot;Failed to allocate space for keyword token&amp;quot;;
+            i = keywordRes.nextPosition;
+            continue;
+        }
+
+        const integerRes = lexInteger(source, i);
+        if (integerRes.token) |token| {
+            tokens.append(token) catch return &amp;quot;Failed to allocate space for integer token&amp;quot;;
+            i = integerRes.nextPosition;
+            continue;
+        }
+
+        const stringRes = lexString(source, i);
+        if (stringRes.token) |token| {
+            tokens.append(token) catch return &amp;quot;Failed to allocate space for string token&amp;quot;;
+            i = stringRes.nextPosition;
+            continue;
+        }
+
+        const identifierRes = lexIdentifier(source, i);
+        if (identifierRes.token) |token| {
+            tokens.append(token) catch return &amp;quot;Failed to allocate space for identifier token&amp;quot;;
+            i = identifierRes.nextPosition;
+            continue;
+        }
+
+        if (tokens.items.len &amp;gt; 0) {
+            debug(tokens.items, tokens.items.len - 1, &amp;quot;Last good token.\n&amp;quot;);
+        }
+        return &amp;quot;Bad token&amp;quot;;
+    }
+
+    return null;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That's it for lexing! Now we can do parsing.&lt;/p&gt;
+&lt;h3 id="parsing-(&lt;code&gt;parse.zig&lt;/code&gt;,-407-loc)"&gt;Parsing (&lt;code&gt;parse.zig&lt;/code&gt;, 407 LoC)&lt;/h3&gt;&lt;p&gt;Parsing takes an array of tokens from the lexing stage and discovers
+the tree structure in them that maps to a predefined syntax tree
+(AST).&lt;/p&gt;
+&lt;p&gt;If it can't discover a valid tree from the array of tokens, it fails.&lt;/p&gt;
+&lt;p&gt;Let's set up the basics of the &lt;code&gt;Parser&lt;/code&gt; struct:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;const std = @import("std");
+
+const lex = @import("lex.zig");
+const Result = @import("types.zig").Result;
+
+const Token = lex.Token;
+
+pub const Parser = struct {
+    allocator: std.mem.Allocator,
+
+    pub fn init(allocator: std.mem.Allocator) Parser {
+        return Parser{ .allocator = allocator };
+    }
+
+    fn expectTokenKind(tokens: []Token, index: usize, kind: Token.Kind) bool {
+        if (index &amp;gt;= tokens.len) {
+            return false;
+        }
+
+        return tokens[index].kind == kind;
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="expressions"&gt;Expressions&lt;/h4&gt;&lt;p&gt;Expressions are at the bottom of the syntax tree.&lt;/p&gt;
+&lt;p&gt;They can be:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Literals (like strings, integers, booleans, etc.)&lt;/li&gt;
+&lt;li&gt;Or binary operations&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Let's define these in Zig:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    pub const BinaryOperationAST = struct {
+        operator: Token,
+        left: *ExpressionAST,
+        right: *ExpressionAST,
+
+        fn print(self: BinaryOperationAST) void {
+            self.left.print();
+            std.debug.print(&amp;quot; {s} &amp;quot;, .{self.operator.string()});
+            self.right.print();
+        }
+    };
+
+    pub const ExpressionAST = union(enum) {
+        literal: Token,
+        binary_operation: BinaryOperationAST,
+
+        fn print(self: ExpressionAST) void {
+            switch (self) {
+                .literal =&amp;gt; |literal| switch (literal.kind) {
+                    .string =&amp;gt; std.debug.print(&amp;quot;&amp;#39;{s}&amp;#39;&amp;quot;, .{literal.string()}),
+                    else =&amp;gt; std.debug.print(&amp;quot;{s}&amp;quot;, .{literal.string()}),
+                },
+                .binary_operation =&amp;gt; self.binary_operation.print(),
+            }
+        }
+    };
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now we can attempt to parse either of these from an array of tokens.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    fn parseExpression(self: Parser, tokens: []Token, index: usize) Result(struct {
+        ast: ExpressionAST,
+        nextPosition: usize,
+    }) {
+        var i = index;
+
+        var e: ExpressionAST = undefined;
+
+        if (expectTokenKind(tokens, i, Token.Kind.integer) or
+                expectTokenKind(tokens, i, Token.Kind.identifier) or
+                expectTokenKind(tokens, i, Token.Kind.string))
+            {
+                e = ExpressionAST{ .literal = tokens[i] };
+                i = i + 1;
+        } else {
+                return .{ .err = &amp;quot;No expression&amp;quot; };
+        }
+
+        if (expectTokenKind(tokens, i, Token.Kind.equal_operator) or
+                expectTokenKind(tokens, i, Token.Kind.lt_operator) or
+                expectTokenKind(tokens, i, Token.Kind.plus_operator) or
+                expectTokenKind(tokens, i, Token.Kind.concat_operator))
+            {
+                var newE = ExpressionAST{
+                    .binary_operation = BinaryOperationAST{
+                        .operator = tokens[i],
+                        .left = self.allocator.create(ExpressionAST) catch return .{
+                            .err = &amp;quot;Could not allocate for left expression.&amp;quot;,
+                        },
+                        .right = self.allocator.create(ExpressionAST) catch return .{
+                            .err = &amp;quot;Could not allocate for right expression.&amp;quot;,
+                        },
+                    },
+                };
+                newE.binary_operation.left.* = e;
+                e = newE;
+
+                switch (self.parseExpression(tokens, i + 1)) {
+                    .err =&amp;gt; |err| return .{ .err = err },
+                    .val =&amp;gt; |val| {
+                        e.binary_operation.right.* = val.ast;
+                        i = val.nextPosition;
+                    },
+                }
+        }
+
+        return .{ .val = .{ .ast = e, .nextPosition = i } };
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Basically, we assume it's a literal expression unless we see an
+operator after it. If there's an operator after it we call
+&lt;code&gt;parseExpression&lt;/code&gt; recursively and return a binary expression.&lt;/p&gt;
+&lt;p&gt;Important to note, this skips both implicit operator precedence and
+explicit precedence via parenthesis.&lt;/p&gt;
+&lt;h4 id="&lt;code&gt;select&lt;/code&gt;"&gt;&lt;code&gt;SELECT&lt;/code&gt;&lt;/h4&gt;&lt;p&gt;A &lt;code&gt;SELECT&lt;/code&gt; query's structure has a &lt;code&gt;FROM&lt;/code&gt; table name, a
+comma-separated list of expressions, and an optional &lt;code&gt;WHERE&lt;/code&gt; section
+with another expression for the where.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    pub const SelectAST = struct {
+        columns: []ExpressionAST,
+        from: Token,
+        where: ?ExpressionAST,
+
+        fn print(self: SelectAST) void {
+            std.debug.print(&amp;quot;SELECT\n&amp;quot;, .{});
+            for (self.columns) |column, i| {
+                std.debug.print(&amp;quot;  &amp;quot;, .{});
+                column.print();
+                if (i &amp;lt; self.columns.len - 1) {
+                    std.debug.print(&amp;quot;,&amp;quot;, .{});
+                }
+                std.debug.print(&amp;quot;\n&amp;quot;, .{});
+            }
+            std.debug.print(&amp;quot;FROM\n  {s}&amp;quot;, .{self.from.string()});
+
+            if (self.where) |where| {
+                std.debug.print(&amp;quot;\nWHERE\n  &amp;quot;, .{});
+                where.print();
+            }
+
+            std.debug.print(&amp;quot;\n&amp;quot;, .{});
+        }
+    };
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;To parse it we look for:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;SELECT&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Then a comma separated list of &lt;code&gt;ExpressionAST&lt;/code&gt;s&lt;/li&gt;
+&lt;li&gt;Then a &lt;code&gt;FROM&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Then optionally a &lt;code&gt;WHERE&lt;/code&gt;&lt;ul&gt;
+&lt;li&gt;And then another &lt;code&gt;ExpressionAST&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;With the help of &lt;code&gt;expectTokenKind&lt;/code&gt; and &lt;code&gt;parseExpression&lt;/code&gt; it is not too
+difficult, but a little verbose, to write.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    fn parseSelect(self: Parser, tokens: []Token) Result(AST) {
+        var i: usize = 0;
+        if (!expectTokenKind(tokens, i, Token.Kind.select_keyword)) {
+            return .{ .err = &amp;quot;Expected SELECT keyword&amp;quot; };
+        }
+        i = i + 1;
+
+        var columns = std.ArrayList(ExpressionAST).init(self.allocator);
+        var select = SelectAST{
+            .columns = undefined,
+            .from = undefined,
+            .where = null,
+        };
+
+        // Parse columns
+        while (!expectTokenKind(tokens, i, Token.Kind.from_keyword)) {
+            if (columns.items.len &amp;gt; 0) {
+                if (!expectTokenKind(tokens, i, Token.Kind.comma_syntax)) {
+                    lex.debug(tokens, i, &amp;quot;Expected comma.\n&amp;quot;);
+                    return .{ .err = &amp;quot;Expected comma.&amp;quot; };
+                }
+
+                i = i + 1;
+            }
+
+            switch (self.parseExpression(tokens, i)) {
+                .err =&amp;gt; |err| return .{ .err = err },
+                .val =&amp;gt; |val| {
+                    i = val.nextPosition;
+
+                    columns.append(val.ast) catch return .{
+                        .err = &amp;quot;Could not allocate for token.&amp;quot;,
+                    };
+                },
+            }
+        }
+
+        if (!expectTokenKind(tokens, i, Token.Kind.from_keyword)) {
+            lex.debug(tokens, i, &amp;quot;Expected FROM keyword after this.\n&amp;quot;);
+            return .{ .err = &amp;quot;Expected FROM keyword&amp;quot; };
+        }
+        i = i + 1;
+
+        if (!expectTokenKind(tokens, i, Token.Kind.identifier)) {
+            lex.debug(tokens, i, &amp;quot;Expected FROM table name after this.\n&amp;quot;);
+            return .{ .err = &amp;quot;Expected FROM keyword&amp;quot; };
+        }
+        select.from = tokens[i];
+        i = i + 1;
+
+        if (expectTokenKind(tokens, i, Token.Kind.where_keyword)) {
+            // i + 1, skip past the where
+            switch (self.parseExpression(tokens, i + 1)) {
+                .err =&amp;gt; |err| return .{ .err = err },
+                .val =&amp;gt; |val| {
+                    select.where = val.ast;
+                    i = val.nextPosition;
+                },
+            }
+        }
+
+        if (i &amp;lt; tokens.len) {
+            lex.debug(tokens, i, &amp;quot;Unexpected token.&amp;quot;);
+            return .{ .err = &amp;quot;Did not complete parsing SELECT&amp;quot; };
+        }
+
+        select.columns = columns.items;
+        return .{ .val = AST{ .select = select } };
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That's it!&lt;/p&gt;
+&lt;h4 id="&lt;code&gt;create-table&lt;/code&gt;"&gt;&lt;code&gt;CREATE TABLE&lt;/code&gt;&lt;/h4&gt;&lt;p&gt;A &lt;code&gt;CREATE TABLE&lt;/code&gt; query's structure has a table name and a list of
+comma separated identifier pairs for column name and kind.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    const CreateTableColumnAST = struct {
+        name: Token,
+        kind: Token,
+    };
+
+    pub const CreateTableAST = struct {
+        table: Token,
+        columns: []CreateTableColumnAST,
+
+        fn print(self: CreateTableAST) void {
+            std.debug.print(&amp;quot;CREATE TABLE {s} (\n&amp;quot;, .{self.table.string()});
+            for (self.columns) |column, i| {
+                std.debug.print(
+                    &amp;quot;  {s} {s}&amp;quot;,
+                    .{ column.name.string(), column.kind.string() },
+                );
+                if (i &amp;lt; self.columns.len - 1) {
+                    std.debug.print(&amp;quot;,&amp;quot;, .{});
+                }
+                std.debug.print(&amp;quot;\n&amp;quot;, .{});
+            }
+            std.debug.print(&amp;quot;)\n&amp;quot;, .{});
+        }
+    };
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;To parse it we look for:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;CREATE TABLE&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Followed by an identifier (the table name)&lt;/li&gt;
+&lt;li&gt;Followed by open parenthesis&lt;/li&gt;
+&lt;li&gt;Followed by a comma separated list of identifier pairs&lt;/li&gt;
+&lt;li&gt;Followed by close parenthesis&lt;/li&gt;
+&lt;/ul&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    fn parseCreateTable(self: Parser, tokens: []Token) Result(AST) {
+        var i: usize = 0;
+        if (!expectTokenKind(tokens, i, Token.Kind.create_table_keyword)) {
+            return .{ .err = &amp;quot;Expected CREATE TABLE keyword&amp;quot; };
+        }
+        i = i + 1;
+
+        if (!expectTokenKind(tokens, i, Token.Kind.identifier)) {
+            lex.debug(tokens, i, &amp;quot;Expected table name after CREATE TABLE keyword.\n&amp;quot;);
+            return .{ .err = &amp;quot;Expected CREATE TABLE name&amp;quot; };
+        }
+
+        var columns = std.ArrayList(CreateTableColumnAST).init(self.allocator);
+        var create_table = CreateTableAST{
+            .columns = undefined,
+            .table = tokens[i],
+        };
+        i = i + 1;
+
+        if (!expectTokenKind(tokens, i, Token.Kind.left_paren_syntax)) {
+            lex.debug(tokens, i, &amp;quot;Expected opening paren after CREATE TABLE name.\n&amp;quot;);
+            return .{ .err = &amp;quot;Expected opening paren&amp;quot; };
+        }
+        i = i + 1;
+
+        while (!expectTokenKind(tokens, i, Token.Kind.right_paren_syntax)) {
+            if (columns.items.len &amp;gt; 0) {
+                if (!expectTokenKind(tokens, i, Token.Kind.comma_syntax)) {
+                    lex.debug(tokens, i, &amp;quot;Expected comma.\n&amp;quot;);
+                    return .{ .err = &amp;quot;Expected comma.&amp;quot; };
+                }
+
+                i = i + 1;
+            }
+
+            var column = CreateTableColumnAST{ .name = undefined, .kind = undefined };
+            if (!expectTokenKind(tokens, i, Token.Kind.identifier)) {
+                lex.debug(tokens, i, &amp;quot;Expected column name after comma.\n&amp;quot;);
+                return .{ .err = &amp;quot;Expected identifier.&amp;quot; };
+            }
+
+            column.name = tokens[i];
+            i = i + 1;
+
+            if (!expectTokenKind(tokens, i, Token.Kind.identifier)) {
+                lex.debug(tokens, i, &amp;quot;Expected column type after column name.\n&amp;quot;);
+                return .{ .err = &amp;quot;Expected identifier.&amp;quot; };
+            }
+
+            column.kind = tokens[i];
+            i = i + 1;
+
+            columns.append(column) catch return .{
+                .err = &amp;quot;Could not allocate for column.&amp;quot;,
+            };
+        }
+
+        // Skip past final paren.
+        i = i + 1;
+
+        if (i &amp;lt; tokens.len) {
+            lex.debug(tokens, i, &amp;quot;Unexpected token.&amp;quot;);
+            return .{ .err = &amp;quot;Did not complete parsing CREATE TABLE&amp;quot; };
+        }
+
+        create_table.columns = columns.items;
+        return .{ .val = AST{ .create_table = create_table } };
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="&lt;code&gt;insert-into&lt;/code&gt;"&gt;&lt;code&gt;INSERT INTO&lt;/code&gt;&lt;/h4&gt;&lt;p&gt;And last we've got &lt;code&gt;INSERT INTO&lt;/code&gt;. This tree has table name and a list
+of expressions to insert into the table.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    pub const InsertAST = struct {
+        table: Token,
+        values: []ExpressionAST,
+
+        fn print(self: InsertAST) void {
+            std.debug.print(&amp;quot;INSERT INTO {s} VALUES (&amp;quot;, .{self.table.string()});
+            for (self.values) |value, i| {
+                value.print();
+                if (i &amp;lt; self.values.len - 1) {
+                    std.debug.print(&amp;quot;, &amp;quot;, .{});
+                }
+            }
+            std.debug.print(&amp;quot;)\n&amp;quot;, .{});
+        }
+    };
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We parse it by looking for:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;INSERT INTO&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Followed by a table name&lt;/li&gt;
+&lt;li&gt;Followed by &lt;code&gt;VALUES&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Followed by open parenthesis&lt;/li&gt;
+&lt;li&gt;Followed by a comma-separated list of expressions&lt;/li&gt;
+&lt;li&gt;Followed by a close parenthesis&lt;/li&gt;
+&lt;/ul&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    fn parseInsert(self: Parser, tokens: []Token) Result(AST) {
+        var i: usize = 0;
+        if (!expectTokenKind(tokens, i, Token.Kind.insert_keyword)) {
+            return .{ .err = &amp;quot;Expected INSERT INTO keyword&amp;quot; };
+        }
+        i = i + 1;
+
+        if (!expectTokenKind(tokens, i, Token.Kind.identifier)) {
+            lex.debug(tokens, i, &amp;quot;Expected table name after INSERT INTO keyword.\n&amp;quot;);
+            return .{ .err = &amp;quot;Expected INSERT INTO table name&amp;quot; };
+        }
+
+        var values = std.ArrayList(ExpressionAST).init(self.allocator);
+        var insert = InsertAST{
+            .values = undefined,
+            .table = tokens[i],
+        };
+        i = i + 1;
+
+        if (!expectTokenKind(tokens, i, Token.Kind.values_keyword)) {
+            lex.debug(tokens, i, &amp;quot;Expected VALUES keyword.\n&amp;quot;);
+            return .{ .err = &amp;quot;Expected VALUES keyword&amp;quot; };
+        }
+        i = i + 1;
+
+        if (!expectTokenKind(tokens, i, Token.Kind.left_paren_syntax)) {
+            lex.debug(tokens, i, &amp;quot;Expected opening paren after CREATE TABLE name.\n&amp;quot;);
+            return .{ .err = &amp;quot;Expected opening paren&amp;quot; };
+        }
+        i = i + 1;
+
+        while (!expectTokenKind(tokens, i, Token.Kind.right_paren_syntax)) {
+            if (values.items.len &amp;gt; 0) {
+                if (!expectTokenKind(tokens, i, Token.Kind.comma_syntax)) {
+                    lex.debug(tokens, i, &amp;quot;Expected comma.\n&amp;quot;);
+                    return .{ .err = &amp;quot;Expected comma.&amp;quot; };
+                }
+
+                i = i + 1;
+            }
+
+            switch (self.parseExpression(tokens, i)) {
+                .err =&amp;gt; |err| return .{ .err = err },
+                .val =&amp;gt; |val| {
+                    values.append(val.ast) catch return .{
+                        .err = &amp;quot;Could not allocate for expression.&amp;quot;,
+                    };
+                    i = val.nextPosition;
+                },
+            }
+        }
+
+        // Skip past final paren.
+        i = i + 1;
+
+        if (i &amp;lt; tokens.len) {
+            lex.debug(tokens, i, &amp;quot;Unexpected token.&amp;quot;);
+            return .{ .err = &amp;quot;Did not complete parsing INSERT INTO&amp;quot; };
+        }
+
+        insert.values = values.items;
+        return .{ .val = AST{ .insert = insert } };
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="&lt;code&gt;ast&lt;/code&gt;"&gt;&lt;code&gt;AST&lt;/code&gt;&lt;/h4&gt;&lt;p&gt;Finally we can define the top-level SQL &lt;code&gt;AST&lt;/code&gt; as being the union of
+the above three query types.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;
+    pub const AST = union(enum) {
+        select: SelectAST,
+        insert: InsertAST,
+        create_table: CreateTableAST,
+
+        pub fn print(self: AST) void {
+            switch (self) {
+                .select =&amp;gt; |select| select.print(),
+                .insert =&amp;gt; |insert| insert.print(),
+                .create_table =&amp;gt; |create_table| create_table.print(),
+            }
+        }
+    };
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And we can implement &lt;code&gt;parse&lt;/code&gt; by switching on the current token.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;
+    pub fn parse(self: Parser, tokens: []Token) Result(AST) {
+        if (expectTokenKind(tokens, 0, Token.Kind.select_keyword)) {
+            return switch (self.parseSelect(tokens)) {
+                .err =&amp;gt; |err| .{ .err = err },
+                .val =&amp;gt; |val| .{ .val = val },
+            };
+        }
+
+        if (expectTokenKind(tokens, 0, Token.Kind.create_table_keyword)) {
+            return switch (self.parseCreateTable(tokens)) {
+                .err =&amp;gt; |err| .{ .err = err },
+                .val =&amp;gt; |val| .{ .val = val },
+            };
+        }
+
+        if (expectTokenKind(tokens, 0, Token.Kind.insert_keyword)) {
+            return switch (self.parseInsert(tokens)) {
+                .err =&amp;gt; |err| .{ .err = err },
+                .val =&amp;gt; |val| .{ .val = val },
+            };
+        }
+
+        return .{ .err = &amp;quot;Unknown statement&amp;quot; };
+    }
+};
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Perfect. (For today. :) )&lt;/p&gt;
+&lt;h3 id="storage-(&lt;code&gt;storage.zig&lt;/code&gt;,-338-loc)"&gt;Storage (&lt;code&gt;storage.zig&lt;/code&gt;, 338 LoC)&lt;/h3&gt;&lt;p&gt;Next we're going to switch contexts completely and think about how
+tables and rows will get serialized into bytes that can be stored on
+disk.&lt;/p&gt;
+&lt;p&gt;The storage layer will define a few general helpers for correctly
+serializing and deserializing strings and numbers:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;const std = @import("std");
+
+const RocksDB = @import("rocksdb.zig").RocksDB;
+const Error = @import("types.zig").Error;
+const Result = @import("types.zig").Result;
+const String = @import("types.zig").String;
+
+pub fn serializeInteger(comptime T: type, buf: *std.ArrayList(u8), i: T) !void {
+    var length: [@sizeOf(T)]u8 = undefined;
+    std.mem.writeIntBig(T, &amp;amp;length, i);
+    try buf.appendSlice(length[0..8]);
+}
+
+pub fn deserializeInteger(comptime T: type, buf: String) T {
+    return std.mem.readIntBig(T, buf[0..@sizeOf(T)]);
+}
+
+pub fn serializeBytes(buf: *std.ArrayList(u8), bytes: String) !void {
+    try serializeInteger(u64, buf, bytes.len);
+    try buf.appendSlice(bytes);
+}
+
+pub fn deserializeBytes(bytes: String) struct {
+    offset: usize,
+    bytes: String,
+} {
+    var length = deserializeInteger(u64, bytes);
+    var offset = length + 8;
+    return .{ .offset = offset, .bytes = bytes[8..offset] };
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Then we'll define the &lt;code&gt;Storage&lt;/code&gt; struct itself. Under the hood it will
+use RocksDB to store and recover data on disk.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;pub const Storage = struct {
+    db: RocksDB,
+    allocator: std.mem.Allocator,
+
+    pub fn init(allocator: std.mem.Allocator, db: RocksDB) Storage {
+        return Storage{
+            .db = db,
+            .allocator = allocator,
+        };
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now let's think about storage entities.&lt;/p&gt;
+&lt;h4 id="values"&gt;Values&lt;/h4&gt;&lt;p&gt;The fundamental unit in the database is a value, or cell. It can be
+either a boolean, an integer, a string, or null.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    pub const Value = union(enum) {
+        bool_value: bool,
+        null_value: bool,
+        string_value: String,
+        integer_value: i64,
+
+        pub const TRUE = Value{ .bool_value = true };
+        pub const FALSE = Value{ .bool_value = false };
+        pub const NULL = Value{ .null_value = true };
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Since all values are strings in the original query, we'll provide a
+&lt;code&gt;fromIntegerString&lt;/code&gt; that we can use to convert.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;        pub fn fromIntegerString(iBytes: String) Value {
+            const i = std.fmt.parseInt(i64, iBytes, 10) catch return Value{
+                .integer_value = 0,
+            };
+            return Value{ .integer_value = i };
+        }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Next we'll define functions to cast values to boolean.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;        pub fn asBool(self: Value) bool {
+            return switch (self) {
+                .null_value =&amp;gt; false,
+                .bool_value =&amp;gt; |value| value,
+                .string_value =&amp;gt; |value| value.len &amp;gt; 0,
+                .integer_value =&amp;gt; |value| value != 0,
+            };
+        }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;To strings.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;        pub fn asString(self: Value, buf: *std.ArrayList(u8)) !void {
+            try switch (self) {
+                .null_value =&amp;gt; _ = 1, // Do nothing
+                .bool_value =&amp;gt; |value| buf.appendSlice(if (value) &amp;quot;true&amp;quot; else &amp;quot;false&amp;quot;),
+                .string_value =&amp;gt; |value| buf.appendSlice(value),
+                .integer_value =&amp;gt; |value| buf.writer().print(&amp;quot;{d}&amp;quot;, .{value}),
+            };
+        }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And to integers.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;        pub fn asInteger(self: Value) i64 {
+            return switch (self) {
+                .null_value =&amp;gt; 0,
+                .bool_value =&amp;gt; |value| if (value) 1 else 0,
+                .string_value =&amp;gt; |value| fromIntegerString(value).integer_value,
+                .integer_value =&amp;gt; |value| value,
+            };
+        }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And finally the storage layer's core concern: serialization...&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;        pub fn serialize(self: Value, buf: *std.ArrayList(u8)) String {
+            switch (self) {
+                .null_value =&amp;gt; buf.append(&amp;#39;0&amp;#39;) catch return &amp;quot;&amp;quot;,
+
+                .bool_value =&amp;gt; |value| {
+                    buf.append(&amp;#39;1&amp;#39;) catch return &amp;quot;&amp;quot;;
+                    buf.append(if (value) &amp;#39;1&amp;#39; else &amp;#39;0&amp;#39;) catch return &amp;quot;&amp;quot;;
+                },
+
+                .string_value =&amp;gt; |value| {
+                    buf.append(&amp;#39;2&amp;#39;) catch return &amp;quot;&amp;quot;;
+                    buf.appendSlice(value) catch return &amp;quot;&amp;quot;;
+                },
+
+                .integer_value =&amp;gt; |value| {
+                    buf.append(&amp;#39;3&amp;#39;) catch return &amp;quot;&amp;quot;;
+                    serializeInteger(i64, buf, value) catch return &amp;quot;&amp;quot;;
+                },
+            }
+
+            return buf.items;
+        }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And deserialization.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;        pub fn deserialize(data: String) Value {
+            return switch (data[0]) {
+                &amp;#39;0&amp;#39; =&amp;gt; Value.NULL,
+                &amp;#39;1&amp;#39; =&amp;gt; Value{ .bool_value = data[1] == &amp;#39;1&amp;#39; },
+                &amp;#39;2&amp;#39; =&amp;gt; Value{ .string_value = data[1..] },
+                &amp;#39;3&amp;#39; =&amp;gt; Value{ .integer_value = deserializeInteger(i64, data[1..]) },
+                else =&amp;gt; unreachable,
+            };
+        }
+    };
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We use a simple, space inefficient scheme for encoding/decoding to
+bytes that can be written to disk.&lt;/p&gt;
+&lt;h4 id="rows"&gt;Rows&lt;/h4&gt;&lt;p&gt;Now that we've got values, we can define rows in terms of values. And
+we can provide a few helper functions for getting cells by field name.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    pub const Row = struct {
+        allocator: std.mem.Allocator,
+        cells: std.ArrayList(String),
+        fields: []String,
+
+        pub fn init(allocator: std.mem.Allocator, fields: []String) Row {
+            return Row{
+                .allocator = allocator,
+                .cells = std.ArrayList(String).init(allocator),
+                .fields = fields,
+            };
+        }
+
+        pub fn append(self: *Row, cell: Value) !void {
+            var cellBuffer = std.ArrayList(u8).init(self.allocator);
+            try self.cells.append(cell.serialize(&amp;amp;cellBuffer));
+        }
+
+        pub fn appendBytes(self: *Row, cell: String) !void {
+            try self.cells.append(cell);
+        }
+
+        pub fn get(self: Row, field: String) Value {
+            for (self.fields) |f, i| {
+                if (std.mem.eql(u8, field, f)) {
+                    // Results are internal buffer views. So make a copy.
+                    var copy = std.ArrayList(u8).init(self.allocator);
+                    copy.appendSlice(self.cells.items[i]) catch return Storage.Value.NULL;
+                    return Storage.Value.deserialize(copy.items);
+                }
+            }
+
+            return Value.NULL;
+        }
+
+        pub fn items(self: Row) []String {
+            return self.cells.items;
+        }
+
+        fn reset(self: *Row) void {
+            self.cells.clearRetainingCapacity();
+        }
+    };
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Since values are serialized with length prefixes, we can
+serialize rows by concatenating all the values together.&lt;/p&gt;
+&lt;p&gt;Since we must map to keys and values for RocksDB, we give each row a
+key prefix that is the table name. And then we give it a random suffix
+to distinguish it from other rows in the table. A more intelligent
+design would use the table's primary key as the suffix but we don't
+support primary keys yet. (See also, the section on "Mapping SQL to
+key-value storage" in &lt;a href="https://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html"&gt;What's the big deal about key-value databases
+like FoundationDB and
+RocksDB?&lt;/a&gt;.)&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    fn generateId() ![]u8 {
+        const file = try std.fs.cwd().openFileZ(&amp;quot;/dev/random&amp;quot;, .{});
+        defer file.close();
+
+        var buf: [16]u8 = .{};
+        _ = try file.read(&amp;amp;buf);
+        return buf[0..];
+    }
+
+    pub fn writeRow(self: Storage, table: String, row: Row) ?Error {
+        // Table name prefix
+        var key = std.ArrayList(u8).init(self.allocator);
+        key.writer().print(&amp;quot;row_{s}_&amp;quot;, .{table}) catch return &amp;quot;Could not allocate row key&amp;quot;;
+
+        // Unique row id
+        var id = generateId() catch return &amp;quot;Could not generate id&amp;quot;;
+        key.appendSlice(id) catch return &amp;quot;Could not allocate for id&amp;quot;;
+
+        var value = std.ArrayList(u8).init(self.allocator);
+        for (row.cells.items) |cell| {
+            serializeBytes(&amp;amp;value, cell) catch return &amp;quot;Could not allocate for cell&amp;quot;;
+        }
+
+        return self.db.set(key.items, value.items);
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="rowiter"&gt;RowIter&lt;/h4&gt;&lt;p&gt;Reading rows will be slightly different from writing rows since
+reading rows will use an iterator. We will wrap the RocksDB iterator
+so the consumer of &lt;code&gt;Storage&lt;/code&gt; only needs to deal with &lt;code&gt;Row&lt;/code&gt;s and
+&lt;code&gt;Value&lt;/code&gt;s.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    pub const RowIter = struct {
+        row: Row,
+        iter: RocksDB.Iter,
+
+        fn init(allocator: std.mem.Allocator, iter: RocksDB.Iter, fields: []String) RowIter {
+            return RowIter{
+                .iter = iter,
+                .row = Row.init(allocator, fields),
+            };
+        }
+
+        pub fn next(self: *RowIter) ?Row {
+            var rowBytes: String = undefined;
+            if (self.iter.next()) |b| {
+                rowBytes = b.value;
+            } else {
+                return null;
+            }
+
+            self.row.reset();
+            var offset: usize = 0;
+            while (offset &amp;lt; rowBytes.len) {
+                var d = deserializeBytes(rowBytes[offset..]);
+                offset += d.offset;
+                self.row.appendBytes(d.bytes) catch return null;
+            }
+
+            return self.row;
+        }
+
+        pub fn close(self: RowIter) void {
+            self.iter.close();
+        }
+    };
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;It does the opposite of what &lt;code&gt;writeRow&lt;/code&gt; did in terms of deserializing
+cells one after another. Again, this works because each cell is
+length-prefixed.&lt;/p&gt;
+&lt;p&gt;Next we must provide the interface for actually getting a
+&lt;code&gt;RowIter&lt;/code&gt;. The only condition for the &lt;code&gt;RowIter&lt;/code&gt; at the moment is that
+it contains all rows in the table.&lt;/p&gt;
+&lt;p&gt;Since we wrote each row with a table name prefix, we can recover it by
+iterating over all rows with that prefix.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    pub fn getRowIter(self: Storage, table: String) Result(RowIter) {
+        var rowPrefix = std.ArrayList(u8).init(self.allocator);
+        rowPrefix.writer().print(&amp;quot;row_{s}_&amp;quot;, .{table}) catch return .{
+            .err = &amp;quot;Could not allocate for row prefix&amp;quot;,
+        };
+
+        var iter = switch (self.db.iter(rowPrefix.items)) {
+            .err =&amp;gt; |err| return .{ .err = err },
+            .val =&amp;gt; |it| it,
+        };
+
+        var tableInfo = switch (self.getTable(table)) {
+            .err =&amp;gt; |err| return .{ .err = err },
+            .val =&amp;gt; |t| t,
+        };
+
+        return .{
+            .val = RowIter.init(self.allocator, iter, tableInfo.columns),
+        };
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="tables"&gt;Tables&lt;/h4&gt;&lt;p&gt;Finally we've got tables. We must store table metadata. Its name,
+columns and column types.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    pub const Table = struct {
+        name: String,
+        columns: []String,
+        types: []String,
+    };
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We will use a &lt;code&gt;tbl_&lt;/code&gt; prefix instead of &lt;code&gt;row_&lt;/code&gt; prefix for table
+metadata. But we'll otherwise encode with the same length-prefixed
+concatentations.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    pub fn writeTable(self: Storage, table: Table) ?Error {
+        // Table name prefix
+        var key = std.ArrayList(u8).init(self.allocator);
+        key.writer().print(&amp;quot;tbl_{s}_&amp;quot;, .{table.name}) catch return &amp;quot;Could not allocate key for table&amp;quot;;
+
+        var value = std.ArrayList(u8).init(self.allocator);
+        for (table.columns) |column, i| {
+            serializeBytes(&amp;amp;value, column) catch return &amp;quot;Could not allocate for column&amp;quot;;
+            serializeBytes(&amp;amp;value, table.types[i]) catch return &amp;quot;Could not allocate for column type&amp;quot;;
+        }
+
+        return self.db.set(key.items, value.items);
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And the opposite for decoding.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;
+    pub fn getTable(self: Storage, name: String) Result(Table) {
+        var tableKey = std.ArrayList(u8).init(self.allocator);
+        tableKey.writer().print(&amp;quot;tbl_{s}_&amp;quot;, .{name}) catch return .{
+            .err = &amp;quot;Could not allocate for table prefix&amp;quot;,
+        };
+
+        var columns = std.ArrayList(String).init(self.allocator);
+        var types = std.ArrayList(String).init(self.allocator);
+        var table = Table{
+            .name = name,
+            .columns = undefined,
+            .types = undefined,
+        };
+        // First grab table info
+        var columnInfo = switch (self.db.get(tableKey.items)) {
+            .err =&amp;gt; |err| return .{ .err = err },
+            .val =&amp;gt; |val| val,
+            .not_found =&amp;gt; return .{ .err = &amp;quot;No such table&amp;quot; },
+        };
+
+        var columnOffset: usize = 0;
+        while (columnOffset &amp;lt; columnInfo.len) {
+            var column = deserializeBytes(columnInfo[columnOffset..]);
+            columnOffset += column.offset;
+            columns.append(column.bytes) catch return .{
+                .err = &amp;quot;Could not allocate for column name.&amp;quot;,
+            };
+
+            var kind = deserializeBytes(columnInfo[columnOffset..]);
+            columnOffset += kind.offset;
+            types.append(kind.bytes) catch return .{
+                .err = &amp;quot;Could not allocate for column kind.&amp;quot;,
+            };
+        }
+
+        table.columns = columns.items;
+        table.types = types.items;
+
+        return .{ .val = table };
+    }
+};
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And that's it for storage! Again, we're building on top of the
+&lt;a href="https://notes.eatonphil.com/zigrocks.html"&gt;RocksDB layer&lt;/a&gt; I already
+wrote about. If you want to see how that works, go for it!&lt;/p&gt;
+&lt;p&gt;If you just want the &lt;code&gt;rocksdb.zig&lt;/code&gt; file, grab it from
+&lt;a href="https://github.com/eatonphil/zigrocks/blob/7831e390f4044bb999507fd6d0e23bb2475756f8/rocksdb.zig"&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id="execute-(&lt;code&gt;execute.zig&lt;/code&gt;,-210-loc)"&gt;Execute (&lt;code&gt;execute.zig&lt;/code&gt;, 210 LoC)&lt;/h3&gt;&lt;p&gt;Now that we've got a storage layer and an AST from our parser, we can
+execute the query on top of the storage!&lt;/p&gt;
+&lt;p&gt;A better implementation might translate the AST to bytecode and
+implement a bytecode interpreter for expression evaluation. But we'll
+build a tree-walking interpreter instead.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;const std = @import(&amp;quot;std&amp;quot;);
+
+const Parser = @import(&amp;quot;parse.zig&amp;quot;).Parser;
+const RocksDB = @import(&amp;quot;rocksdb.zig&amp;quot;).RocksDB;
+const Storage = @import(&amp;quot;storage.zig&amp;quot;).Storage;
+const Result = @import(&amp;quot;types.zig&amp;quot;).Result;
+const String = @import(&amp;quot;types.zig&amp;quot;).String;
+
+pub const Executor = struct {
+    allocator: std.mem.Allocator,
+    storage: Storage,
+
+    pub fn init(allocator: std.mem.Allocator, storage: Storage) Executor {
+        return Executor{ .allocator = allocator, .storage = storage };
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;In general we'll make query responses optional. They can be empty or
+they can be an array of an array of strings (rows and cells) and an
+array of strings (column names).&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    const QueryResponse = struct {
+        fields: []String,
+        // Array of cells (which is an array of serde (which is an array of u8))
+        rows: [][]String,
+        empty: bool,
+    };
+    const QueryResponseResult = Result(QueryResponse);
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="expressions"&gt;Expressions&lt;/h4&gt;&lt;p&gt;For execution we start again at the bottom with expressions. There are literals.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    fn executeExpression(self: Executor, e: Parser.ExpressionAST, row: Storage.Row) Storage.Value {
+        return switch (e) {
+            .literal =&amp;gt; |lit| switch (lit.kind) {
+                .string =&amp;gt; Storage.Value{ .string_value = lit.string() },
+                .integer =&amp;gt; Storage.Value.fromIntegerString(lit.string()),
+                .identifier =&amp;gt; row.get(lit.string()),
+                else =&amp;gt; unreachable,
+            },
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And there are a handful of binary operations.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;            .binary_operation =&amp;gt; |bin_op| {
+                var left = self.executeExpression(bin_op.left.*, row);
+                var right = self.executeExpression(bin_op.right.*, row);
+
+                if (bin_op.operator.kind == .equal_operator) {
+                    // Cast dissimilar types to serde
+                    if (@enumToInt(left) != @enumToInt(right)) {
+                        var leftBuf = std.ArrayList(u8).init(self.allocator);
+                        left.asString(&amp;amp;leftBuf) catch unreachable;
+                        left = Storage.Value{ .string_value = leftBuf.items };
+
+                        var rightBuf = std.ArrayList(u8).init(self.allocator);
+                        right.asString(&amp;amp;rightBuf) catch unreachable;
+                        right = Storage.Value{ .string_value = rightBuf.items };
+                    }
+
+                    return Storage.Value{
+                        .bool_value = switch (left) {
+                            .null_value =&amp;gt; true,
+                            .bool_value =&amp;gt; |v| v == right.asBool(),
+                            .string_value =&amp;gt; blk: {
+                                var leftBuf = std.ArrayList(u8).init(self.allocator);
+                                left.asString(&amp;amp;leftBuf) catch unreachable;
+
+                                var rightBuf = std.ArrayList(u8).init(self.allocator);
+                                right.asString(&amp;amp;rightBuf) catch unreachable;
+
+                                break :blk std.mem.eql(u8, leftBuf.items, rightBuf.items);
+                            },
+                            .integer_value =&amp;gt; left.asInteger() == right.asInteger(),
+                        },
+                    };
+                }
+
+                if (bin_op.operator.kind == .concat_operator) {
+                    var copy = std.ArrayList(u8).init(self.allocator);
+                    left.asString(&amp;amp;copy) catch unreachable;
+                    right.asString(&amp;amp;copy) catch unreachable;
+                    return Storage.Value{ .string_value = copy.items };
+                }
+
+                return switch (bin_op.operator.kind) {
+                    .lt_operator =&amp;gt; if (left.asInteger() &amp;lt; right.asInteger()) Storage.Value.TRUE else Storage.Value.FALSE,
+                    .plus_operator =&amp;gt; Storage.Value{ .integer_value = left.asInteger() + right.asInteger() },
+                    else =&amp;gt; Storage.Value.NULL,
+                };
+            },
+        };
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="&lt;code&gt;select&lt;/code&gt;"&gt;&lt;code&gt;SELECT&lt;/code&gt;&lt;/h4&gt;&lt;p&gt;To execute a &lt;code&gt;SELECT&lt;/code&gt; query we first validate the requested table and
+requested fields.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    fn executeSelect(self: Executor, s: Parser.SelectAST) QueryResponseResult {
+        switch (self.storage.getTable(s.from.string())) {
+            .err =&amp;gt; |err| return .{ .err = err },
+            else =&amp;gt; _ = 1,
+        }
+
+        // Now validate and store requested fields
+        var requestedFields = std.ArrayList(String).init(self.allocator);
+        for (s.columns) |requestedColumn| {
+            var fieldName = switch (requestedColumn) {
+                .literal =&amp;gt; |lit| switch (lit.kind) {
+                    .identifier =&amp;gt; lit.string(),
+                    // TODO: give reasonable names
+                    else =&amp;gt; &amp;quot;unknown&amp;quot;,
+                },
+                // TODO: give reasonable names
+                else =&amp;gt; &amp;quot;unknown&amp;quot;,
+            };
+            requestedFields.append(fieldName) catch return .{
+                .err = &amp;quot;Could not allocate for requested field.&amp;quot;,
+            };
+        }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Then grab an iterator for rows in the table.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;        var rows = std.ArrayList([]String).init(self.allocator);
+        var response = QueryResponse{
+            .fields = requestedFields.items,
+            .rows = undefined,
+            .empty = false,
+        };
+
+        var iter = switch (self.storage.getRowIter(s.from.string())) {
+            .err =&amp;gt; |err| return .{ .err = err },
+            .val =&amp;gt; |it| it,
+        };
+        defer iter.close();
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And finally we iterate through all rows and add rows to the response
+if there is no &lt;code&gt;WHERE&lt;/code&gt; condition or if we evaluate the &lt;code&gt;WHERE&lt;/code&gt;
+condition successfully.&lt;/p&gt;
+&lt;p&gt;When we add rows to the response, we need to actually evaluate the
+expression from each column in the &lt;code&gt;SELECT&lt;/code&gt; AST.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;        while (iter.next()) |row| {
+            var add = false;
+            if (s.where) |where| {
+                if (self.executeExpression(where, row).asBool()) {
+                    add = true;
+                }
+            } else {
+                add = true;
+            }
+
+            if (add) {
+                var requested = std.ArrayList(String).init(self.allocator);
+                for (s.columns) |exp| {
+                    var val = self.executeExpression(exp, row);
+                    var valBuf = std.ArrayList(u8).init(self.allocator);
+                    val.asString(&amp;amp;valBuf) catch unreachable;
+                    requested.append(valBuf.items) catch return .{
+                        .err = &amp;quot;Could not allocate for requested cell&amp;quot;,
+                    };
+                }
+                rows.append(requested.items) catch return .{
+                    .err = &amp;quot;Could not allocate for row&amp;quot;,
+                };
+            }
+        }
+
+        response.rows = rows.items;
+        return .{ .val = response };
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="&lt;code&gt;insert-into&lt;/code&gt;"&gt;&lt;code&gt;INSERT INTO&lt;/code&gt;&lt;/h4&gt;&lt;p&gt;Inserting is pretty simple, we just evaluate the &lt;code&gt;VALUES&lt;/code&gt; passed and
+write them to storage.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    fn executeInsert(self: Executor, i: Parser.InsertAST) QueryResponseResult {
+        var emptyRow = Storage.Row.init(self.allocator, undefined);
+        var row = Storage.Row.init(self.allocator, undefined);
+        for (i.values) |v| {
+            var exp = self.executeExpression(v, emptyRow);
+            row.append(exp) catch return .{ .err = &amp;quot;Could not allocate for cell&amp;quot; };
+        }
+
+        if (self.storage.writeRow(i.table.string(), row)) |err| {
+            return .{ .err = err };
+        }
+
+        return .{
+            .val = .{ .fields = undefined, .rows = undefined, .empty = true },
+        };
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id="&lt;code&gt;create-table&lt;/code&gt;"&gt;&lt;code&gt;CREATE TABLE&lt;/code&gt;&lt;/h4&gt;&lt;p&gt;Similarly to &lt;code&gt;INSERT INTO&lt;/code&gt; but without any expression evaluation we
+map the &lt;code&gt;CreateTableAST&lt;/code&gt; to &lt;code&gt;Storage&lt;/code&gt; entities and write them to
+storage.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    fn executeCreateTable(self: Executor, c: Parser.CreateTableAST) QueryResponseResult {
+        var columns = std.ArrayList(String).init(self.allocator);
+        var types = std.ArrayList(String).init(self.allocator);
+
+        for (c.columns) |column| {
+            columns.append(column.name.string()) catch return .{
+                .err = &amp;quot;Could not allocate for column name&amp;quot;,
+            };
+            types.append(column.kind.string()) catch return .{
+                .err = &amp;quot;Could not allocate for column kind&amp;quot;,
+            };
+        }
+
+        var table = Storage.Table{
+            .name = c.table.string(),
+            .columns = columns.items,
+            .types = types.items,
+        };
+
+        if (self.storage.writeTable(table)) |err| {
+            return .{ .err = err };
+        }
+        return .{
+            .val = .{ .fields = undefined, .rows = undefined, .empty = true },
+        };
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;For both &lt;code&gt;CREATE TABLE&lt;/code&gt; and &lt;code&gt;INSERT INTO&lt;/code&gt; there is more validation we
+could do. Exercise for the reader and whatnot. :)&lt;/p&gt;
+&lt;h4 id="&lt;code&gt;execute&lt;/code&gt;"&gt;&lt;code&gt;execute&lt;/code&gt;&lt;/h4&gt;&lt;p&gt;Finally we can switch on the &lt;code&gt;AST&lt;/code&gt; and call the appropriate execution
+function.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    pub fn execute(self: Executor, ast: Parser.AST) QueryResponseResult {
+        return switch (ast) {
+            .select =&amp;gt; |select| switch (self.executeSelect(select)) {
+                .val =&amp;gt; |val| .{ .val = val },
+                .err =&amp;gt; |err| .{ .err = err },
+            },
+            .insert =&amp;gt; |insert| switch (self.executeInsert(insert)) {
+                .val =&amp;gt; |val| .{ .val = val },
+                .err =&amp;gt; |err| .{ .err = err },
+            },
+            .create_table =&amp;gt; |createTable| switch (self.executeCreateTable(createTable)) {
+                .val =&amp;gt; |val| .{ .val = val },
+                .err =&amp;gt; |err| .{ .err = err },
+            },
+        };
+    }
+};
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And now we're ready to put it all together in &lt;code&gt;main&lt;/code&gt;!&lt;/p&gt;
+&lt;h3 id="&lt;code&gt;main&lt;/code&gt;-(&lt;code&gt;main.zig&lt;/code&gt;,-144-loc)"&gt;&lt;code&gt;main&lt;/code&gt; (&lt;code&gt;main.zig&lt;/code&gt;, 144 LoC)&lt;/h3&gt;&lt;p&gt;First we set up our arena allocator.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;const std = @import(&amp;quot;std&amp;quot;);
+
+const RocksDB = @import(&amp;quot;rocksdb.zig&amp;quot;).RocksDB;
+const lex = @import(&amp;quot;lex.zig&amp;quot;);
+const parse = @import(&amp;quot;parse.zig&amp;quot;);
+const execute = @import(&amp;quot;execute.zig&amp;quot;);
+const Storage = @import(&amp;quot;storage.zig&amp;quot;).Storage;
+
+pub fn main() !void {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Then we parse CLI arguments. Importantly we need to grab a location on
+disk for RocksDB to store data. And we need a query to execute.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    var debugTokens = false;
+    var debugAST = false;
+    var args = std.process.args();
+    var scriptArg: usize = 0;
+    var databaseArg: usize = 0;
+    var i: usize = 0;
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, &amp;quot;--debug-tokens&amp;quot;)) {
+            debugTokens = true;
+        }
+
+        if (std.mem.eql(u8, arg, &amp;quot;--debug-ast&amp;quot;)) {
+            debugAST = true;
+        }
+
+        if (std.mem.eql(u8, arg, &amp;quot;--database&amp;quot;)) {
+            databaseArg = i + 1;
+            i += 1;
+            _ = args.next();
+        }
+
+        if (std.mem.eql(u8, arg, &amp;quot;--script&amp;quot;)) {
+            scriptArg = i + 1;
+            i += 1;
+            _ = args.next();
+        }
+
+        i += 1;
+    }
+
+    if (databaseArg == 0) {
+        std.debug.print(&amp;quot;--database is a required flag. Should be a directory for data.\n&amp;quot;, .{});
+        return;
+    }
+
+    if (scriptArg == 0) {
+        std.debug.print(&amp;quot;--script is a required flag. Should be a file containing SQL.\n&amp;quot;, .{});
+        return;
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Next we read the file passed for the query.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    const file = try std.fs.cwd().openFileZ(std.os.argv[scriptArg], .{});
+    defer file.close();
+
+    const file_size = try file.getEndPos();
+    var prog = try allocator.alloc(u8, file_size);
+
+    _ = try file.read(prog);
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And pass the query to the lexer.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    var tokens = std.ArrayList(lex.Token).init(allocator);
+    const lexErr = lex.lex(prog, &amp;amp;tokens);
+    if (lexErr) |err| {
+        std.debug.print(&amp;quot;Failed to lex: {s}&amp;quot;, .{err});
+        return;
+    }
+
+    if (debugTokens) {
+        for (tokens.items) |token| {
+            std.debug.print(&amp;quot;Token: {s}\n&amp;quot;, .{token.string()});
+        }
+    }
+
+    if (tokens.items.len == 0) {
+        std.debug.print(&amp;quot;Program is empty&amp;quot;, .{});
+        return;
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Pass the tokens to the parser.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    const parser = parse.Parser.init(allocator);
+    var ast: parse.Parser.AST = undefined;
+    switch (parser.parse(tokens.items)) {
+        .err =&amp;gt; |err| {
+            std.debug.print(&amp;quot;Failed to parse: {s}&amp;quot;, .{err});
+            return;
+        },
+        .val =&amp;gt; |val| ast = val,
+    }
+
+    if (debugAST) {
+        ast.print();
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Initialize storage.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    var db: RocksDB = undefined;
+    var dataDirectory = std.mem.span(std.os.argv[databaseArg]);
+    switch (RocksDB.open(allocator, dataDirectory)) {
+        .err =&amp;gt; |err| {
+            std.debug.print(&amp;quot;Failed to open database: {s}&amp;quot;, .{err});
+            return;
+        },
+        .val =&amp;gt; |val| db = val,
+    }
+    defer db.close();
+
+    const storage = Storage.init(allocator, db);
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And execute and print results. :)&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    const executor = execute.Executor.init(allocator, storage);
+    switch (executor.execute(ast)) {
+        .err =&amp;gt; |err| {
+            std.debug.print(&amp;quot;Failed to execute: {s}&amp;quot;, .{err});
+            return;
+        },
+        .val =&amp;gt; |val| {
+            if (val.rows.len == 0) {
+                std.debug.print(&amp;quot;ok\n&amp;quot;, .{});
+                return;
+            }
+
+            std.debug.print(&amp;quot;| &amp;quot;, .{});
+            for (val.fields) |field| {
+                std.debug.print(&amp;quot;{s}\t\t|&amp;quot;, .{field});
+            }
+            std.debug.print(&amp;quot;\n&amp;quot;, .{});
+            std.debug.print(&amp;quot;+ &amp;quot;, .{});
+            for (val.fields) |field| {
+                var fieldLen = field.len;
+                while (fieldLen &amp;gt; 0) {
+                    std.debug.print(&amp;quot;=&amp;quot;, .{});
+                    fieldLen -= 1;
+                }
+                std.debug.print(&amp;quot;\t\t+&amp;quot;, .{});
+            }
+            std.debug.print(&amp;quot;\n&amp;quot;, .{});
+
+            for (val.rows) |row| {
+                std.debug.print(&amp;quot;| &amp;quot;, .{});
+                for (row) |cell| {
+                    std.debug.print(&amp;quot;{s}\t\t|&amp;quot;, .{cell});
+                }
+                std.debug.print(&amp;quot;\n&amp;quot;, .{});
+            }
+        },
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id="build.zig"&gt;build.zig&lt;/h3&gt;&lt;p&gt;Finally, finally, tie it all together with &lt;code&gt;build.zig&lt;/code&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs zig"&gt;const version = @import(&amp;quot;builtin&amp;quot;).zig_version;
+const std = @import(&amp;quot;std&amp;quot;);
+
+pub fn build(b: *std.build.Builder) void {
+    const exe = b.addExecutable(&amp;quot;main&amp;quot;, &amp;quot;main.zig&amp;quot;);
+    exe.linkLibC();
+    exe.linkSystemLibraryName(&amp;quot;rocksdb&amp;quot;);
+
+    if (@hasDecl(@TypeOf(exe.*), &amp;quot;addLibraryPath&amp;quot;)) {
+        exe.addLibraryPath(&amp;quot;./rocksdb&amp;quot;);
+        exe.addIncludePath(&amp;quot;./rocksdb/include&amp;quot;);
+    } else {
+        exe.addLibPath(&amp;quot;./rocksdb&amp;quot;);
+        exe.addIncludeDir(&amp;quot;./rocksdb/include&amp;quot;);
+    }
+
+    exe.setOutputDir(&amp;quot;.&amp;quot;);
+
+    if (exe.target.isDarwin()) {
+        exe.addRPath(&amp;quot;.&amp;quot;);
+    }
+
+    exe.install();
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Grab RocksDB, build it, and build our CLI.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ git clone https://github.com/facebook/rocksdb
+$ ( cd rocksdb &amp;amp;&amp;amp; make shared_lib -j8 )
+
+# ONLY IF YOU ARE ON A MAC
+$ cp rocksdb/*.dylib . # ONLY IF YOU ARE ON A MAC
+# DONE ONLY IF YOU ARE ON A MAC
+
+$ zig build
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And give it a go. :)&lt;/p&gt;
+&lt;pre&gt;&lt;code class="hljs bash"&gt;$ ./main --database data --script &amp;lt;(echo &amp;quot;CREATE TABLE y (year int, age int, name text)&amp;quot;)
+echo &amp;quot;CREATE TABLE y (year int, age int, name text)&amp;quot;
+ok
+$ ./main --database data --script &amp;lt;(echo &amp;quot;INSERT INTO y VALUES (2010, 38, &amp;#39;Gary&amp;#39;)&amp;quot;)
+echo &amp;quot;INSERT INTO y VALUES (2010, 38, &amp;#39;Gary&amp;#39;)&amp;quot;
+ok
+$ ./main --database data --script &amp;lt;(echo &amp;quot;INSERT INTO y VALUES (2021, 92, &amp;#39;Teej&amp;#39;)&amp;quot;)
+echo &amp;quot;INSERT INTO y VALUES (2021, 92, &amp;#39;Teej&amp;#39;)&amp;quot;
+ok
+$ ./main --database data --script &amp;lt;(echo &amp;quot;INSERT INTO y VALUES (1994, 18, &amp;#39;Mel&amp;#39;)&amp;quot;)
+echo &amp;quot;INSERT INTO y VALUES (1994, 18, &amp;#39;Mel&amp;#39;)&amp;quot;
+ok
+
+# Basic query
+$ ./main --database data --script &amp;lt;(echo &amp;quot;SELECT name, age, year FROM y&amp;quot;)
+echo &amp;quot;SELECT name, age, year FROM y&amp;quot;
+| name          |age            |year           |
++ ====          +===            +====           +
+| Mel           |18             |1994           |
+| Gary          |38             |2010           |
+| Teej          |92             |2021           |
+
+# With WHERE
+$ ./main --database data --script &amp;lt;(echo &amp;quot;SELECT name, year, age FROM y WHERE age &amp;lt; 40&amp;quot;)
+echo &amp;quot;SELECT name, year, age FROM y WHERE age &amp;lt; 40&amp;quot;
+| name          |year           |age            |
++ ====          +====           +===            +
+| Mel           |1994           |18             |
+| Gary          |2010           |38             |
+
+# With operations
+$ ./main --database data --script &amp;lt;(echo &amp;quot;SELECT &amp;#39;Name: &amp;#39; || name, year + 30, age FROM y WHERE age &amp;lt; 40&amp;quot;)
+echo &amp;quot;SELECT &amp;#39;Name: &amp;#39; || name, year + 30, age FROM y WHERE age &amp;lt; 40&amp;quot;
+| unknown               |unknown                |age            |
++ =======               +=======                +===            +
+| Name: Mel             |2024           |18             |
+| Name: Gary            |2040           |38             |
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id="from-here"&gt;From Here&lt;/h3&gt;&lt;p&gt;As mentioned, this project is a vast simplification and there are
+plenty of bugs and subpar design choices. But hopefully it helps to
+make database development feel a little less intimidating!&lt;/p&gt;
+&lt;p&gt;If you liked this, here are some other things you might want to check
+out!&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Designing Database Intensive Applications&lt;/li&gt;
+&lt;li&gt;Database Internals: A Deep Dive Into How Distributed Data Systems Work&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://reddit.com/r/databasedevelopment"&gt;r/databasedevelopment&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https//discord.multiprocess.io"&gt;The #dbs channel on a software internals/hacking Discord I run&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/gosql"&gt;gosql&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;And of course, other posts on this blog. :)&lt;/p&gt;
+</description><guid isPermaLink="false">http://notes.eatonphil.com/zigrocks-sql.html</guid><pubDate>Sun, 13 Nov 2022 00:00:00 +0000</pubDate></item><item><title>A minimal RocksDB example with Zig</title><link>http://notes.eatonphil.com/zigrocks.html</link><description>&lt;p&gt;I mostly programmed in Go the last few years. So every time I
 wanted an embedded key-value database, I reached for Cockroach's
 &lt;a href="https://github.com/cockroachdb/pebble"&gt;Pebble&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;Pebble is great for Go programming but Go does not embed well into
