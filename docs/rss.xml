@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 14 Nov 2022 02:20:02 +0000</lastBuildDate><item><title>Writing a SQL database, take two: Zig and RocksDB</title><link>http://notes.eatonphil.com/zigrocks-sql.html</link><description>&lt;p&gt;As a second non-trivial post while learning Zig, I decided to port an
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 14 Nov 2022 02:24:29 +0000</lastBuildDate><item><title>Writing a SQL database, take two: Zig and RocksDB</title><link>http://notes.eatonphil.com/zigrocks-sql.html</link><description>&lt;p&gt;As a second non-trivial post while learning Zig, I decided to port an
 old, minimal SQL database project from Go to Zig.&lt;/p&gt;
 &lt;p&gt;In this post, in ~1700 lines of code (yes, I'm sorry it's bigger than
 my usual), we'll create a basic embedded SQL database in Zig on top of
@@ -1789,6 +1789,15 @@ out!&lt;/p&gt;
 &lt;li&gt;&lt;a href="https://github.com/gosql"&gt;gosql&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;And of course, other posts on this blog. :)&lt;/p&gt;
+&lt;p&gt;Lastly, a few resources that helped me out while hacking on this:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://ziglang.org/documentation/master/"&gt;Zig Documentation&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Browsing the source code (and tests!!) of standard library data structures&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://discord.gg/gxsFFjE"&gt;Zig Programming Language Discord's #zig-help channel&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;Friendly and helpful crowd :)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Spent a month hacking on it and happy to finally have this post out.&lt;br&gt;&lt;br&gt;Let&amp;#39;s build a basic SQL database in Zig on top of RocksDB. 😃&lt;a href="https://t.co/fkSnaEKsya"&gt;https://t.co/fkSnaEKsya&lt;/a&gt; &lt;a href="https://t.co/adfpMvvvOn"&gt;pic.twitter.com/adfpMvvvOn&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1591974393130934273?ref_src=twsrc%5Etfw"&gt;November 14, 2022&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/zigrocks-sql.html</guid><pubDate>Sun, 13 Nov 2022 00:00:00 +0000</pubDate></item><item><title>A minimal RocksDB example with Zig</title><link>http://notes.eatonphil.com/zigrocks.html</link><description>&lt;p&gt;I mostly programmed in Go the last few years. So every time I
 wanted an embedded key-value database, I reached for Cockroach's
