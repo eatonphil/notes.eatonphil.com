@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 14 Nov 2022 13:31:39 +0000</lastBuildDate><item><title>Writing a SQL database, take two: Zig and RocksDB</title><link>http://notes.eatonphil.com/zigrocks-sql.html</link><description>&lt;p&gt;For my second project while learning Zig, I decided to port an
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 14 Nov 2022 13:37:43 +0000</lastBuildDate><item><title>Writing a SQL database, take two: Zig and RocksDB</title><link>http://notes.eatonphil.com/zigrocks-sql.html</link><description>&lt;p&gt;For my second project while learning Zig, I decided to port an
 old, minimal SQL database project from Go to Zig.&lt;/p&gt;
 &lt;p&gt;In this post, in ~1700 lines of code (yes, I'm sorry it's bigger than
 my usual), we'll create a basic embedded SQL database in Zig on top of
@@ -82,7 +82,8 @@ high-level tables and rows from bytes on disk.&lt;/p&gt;
 the bytes are actually stored on disk. &lt;a href="http://rocksdb.org/"&gt;RocksDB&lt;/a&gt; is a persistant store
 that maps arbitary byte keys to arbitrary byte values. We'll use it
 for storing and recovering both table metadata and actual row data.&lt;/p&gt;
-&lt;p&gt;&lt;em&gt;Execution&lt;/em&gt; takes a query AST and executes it against &lt;em&gt;Storage&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Execution&lt;/em&gt; takes a query AST and executes it against &lt;em&gt;Storage&lt;/em&gt;,
+potentially returning result rows.&lt;/p&gt;
 &lt;p&gt;These terms are a vast simplification of real-world database
 design. But they are helpful structure to have even in a project
 this small.&lt;/p&gt;

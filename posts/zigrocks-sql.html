@@ -98,7 +98,8 @@ the bytes are actually stored on disk. [RocksDB](http://rocksdb.org/) is a persi
 that maps arbitary byte keys to arbitrary byte values. We'll use it
 for storing and recovering both table metadata and actual row data.
 
-*Execution* takes a query AST and executes it against *Storage*.
+*Execution* takes a query AST and executes it against *Storage*,
+potentially returning result rows.
 
 These terms are a vast simplification of real-world database
 design. But they are helpful structure to have even in a project

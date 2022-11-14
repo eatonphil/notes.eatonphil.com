@@ -161,7 +161,8 @@ high-level tables and rows from bytes on disk.</p>
 the bytes are actually stored on disk. <a href="http://rocksdb.org/">RocksDB</a> is a persistant store
 that maps arbitary byte keys to arbitrary byte values. We'll use it
 for storing and recovering both table metadata and actual row data.</p>
-<p><em>Execution</em> takes a query AST and executes it against <em>Storage</em>.</p>
+<p><em>Execution</em> takes a query AST and executes it against <em>Storage</em>,
+potentially returning result rows.</p>
 <p>These terms are a vast simplification of real-world database
 design. But they are helpful structure to have even in a project
 this small.</p>
