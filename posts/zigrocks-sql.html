@@ -50,7 +50,7 @@ echo "SELECT 'Name: ' || name, year + 30, age FROM y WHERE age < 40"
 ```
 
 This post is standalone (except for the RocksDB layer which [you can
-read about here](https://notes.eatonphil.com/)) but it builds on a
+read about here](https://notes.eatonphil.com/zigrocks.html)) but it builds on a
 number of ideas I've explored that you may be interested in:
 
 * [What's the big deal about key-value databases like FoundationDB and RocksDB?](https://notes.eatonphil.com/whats-the-big-deal-about-key-value-databases.html)
@@ -99,20 +99,62 @@ These terms are a vast simplification of real-world database
 design. But they are already extremely helpful to have in a project
 this small.
 
+### Memory Management
+
+Zig doesn't have a garbage collector. Mitchell Hashimoto [wrote
+bindings to Boehm GC](https://github.com/mitchellh/zig-libgc), but Zig
+also has a [builtin Arena
+allocator](https://ziglang.org/documentation/master/#toc-Choosing-an-Allocator)
+which is perfect for this simple project.
+
+The `main` function will create the arena and pass it to each
+component, where they can do allocations as they please. At the end of
+`main`, the entire arena will be freed at once.
+
+The only other place where we must do manual memory management is in
+the RocksDB wrapper. But [I've already
+covered](https://notes.eatonphil.com/zigrocks.html) that in a separate
+post.
+
+### Zig Specifics
+
+I'm not going to cover the basics of Zig syntax. If you are new to
+Zig, read [this](https://notes.eatonphil.com/zigrocks.html) first!
+(It's short.)
+
 Now that we've got the basic idea, we can start coding!
 
-### Lexing (`lex.zig`)
+### Types (`types.zig`, 10 LoC)
+
+Let's create a few helper types that we'll use in the rest of the
+code.
+
+```zig
+pub const String = []const u8;
+
+pub const Error = String;
+
+pub fn Result(comptime T: type) type {
+    return union(enum) {
+        val: T,
+        err: Error,
+    };
+}
+```
+
+That's it. :) Makes things a little more readable.
+
+### Lexing (`lex.zig`, 308 LoC)
 
 Lexing turns a query string into an array of tokens.
 
 There are a few *kinds* of tokens we'll define:
 
-* Keywords (like `CREATE`)
+* Keywords (like `CREATE`, `true`, `false`, `null`)
+  * Syntax (commas, parentheses, operators, and all other builtin symbols)
 * Strings
-* Numbers (just integers for now)
-* Booleans
+* Integers
 * Identifiers
-* Syntax (commas, parentheses, operators, whatnot)
 
 And not listed there but important to *skip past* is whitespace.
 
@@ -121,13 +163,14 @@ Let's turn this into a Zig struct!
 ```zig
 const std = @import("std");
 
-const Error = @import("result.zig").Error;
+const Error = @import("types.zig").Error;
+const String = @import("types.zig").String;
 
 pub const Token = struct {
     start: u64,
     end: u64,
     kind: Kind,
-    source: []const u8,
+    source: String,
 
     pub const Kind = enum {
 	    // Keywords
@@ -151,11 +194,11 @@ pub const Token = struct {
 
         // Literals
         identifier,
-        numeric,
+        integer,
         string,
     };
 
-    pub fn string(self: Token) []const u8 {
+    pub fn string(self: Token) String {
         return self.source[self.start..self.end];
     }
 ```
@@ -165,7 +208,7 @@ location in the token, we can build a nice debug function for when
 lexing or parsing fails.
 
 ```zig
-    fn debug(self: Token, msg: []const u8) void {
+    fn debug(self: Token, msg: String) void {
         var line: usize = 0;
         var column: usize = 0;
         var lineStartIndex: usize = 0;
@@ -210,7 +253,7 @@ And similarly, let's add a debug helper for when we're dealing with an
 array of tokens.
 
 ```zig
-pub fn debug(tokens: []Token, preferredIndex: usize, msg: []const u8) void {
+pub fn debug(tokens: []Token, preferredIndex: usize, msg: String) void {
     var i = preferredIndex;
     while (i >= tokens.len) {
         i = i - 0;
@@ -227,7 +270,7 @@ from the `Token.kind` enum to strings we can see in a query.
 
 ```zig
 const Builtin = struct {
-    name: []const u8,
+    name: String,
     kind: Token.Kind,
 };
 
@@ -249,13 +292,15 @@ var BUILTINS = [_]Builtin{
 };
 ```
 
+We'll use this in a few lexing functions below.
+
 #### Whitespace
 
 Outside of tokens, we need to be able to skip past whitespace.
 
 ```zig
 
-fn eatWhitespace(source: []const u8, index: usize) usize {
+fn eatWhitespace(source: String, index: usize) usize {
     var res = index;
     while (source[res] == ' ' or
         source[res] == '\n' or
@@ -278,4 +323,1727 @@ another.
 
 #### Keywords
 
-Let's handle lexing keyword tokens next.
+Let's handle lexing keyword tokens next. Keywords are case
+insensitive. I don't think there's a builtin case insensitive string
+comparison function in Zig. So let's write that first.
+
+```zig
+fn asciiCaseInsensitiveEqual(left: String, right: String) bool {
+    var min = left;
+    if (right.len < left.len) {
+        min = right;
+    }
+
+    for (min) |_, i| {
+        var l = left[i];
+        if (l >= 97 and l <= 122) {
+            l = l - 32;
+        }
+
+        var r = right[i];
+        if (r >= 97 and r <= 122) {
+            r = r - 32;
+        }
+
+        if (l != r) {
+            return false;
+        }
+    }
+
+    return true;
+}
+```
+
+Unfortunately it only supports ASCII for now.
+
+Now we can write a simple longest matching substring function. It will
+be simple because the keyword mapping we set up above is ordered by
+length descending.
+
+```zig
+fn lexKeyword(source: String, index: usize) struct { nextPosition: usize, token: ?Token } {
+    var longestLen: usize = 0;
+    var kind = Token.Kind.select_keyword;
+    for (BUILTINS) |builtin| {
+        if (index + builtin.name.len >= source.len) {
+            continue;
+        }
+
+        if (asciiCaseInsensitiveEqual(source[index .. index + builtin.name.len], builtin.name)) {
+            longestLen = builtin.name.len;
+            kind = builtin.kind;
+            // First match is the longest match
+            break;
+        }
+    }
+
+    if (longestLen == 0) {
+        return .{ .nextPosition = 0, .token = null };
+    }
+
+    return .{
+        .nextPosition = index + longestLen,
+        .token = Token{
+            .source = source,
+            .start = index,
+            .end = index + longestLen,
+            .kind = kind,
+        },
+    };
+}
+```
+
+That's it!
+
+#### Integers
+
+For integers we read through the source until we stop seeing
+decimal digits. Obviously this is a subset of what people consider
+integers, but it will do for now!
+
+```zig
+fn lexInteger(source: String, index: usize) struct { nextPosition: usize, token: ?Token } {
+    var start = index;
+    var end = index;
+    var i = index;
+    while (source[i] >= '0' and source[i] <= '9') {
+        end = end + 1;
+        i = i + 1;
+    }
+
+    if (start == end) {
+        return .{ .nextPosition = 0, .token = null };
+    }
+
+    return .{
+        .nextPosition = end,
+        .token = Token{
+            .source = source,
+            .start = start,
+            .end = end,
+            .kind = Token.Kind.integer,
+        },
+    };
+}
+```
+
+#### Strings
+
+Strings are enclosed in single quotes.
+
+```zig
+fn lexString(source: String, index: usize) struct { nextPosition: usize, token: ?Token } {
+    var i = index;
+    if (source[i] != '\'') {
+        return .{ .nextPosition = 0, .token = null };
+    }
+    i = i + 1;
+
+    var start = i;
+    var end = i;
+    while (source[i] != '\'') {
+        end = end + 1;
+        i = i + 1;
+    }
+
+    if (source[i] == '\'') {
+        i = i + 1;
+    }
+
+    if (start == end) {
+        return .{ .nextPosition = 0, .token = null };
+    }
+
+    return .{
+        .nextPosition = i,
+        .token = Token{
+            .source = source,
+            .start = start,
+            .end = end,
+            .kind = Token.Kind.string,
+        },
+    };
+}
+```
+
+#### Identifiers
+
+Identifiers for this project are alphanumeric characters. We could
+support more by optionally checking for double quote enclosed
+strings. But I'll leave that as an exercise for the reader.
+
+```zig
+fn lexIdentifier(source: String, index: usize) struct { nextPosition: usize, token: ?Token } {
+    var start = index;
+    var end = index;
+    var i = index;
+    while ((source[i] >= 'a' and source[i] <= 'z') or
+        (source[i] >= 'A' and source[i] <= 'Z') or
+        (source[i] == '*'))
+    {
+        end = end + 1;
+        i = i + 1;
+    }
+
+    if (start == end) {
+        return .{ .nextPosition = 0, .token = null };
+    }
+
+    return .{
+        .nextPosition = end,
+        .token = Token{
+            .source = source,
+            .start = start,
+            .end = end,
+            .kind = Token.Kind.identifier,
+        },
+    };
+}
+```
+
+#### `lex`
+
+Now we can pull together all these helper functions in a public
+entrypoint for lexing.
+
+It will loop through a query string, eating whitespace and checking
+for tokens. It will continue until it hits the end of the query
+string. If it ever can't continue it fails.
+
+```zig
+
+pub fn lex(source: String, tokens: *std.ArrayList(Token)) ?Error {
+    var i: usize = 0;
+    while (true) {
+        i = eatWhitespace(source, i);
+        if (i >= source.len) {
+            break;
+        }
+
+        const keywordRes = lexKeyword(source, i);
+        if (keywordRes.token) |token| {
+            tokens.append(token) catch return "Failed to allocate space for keyword token";
+            i = keywordRes.nextPosition;
+            continue;
+        }
+
+        const numericRes = lexNumeric(source, i);
+        if (numericRes.token) |token| {
+            tokens.append(token) catch return "Failed to allocate space for numeric token";
+            i = numericRes.nextPosition;
+            continue;
+        }
+
+        const stringRes = lexString(source, i);
+        if (stringRes.token) |token| {
+            tokens.append(token) catch return "Failed to allocate space for string token";
+            i = stringRes.nextPosition;
+            continue;
+        }
+
+        const identifierRes = lexIdentifier(source, i);
+        if (identifierRes.token) |token| {
+            tokens.append(token) catch return "Failed to allocate space for identifier token";
+            i = identifierRes.nextPosition;
+            continue;
+        }
+
+        if (tokens.items.len > 0) {
+            debug(tokens.items, tokens.items.len - 1, "Last good token.\n");
+        }
+        return "Bad token";
+    }
+
+    return null;
+}
+```
+
+That's it for lexing! Now we can do parsing.
+
+### Parsing (`parse.zig`, 407 LoC)
+
+Parsing takes an array of tokens from the lexing stage and discovers
+the tree structure in them that maps to a predefined syntax tree
+(AST).
+
+If it can't discover a valid tree from the array of tokens, it fails.
+
+Let's set up the basics of the `Parser` struct:
+
+```
+const std = @import("std");
+
+const lex = @import("lex.zig");
+const Result = @import("types.zig").Result;
+
+const Token = lex.Token;
+
+pub const Parser = struct {
+    allocator: std.mem.Allocator,
+
+    pub fn init(allocator: std.mem.Allocator) Parser {
+        return Parser{ .allocator = allocator };
+    }
+
+    fn expectTokenKind(tokens: []Token, index: usize, kind: Token.Kind) bool {
+        if (index >= tokens.len) {
+            return false;
+        }
+
+        return tokens[index].kind == kind;
+    }
+```
+
+#### Expressions
+
+Expressions are at the bottom of the syntax tree.
+
+They can be:
+
+* Literals (like strings, integers, booleans, etc.)
+* Or binary operations
+
+Let's define these in Zig:
+
+```    
+    pub const BinaryOperationAST = struct {
+        operator: Token,
+        left: *ExpressionAST,
+        right: *ExpressionAST,
+
+        fn print(self: BinaryOperationAST) void {
+            self.left.print();
+            std.debug.print(" {s} ", .{self.operator.string()});
+            self.right.print();
+        }
+    };
+
+    pub const ExpressionAST = union(enum) {
+        literal: Token,
+        binary_operation: BinaryOperationAST,
+
+        fn print(self: ExpressionAST) void {
+            switch (self) {
+                .literal => |literal| switch (literal.kind) {
+                    .string => std.debug.print("'{s}'", .{literal.string()}),
+                    else => std.debug.print("{s}", .{literal.string()}),
+                },
+                .binary_operation => self.binary_operation.print(),
+            }
+        }
+    };
+```
+
+Now we can attempt to parse either of these from an array of tokens.
+
+```zig
+    fn parseExpression(self: Parser, tokens: []Token, index: usize) Result(struct {
+        ast: ExpressionAST,
+        nextPosition: usize,
+    }) {
+        var i = index;
+
+        var e: ExpressionAST = undefined;
+
+        if (expectTokenKind(tokens, i, Token.Kind.integer) or
+                expectTokenKind(tokens, i, Token.Kind.identifier) or
+                expectTokenKind(tokens, i, Token.Kind.string))
+            {
+                e = ExpressionAST{ .literal = tokens[i] };
+                i = i + 1;
+        } else {
+                return .{ .err = "No expression" };
+        }
+
+        if (expectTokenKind(tokens, i, Token.Kind.equal_operator) or
+                expectTokenKind(tokens, i, Token.Kind.lt_operator) or
+                expectTokenKind(tokens, i, Token.Kind.plus_operator) or
+                expectTokenKind(tokens, i, Token.Kind.concat_operator))
+            {
+                var newE = ExpressionAST{
+                    .binary_operation = BinaryOperationAST{
+                        .operator = tokens[i],
+                        .left = self.allocator.create(ExpressionAST) catch return .{
+                            .err = "Could not allocate for left expression.",
+                        },
+                        .right = self.allocator.create(ExpressionAST) catch return .{
+                            .err = "Could not allocate for right expression.",
+                        },
+                    },
+                };
+                newE.binary_operation.left.* = e;
+                e = newE;
+
+                switch (self.parseExpression(tokens, i + 1)) {
+                    .err => |err| return .{ .err = err },
+                    .val => |val| {
+                        e.binary_operation.right.* = val.ast;
+                        i = val.nextPosition;
+                    },
+                }
+        }
+
+        return .{ .val = .{ .ast = e, .nextPosition = i } };
+    }
+```
+
+Basically, we assume it's a literal expression unless we see an
+operator after it. If there's an operator after it we call
+`parseExpression` recursively and return a binary expression.
+
+Important to note, this skips both implicit operator precedence and
+explicit precedence via parenthesis.
+
+#### `SELECT`
+
+A `SELECT` query's structure has a `FROM` table name, a
+comma-separated list of expressions, and an optional `WHERE` section
+with another expression for the where.
+
+```zig
+    pub const SelectAST = struct {
+        columns: []ExpressionAST,
+        from: Token,
+        where: ?ExpressionAST,
+
+        fn print(self: SelectAST) void {
+            std.debug.print("SELECT\n", .{});
+            for (self.columns) |column, i| {
+                std.debug.print("  ", .{});
+                column.print();
+                if (i < self.columns.len - 1) {
+                    std.debug.print(",", .{});
+                }
+                std.debug.print("\n", .{});
+            }
+            std.debug.print("FROM\n  {s}", .{self.from.string()});
+
+            if (self.where) |where| {
+                std.debug.print("\nWHERE\n  ", .{});
+                where.print();
+            }
+
+            std.debug.print("\n", .{});
+        }
+    };
+```
+
+To parse it we look for: 
+
+* `SELECT`
+* Then a comma separated list of `ExpressionAST`s
+* Then a `FROM`
+* Then optionally a `WHERE`
+  * And then another `ExpressionAST`
+  
+With the help of `expectTokenKind` and `parseExpression` it is not too
+difficult, but a little verbose, to write.
+
+```zig
+    fn parseSelect(self: Parser, tokens: []Token) Result(AST) {
+        var i: usize = 0;
+        if (!expectTokenKind(tokens, i, Token.Kind.select_keyword)) {
+            return .{ .err = "Expected SELECT keyword" };
+        }
+        i = i + 1;
+
+        var columns = std.ArrayList(ExpressionAST).init(self.allocator);
+        var select = SelectAST{
+            .columns = undefined,
+            .from = undefined,
+            .where = null,
+        };
+
+        // Parse columns
+        while (!expectTokenKind(tokens, i, Token.Kind.from_keyword)) {
+            if (columns.items.len > 0) {
+                if (!expectTokenKind(tokens, i, Token.Kind.comma_syntax)) {
+                    lex.debug(tokens, i, "Expected comma.\n");
+                    return .{ .err = "Expected comma." };
+                }
+
+                i = i + 1;
+            }
+
+            switch (self.parseExpression(tokens, i)) {
+                .err => |err| return .{ .err = err },
+                .val => |val| {
+                    i = val.nextPosition;
+
+                    columns.append(val.ast) catch return .{
+                        .err = "Could not allocate for token.",
+                    };
+                },
+            }
+        }
+
+        if (!expectTokenKind(tokens, i, Token.Kind.from_keyword)) {
+            lex.debug(tokens, i, "Expected FROM keyword after this.\n");
+            return .{ .err = "Expected FROM keyword" };
+        }
+        i = i + 1;
+
+        if (!expectTokenKind(tokens, i, Token.Kind.identifier)) {
+            lex.debug(tokens, i, "Expected FROM table name after this.\n");
+            return .{ .err = "Expected FROM keyword" };
+        }
+        select.from = tokens[i];
+        i = i + 1;
+
+        if (expectTokenKind(tokens, i, Token.Kind.where_keyword)) {
+            // i + 1, skip past the where
+            switch (self.parseExpression(tokens, i + 1)) {
+                .err => |err| return .{ .err = err },
+                .val => |val| {
+                    select.where = val.ast;
+                    i = val.nextPosition;
+                },
+            }
+        }
+
+        if (i < tokens.len) {
+            lex.debug(tokens, i, "Unexpected token.");
+            return .{ .err = "Did not complete parsing SELECT" };
+        }
+
+        select.columns = columns.items;
+        return .{ .val = AST{ .select = select } };
+    }
+```
+
+That's it!
+
+#### `CREATE TABLE`
+
+A `CREATE TABLE` query's structure has a table name and a list of
+comma separated identifier pairs for column name and kind.
+
+```zig
+    const CreateTableColumnAST = struct {
+        name: Token,
+        kind: Token,
+    };
+
+    pub const CreateTableAST = struct {
+        table: Token,
+        columns: []CreateTableColumnAST,
+
+        fn print(self: CreateTableAST) void {
+            std.debug.print("CREATE TABLE {s} (\n", .{self.table.string()});
+            for (self.columns) |column, i| {
+                std.debug.print(
+                    "  {s} {s}",
+                    .{ column.name.string(), column.kind.string() },
+                );
+                if (i < self.columns.len - 1) {
+                    std.debug.print(",", .{});
+                }
+                std.debug.print("\n", .{});
+            }
+            std.debug.print(")\n", .{});
+        }
+    };
+```
+
+To parse it we look for:
+
+* `CREATE TABLE`
+* Followed by an identifier (the table name)
+* Followed by open parenthesis
+* Followed by a comma separated list of identifier pairs
+* Followed by close parenthesis
+
+```zig
+    fn parseCreateTable(self: Parser, tokens: []Token) Result(AST) {
+        var i: usize = 0;
+        if (!expectTokenKind(tokens, i, Token.Kind.create_table_keyword)) {
+            return .{ .err = "Expected CREATE TABLE keyword" };
+        }
+        i = i + 1;
+
+        if (!expectTokenKind(tokens, i, Token.Kind.identifier)) {
+            lex.debug(tokens, i, "Expected table name after CREATE TABLE keyword.\n");
+            return .{ .err = "Expected CREATE TABLE name" };
+        }
+
+        var columns = std.ArrayList(CreateTableColumnAST).init(self.allocator);
+        var create_table = CreateTableAST{
+            .columns = undefined,
+            .table = tokens[i],
+        };
+        i = i + 1;
+
+        if (!expectTokenKind(tokens, i, Token.Kind.left_paren_syntax)) {
+            lex.debug(tokens, i, "Expected opening paren after CREATE TABLE name.\n");
+            return .{ .err = "Expected opening paren" };
+        }
+        i = i + 1;
+
+        while (!expectTokenKind(tokens, i, Token.Kind.right_paren_syntax)) {
+            if (columns.items.len > 0) {
+                if (!expectTokenKind(tokens, i, Token.Kind.comma_syntax)) {
+                    lex.debug(tokens, i, "Expected comma.\n");
+                    return .{ .err = "Expected comma." };
+                }
+
+                i = i + 1;
+            }
+
+            var column = CreateTableColumnAST{ .name = undefined, .kind = undefined };
+            if (!expectTokenKind(tokens, i, Token.Kind.identifier)) {
+                lex.debug(tokens, i, "Expected column name after comma.\n");
+                return .{ .err = "Expected identifier." };
+            }
+
+            column.name = tokens[i];
+            i = i + 1;
+
+            if (!expectTokenKind(tokens, i, Token.Kind.identifier)) {
+                lex.debug(tokens, i, "Expected column type after column name.\n");
+                return .{ .err = "Expected identifier." };
+            }
+
+            column.kind = tokens[i];
+            i = i + 1;
+
+            columns.append(column) catch return .{
+                .err = "Could not allocate for column.",
+            };
+        }
+
+        // Skip past final paren.
+        i = i + 1;
+
+        if (i < tokens.len) {
+            lex.debug(tokens, i, "Unexpected token.");
+            return .{ .err = "Did not complete parsing CREATE TABLE" };
+        }
+
+        create_table.columns = columns.items;
+        return .{ .val = AST{ .create_table = create_table } };
+    }
+```
+
+#### `INSERT INTO`
+
+And last we've got `INSERT INTO`. This tree has table name and a list
+of expressions to insert into the table.
+
+```zig
+    pub const InsertAST = struct {
+        table: Token,
+        values: []ExpressionAST,
+
+        fn print(self: InsertAST) void {
+            std.debug.print("INSERT INTO {s} VALUES (", .{self.table.string()});
+            for (self.values) |value, i| {
+                value.print();
+                if (i < self.values.len - 1) {
+                    std.debug.print(", ", .{});
+                }
+            }
+            std.debug.print(")\n", .{});
+        }
+    };
+```
+
+We parse it by looking for:
+
+* `INSERT INTO`
+* Followed by a table name
+* Followed by `VALUES`
+* Followed by open parenthesis
+* Followed by a comma-separated list of expressions
+* Followed by a close parenthesis
+
+```zig
+    fn parseInsert(self: Parser, tokens: []Token) Result(AST) {
+        var i: usize = 0;
+        if (!expectTokenKind(tokens, i, Token.Kind.insert_keyword)) {
+            return .{ .err = "Expected INSERT INTO keyword" };
+        }
+        i = i + 1;
+
+        if (!expectTokenKind(tokens, i, Token.Kind.identifier)) {
+            lex.debug(tokens, i, "Expected table name after INSERT INTO keyword.\n");
+            return .{ .err = "Expected INSERT INTO table name" };
+        }
+
+        var values = std.ArrayList(ExpressionAST).init(self.allocator);
+        var insert = InsertAST{
+            .values = undefined,
+            .table = tokens[i],
+        };
+        i = i + 1;
+
+        if (!expectTokenKind(tokens, i, Token.Kind.values_keyword)) {
+            lex.debug(tokens, i, "Expected VALUES keyword.\n");
+            return .{ .err = "Expected VALUES keyword" };
+        }
+        i = i + 1;
+
+        if (!expectTokenKind(tokens, i, Token.Kind.left_paren_syntax)) {
+            lex.debug(tokens, i, "Expected opening paren after CREATE TABLE name.\n");
+            return .{ .err = "Expected opening paren" };
+        }
+        i = i + 1;
+
+        while (!expectTokenKind(tokens, i, Token.Kind.right_paren_syntax)) {
+            if (values.items.len > 0) {
+                if (!expectTokenKind(tokens, i, Token.Kind.comma_syntax)) {
+                    lex.debug(tokens, i, "Expected comma.\n");
+                    return .{ .err = "Expected comma." };
+                }
+
+                i = i + 1;
+            }
+
+            switch (self.parseExpression(tokens, i)) {
+                .err => |err| return .{ .err = err },
+                .val => |val| {
+                    values.append(val.ast) catch return .{
+                        .err = "Could not allocate for expression.",
+                    };
+                    i = val.nextPosition;
+                },
+            }
+        }
+
+        // Skip past final paren.
+        i = i + 1;
+
+        if (i < tokens.len) {
+            lex.debug(tokens, i, "Unexpected token.");
+            return .{ .err = "Did not complete parsing INSERT INTO" };
+        }
+
+        insert.values = values.items;
+        return .{ .val = AST{ .insert = insert } };
+    }
+```
+
+#### `AST`
+
+Finally we can define the top-level SQL `AST` as being the union of
+the above three query types.
+
+```zig
+
+    pub const AST = union(enum) {
+        select: SelectAST,
+        insert: InsertAST,
+        create_table: CreateTableAST,
+
+        pub fn print(self: AST) void {
+            switch (self) {
+                .select => |select| select.print(),
+                .insert => |insert| insert.print(),
+                .create_table => |create_table| create_table.print(),
+            }
+        }
+    };
+```
+
+And we can implement `parse` by switching on the current token.
+
+```zig
+
+    pub fn parse(self: Parser, tokens: []Token) Result(AST) {
+        if (expectTokenKind(tokens, 0, Token.Kind.select_keyword)) {
+            return switch (self.parseSelect(tokens)) {
+                .err => |err| .{ .err = err },
+                .val => |val| .{ .val = val },
+            };
+        }
+
+        if (expectTokenKind(tokens, 0, Token.Kind.create_table_keyword)) {
+            return switch (self.parseCreateTable(tokens)) {
+                .err => |err| .{ .err = err },
+                .val => |val| .{ .val = val },
+            };
+        }
+
+        if (expectTokenKind(tokens, 0, Token.Kind.insert_keyword)) {
+            return switch (self.parseInsert(tokens)) {
+                .err => |err| .{ .err = err },
+                .val => |val| .{ .val = val },
+            };
+        }
+
+        return .{ .err = "Unknown statement" };
+    }
+};
+```
+
+Perfect. (For today. :) )
+
+### Storage (`storage.zig`, 338 LoC)
+
+Next we're going to switch contexts completely and think about how
+tables and rows will get serialized into bytes that can be stored on
+disk.
+
+The storage layer will define a few general helpers for correctly
+serializing and deserializing strings and numbers:
+
+```
+const std = @import("std");
+
+const RocksDB = @import("rocksdb.zig").RocksDB;
+const Error = @import("types.zig").Error;
+const Result = @import("types.zig").Result;
+const String = @import("types.zig").String;
+
+pub fn serializeInteger(comptime T: type, buf: *std.ArrayList(u8), i: T) !void {
+    var length: [@sizeOf(T)]u8 = undefined;
+    std.mem.writeIntBig(T, &length, i);
+    try buf.appendSlice(length[0..8]);
+}
+
+pub fn deserializeInteger(comptime T: type, buf: String) T {
+    return std.mem.readIntBig(T, buf[0..@sizeOf(T)]);
+}
+
+pub fn serializeBytes(buf: *std.ArrayList(u8), bytes: String) !void {
+    try serializeInteger(u64, buf, bytes.len);
+    try buf.appendSlice(bytes);
+}
+
+pub fn deserializeBytes(bytes: String) struct {
+    offset: usize,
+    bytes: String,
+} {
+    var length = deserializeInteger(u64, bytes);
+    var offset = length + 8;
+    return .{ .offset = offset, .bytes = bytes[8..offset] };
+}
+```
+
+Then we'll define the `Storage` struct itself. Under the hood it will
+use RocksDB to store and recover data on disk.
+
+```zig
+pub const Storage = struct {
+    db: RocksDB,
+    allocator: std.mem.Allocator,
+
+    pub fn init(allocator: std.mem.Allocator, db: RocksDB) Storage {
+        return Storage{
+            .db = db,
+            .allocator = allocator,
+        };
+    }
+```
+
+Now let's think about storage entities.
+
+#### Values
+
+The fundamental unit in the database is a value, or cell. It can be
+either a boolean, an integer, a string, or null.
+
+```zig
+    pub const Value = union(enum) {
+        bool_value: bool,
+        null_value: bool,
+        string_value: String,
+        integer_value: i64,
+
+        pub const TRUE = Value{ .bool_value = true };
+        pub const FALSE = Value{ .bool_value = false };
+        pub const NULL = Value{ .null_value = true };
+```
+
+Since all values are strings in the original query, we'll provide a
+`fromIntegerString` that we can use to convert.
+
+```zig
+        pub fn fromIntegerString(iBytes: String) Value {
+            const i = std.fmt.parseInt(i64, iBytes, 10) catch return Value{
+                .integer_value = 0,
+            };
+            return Value{ .integer_value = i };
+        }
+```
+
+Next we'll define functions to cast values to boolean.
+
+```zig
+        pub fn asBool(self: Value) bool {
+            return switch (self) {
+                .null_value => false,
+                .bool_value => |value| value,
+                .string_value => |value| value.len > 0,
+                .integer_value => |value| value != 0,
+            };
+        }
+```
+
+To strings.
+
+```zig
+        pub fn asString(self: Value, buf: *std.ArrayList(u8)) !void {
+            try switch (self) {
+                .null_value => _ = 1, // Do nothing
+                .bool_value => |value| buf.appendSlice(if (value) "true" else "false"),
+                .string_value => |value| buf.appendSlice(value),
+                .integer_value => |value| buf.writer().print("{d}", .{value}),
+            };
+        }
+```
+
+And to integers.
+
+```zig
+        pub fn asInteger(self: Value) i64 {
+            return switch (self) {
+                .null_value => 0,
+                .bool_value => |value| if (value) 1 else 0,
+                .string_value => |value| fromIntegerString(value).integer_value,
+                .integer_value => |value| value,
+            };
+        }
+```
+
+And finally the storage layer's core concern: serialization...
+
+```zig
+        pub fn serialize(self: Value, buf: *std.ArrayList(u8)) String {
+            switch (self) {
+                .null_value => buf.append('0') catch return "",
+
+                .bool_value => |value| {
+                    buf.append('1') catch return "";
+                    buf.append(if (value) '1' else '0') catch return "";
+                },
+
+                .string_value => |value| {
+                    buf.append('2') catch return "";
+                    buf.appendSlice(value) catch return "";
+                },
+
+                .integer_value => |value| {
+                    buf.append('3') catch return "";
+                    serializeInteger(i64, buf, value) catch return "";
+                },
+            }
+
+            return buf.items;
+        }
+```
+
+And deserialization.
+
+```zig
+        pub fn deserialize(data: String) Value {
+            return switch (data[0]) {
+                '0' => Value.NULL,
+                '1' => Value{ .bool_value = data[1] == '1' },
+                '2' => Value{ .string_value = data[1..] },
+                '3' => Value{ .integer_value = deserializeInteger(i64, data[1..]) },
+                else => unreachable,
+            };
+        }
+    };
+```
+
+We use a simple, space inefficient scheme for encoding/decoding to
+bytes that can be written to disk.
+
+#### Rows
+
+Now that we've got values, we can define rows in terms of values. And
+we can provide a few helper functions for getting cells by field name.
+
+```zig
+    pub const Row = struct {
+        allocator: std.mem.Allocator,
+        cells: std.ArrayList(String),
+        fields: []String,
+
+        pub fn init(allocator: std.mem.Allocator, fields: []String) Row {
+            return Row{
+                .allocator = allocator,
+                .cells = std.ArrayList(String).init(allocator),
+                .fields = fields,
+            };
+        }
+
+        pub fn append(self: *Row, cell: Value) !void {
+            var cellBuffer = std.ArrayList(u8).init(self.allocator);
+            try self.cells.append(cell.serialize(&cellBuffer));
+        }
+
+        pub fn appendBytes(self: *Row, cell: String) !void {
+            try self.cells.append(cell);
+        }
+
+        pub fn get(self: Row, field: String) Value {
+            for (self.fields) |f, i| {
+                if (std.mem.eql(u8, field, f)) {
+                    // Results are internal buffer views. So make a copy.
+                    var copy = std.ArrayList(u8).init(self.allocator);
+                    copy.appendSlice(self.cells.items[i]) catch return Storage.Value.NULL;
+                    return Storage.Value.deserialize(copy.items);
+                }
+            }
+
+            return Value.NULL;
+        }
+
+        pub fn items(self: Row) []String {
+            return self.cells.items;
+        }
+
+        fn reset(self: *Row) void {
+            self.cells.clearRetainingCapacity();
+        }
+    };
+```
+
+Since values are serialized with length prefixes, we can
+serialize rows by concatenating all the values together.
+
+Since we must map to keys and values for RocksDB, we give each row a
+key prefix that is the table name. And then we give it a random suffix
+to distinguish it from other rows in the table. A more intelligent
+design would use the table's primary key as the suffix but we don't
+support primary keys yet.
+
+```zig
+    pub fn writeRow(self: Storage, table: String, row: Row) ?Error {
+        // Table name prefix
+        var key = std.ArrayList(u8).init(self.allocator);
+        key.writer().print("row_{s}_", .{table}) catch return "Could not allocate row key";
+
+        // Unique row id
+        var id = generateId() catch return "Could not generate id";
+        key.appendSlice(id) catch return "Could not allocate for id";
+
+        var value = std.ArrayList(u8).init(self.allocator);
+        for (row.cells.items) |cell| {
+            serializeBytes(&value, cell) catch return "Could not allocate for cell";
+        }
+
+        return self.db.set(key.items, value.items);
+    }
+```
+
+#### RowIter
+
+Reading rows will be slightly different from writing rows since
+reading rows will use an iterator. We will wrap the RocksDB iterator
+so the consumer of `Storage` only needs to deal with `Row`s and
+`Value`s.
+
+```zig
+    pub const RowIter = struct {
+        row: Row,
+        iter: RocksDB.Iter,
+
+        fn init(allocator: std.mem.Allocator, iter: RocksDB.Iter, fields: []String) RowIter {
+            return RowIter{
+                .iter = iter,
+                .row = Row.init(allocator, fields),
+            };
+        }
+
+        pub fn next(self: *RowIter) ?Row {
+            var rowBytes: String = undefined;
+            if (self.iter.next()) |b| {
+                rowBytes = b.value;
+            } else {
+                return null;
+            }
+
+            self.row.reset();
+            var offset: usize = 0;
+            while (offset < rowBytes.len) {
+                var d = deserializeBytes(rowBytes[offset..]);
+                offset += d.offset;
+                self.row.appendBytes(d.bytes) catch return null;
+            }
+
+            return self.row;
+        }
+
+        pub fn close(self: RowIter) void {
+            self.iter.close();
+        }
+    };
+```
+
+It does the opposite of what `writeRow` did in terms of deserializing
+cells one after another. Again, this works because each cell is
+length-prefixed.
+
+Next we must provide the interface for actually getting a
+`RowIter`. The only condition for the `RowIter` at the moment is that
+it contains all rows in the table.
+
+Since we wrote each row with a table name prefix, we can recover it by
+iterating over all rows with that prefix.
+
+```zig
+    pub fn getRowIter(self: Storage, table: String) Result(RowIter) {
+        var rowPrefix = std.ArrayList(u8).init(self.allocator);
+        rowPrefix.writer().print("row_{s}_", .{table}) catch return .{
+            .err = "Could not allocate for row prefix",
+        };
+
+        var iter = switch (self.db.iter(rowPrefix.items)) {
+            .err => |err| return .{ .err = err },
+            .val => |it| it,
+        };
+
+        var tableInfo = switch (self.getTable(table)) {
+            .err => |err| return .{ .err = err },
+            .val => |t| t,
+        };
+
+        return .{
+            .val = RowIter.init(self.allocator, iter, tableInfo.columns),
+        };
+    }
+```
+
+#### Tables
+
+Finally we've got tables. We must store table metadata. Its name,
+columns and column types.
+
+```zig
+    pub const Table = struct {
+        name: String,
+        columns: []String,
+        types: []String,
+    };
+```
+
+We will use a `tbl_` prefix instead of `row_` prefix for table
+metadata. But we'll otherwise encode with the same length-prefixed
+concatentations.
+
+```zig
+    pub fn writeTable(self: Storage, table: Table) ?Error {
+        // Table name prefix
+        var key = std.ArrayList(u8).init(self.allocator);
+        key.writer().print("tbl_{s}_", .{table.name}) catch return "Could not allocate key for table";
+
+        var value = std.ArrayList(u8).init(self.allocator);
+        for (table.columns) |column, i| {
+            serializeBytes(&value, column) catch return "Could not allocate for column";
+            serializeBytes(&value, table.types[i]) catch return "Could not allocate for column type";
+        }
+
+        return self.db.set(key.items, value.items);
+    }
+```
+
+And the opposite for decoding.
+
+```zig
+
+    pub fn getTable(self: Storage, name: String) Result(Table) {
+        var tableKey = std.ArrayList(u8).init(self.allocator);
+        tableKey.writer().print("tbl_{s}_", .{name}) catch return .{
+            .err = "Could not allocate for table prefix",
+        };
+
+        var columns = std.ArrayList(String).init(self.allocator);
+        var types = std.ArrayList(String).init(self.allocator);
+        var table = Table{
+            .name = name,
+            .columns = undefined,
+            .types = undefined,
+        };
+        // First grab table info
+        var columnInfo = switch (self.db.get(tableKey.items)) {
+            .err => |err| return .{ .err = err },
+            .val => |val| val,
+            .not_found => return .{ .err = "No such table" },
+        };
+
+        var columnOffset: usize = 0;
+        while (columnOffset < columnInfo.len) {
+            var column = deserializeBytes(columnInfo[columnOffset..]);
+            columnOffset += column.offset;
+            columns.append(column.bytes) catch return .{
+                .err = "Could not allocate for column name.",
+            };
+
+            var kind = deserializeBytes(columnInfo[columnOffset..]);
+            columnOffset += kind.offset;
+            types.append(kind.bytes) catch return .{
+                .err = "Could not allocate for column kind.",
+            };
+        }
+
+        table.columns = columns.items;
+        table.types = types.items;
+
+        return .{ .val = table };
+    }
+};
+```
+
+And that's it for storage! Again, we're building on top of the
+[RocksDB layer](https://notes.eatonphil.com/zigrocks.html) I already
+wrote about. If you want to see how that works, go for it!
+
+### Execute (`execute.zig`, 210 LoC)
+
+Now that we've got a storage layer and an AST from our parser, we can
+execute the query on top of the storage!
+
+A better implementation might translate the AST to bytecode and
+implement a bytecode interpreter for expression evaluation. But we'll
+build a tree-walking interpreter instead.
+
+```zig
+const std = @import("std");
+
+const Parser = @import("parse.zig").Parser;
+const RocksDB = @import("rocksdb.zig").RocksDB;
+const Storage = @import("storage.zig").Storage;
+const Result = @import("types.zig").Result;
+const String = @import("types.zig").String;
+
+pub const Executor = struct {
+    allocator: std.mem.Allocator,
+    storage: Storage,
+
+    pub fn init(allocator: std.mem.Allocator, storage: Storage) Executor {
+        return Executor{ .allocator = allocator, .storage = storage };
+    }
+```
+
+In general we'll make query responses optional. They can be empty or
+they can be an array of an array of strings (rows and cells) and an
+array of strings (column names).
+
+```zig
+    const QueryResponse = struct {
+        fields: []String,
+        // Array of cells (which is an array of serde (which is an array of u8))
+        rows: [][]String,
+        empty: bool,
+    };
+    const QueryResponseResult = Result(QueryResponse);
+```
+
+#### Expressions
+
+For execution we start again at the bottom with expressions. There are literals.
+
+```zig
+    fn executeExpression(self: Executor, e: Parser.ExpressionAST, row: Storage.Row) Storage.Value {
+        return switch (e) {
+            .literal => |lit| switch (lit.kind) {
+                .string => Storage.Value{ .string_value = lit.string() },
+                .integer => Storage.Value.fromIntegerString(lit.string()),
+                .identifier => row.get(lit.string()),
+                else => unreachable,
+            },
+```
+
+And there are a handful of binary operations.
+
+```zig
+            .binary_operation => |bin_op| {
+                var left = self.executeExpression(bin_op.left.*, row);
+                var right = self.executeExpression(bin_op.right.*, row);
+
+                if (bin_op.operator.kind == .equal_operator) {
+                    // Cast dissimilar types to serde
+                    if (@enumToInt(left) != @enumToInt(right)) {
+                        var leftBuf = std.ArrayList(u8).init(self.allocator);
+                        left.asString(&leftBuf) catch unreachable;
+                        left = Storage.Value{ .string_value = leftBuf.items };
+
+                        var rightBuf = std.ArrayList(u8).init(self.allocator);
+                        right.asString(&rightBuf) catch unreachable;
+                        right = Storage.Value{ .string_value = rightBuf.items };
+                    }
+
+                    return Storage.Value{
+                        .bool_value = switch (left) {
+                            .null_value => true,
+                            .bool_value => |v| v == right.asBool(),
+                            .string_value => blk: {
+                                var leftBuf = std.ArrayList(u8).init(self.allocator);
+                                left.asString(&leftBuf) catch unreachable;
+
+                                var rightBuf = std.ArrayList(u8).init(self.allocator);
+                                right.asString(&rightBuf) catch unreachable;
+
+                                break :blk std.mem.eql(u8, leftBuf.items, rightBuf.items);
+                            },
+                            .integer_value => left.asInteger() == right.asInteger(),
+                        },
+                    };
+                }
+
+                if (bin_op.operator.kind == .concat_operator) {
+                    var copy = std.ArrayList(u8).init(self.allocator);
+                    left.asString(&copy) catch unreachable;
+                    right.asString(&copy) catch unreachable;
+                    return Storage.Value{ .string_value = copy.items };
+                }
+
+                return switch (bin_op.operator.kind) {
+                    .lt_operator => if (left.asInteger() < right.asInteger()) Storage.Value.TRUE else Storage.Value.FALSE,
+                    .plus_operator => Storage.Value{ .integer_value = left.asInteger() + right.asInteger() },
+                    else => Storage.Value.NULL,
+                };
+            },
+        };
+    }
+```
+
+#### `SELECT`
+
+To execute a `SELECT` query we first validate the requested table and
+requested fields.
+
+```zig
+    fn executeSelect(self: Executor, s: Parser.SelectAST) QueryResponseResult {
+        switch (self.storage.getTable(s.from.string())) {
+            .err => |err| return .{ .err = err },
+            else => _ = 1,
+        }
+
+        // Now validate and store requested fields
+        var requestedFields = std.ArrayList(String).init(self.allocator);
+        for (s.columns) |requestedColumn| {
+            var fieldName = switch (requestedColumn) {
+                .literal => |lit| switch (lit.kind) {
+                    .identifier => lit.string(),
+                    // TODO: give reasonable names
+                    else => "unknown",
+                },
+                // TODO: give reasonable names
+                else => "unknown",
+            };
+            requestedFields.append(fieldName) catch return .{
+                .err = "Could not allocate for requested field.",
+            };
+        }
+```
+
+Then grab an iterator for rows in the table.
+
+```zig
+        var rows = std.ArrayList([]String).init(self.allocator);
+        var response = QueryResponse{
+            .fields = requestedFields.items,
+            .rows = undefined,
+            .empty = false,
+        };
+
+        var iter = switch (self.storage.getRowIter(s.from.string())) {
+            .err => |err| return .{ .err = err },
+            .val => |it| it,
+        };
+        defer iter.close();
+```
+
+And finally we iterate through all rows and add rows to the response
+if there is no `WHERE` condition or if we evaluate the `WHERE`
+condition successfully.
+
+When we add rows to the response, we need to actually evaluate the
+expression from each column in the `SELECT` AST.
+
+```zig
+        while (iter.next()) |row| {
+            var add = false;
+            if (s.where) |where| {
+                if (self.executeExpression(where, row).asBool()) {
+                    add = true;
+                }
+            } else {
+                add = true;
+            }
+
+            if (add) {
+                var requested = std.ArrayList(String).init(self.allocator);
+                for (s.columns) |exp| {
+                    var val = self.executeExpression(exp, row);
+                    var valBuf = std.ArrayList(u8).init(self.allocator);
+                    val.asString(&valBuf) catch unreachable;
+                    requested.append(valBuf.items) catch return .{
+                        .err = "Could not allocate for requested cell",
+                    };
+                }
+                rows.append(requested.items) catch return .{
+                    .err = "Could not allocate for row",
+                };
+            }
+        }
+
+        response.rows = rows.items;
+        return .{ .val = response };
+    }
+```
+
+#### `INSERT INTO`
+
+Inserting is pretty simple, we just evaluate the `VALUES` passed and
+write them to storage.
+
+```zig
+    fn executeInsert(self: Executor, i: Parser.InsertAST) QueryResponseResult {
+        var emptyRow = Storage.Row.init(self.allocator, undefined);
+        var row = Storage.Row.init(self.allocator, undefined);
+        for (i.values) |v| {
+            var exp = self.executeExpression(v, emptyRow);
+            row.append(exp) catch return .{ .err = "Could not allocate for cell" };
+        }
+
+        if (self.storage.writeRow(i.table.string(), row)) |err| {
+            return .{ .err = err };
+        }
+
+        return .{
+            .val = .{ .fields = undefined, .rows = undefined, .empty = true },
+        };
+    }
+```
+
+#### `CREATE TABLE`
+
+Similarly to `INSERT INTO` but without any expression evaluation we
+map the `CreateTableAST` to `Storage` entities and write them to
+storage.
+
+```zig
+    fn executeCreateTable(self: Executor, c: Parser.CreateTableAST) QueryResponseResult {
+        var columns = std.ArrayList(String).init(self.allocator);
+        var types = std.ArrayList(String).init(self.allocator);
+
+        for (c.columns) |column| {
+            columns.append(column.name.string()) catch return .{
+                .err = "Could not allocate for column name",
+            };
+            types.append(column.kind.string()) catch return .{
+                .err = "Could not allocate for column kind",
+            };
+        }
+
+        var table = Storage.Table{
+            .name = c.table.string(),
+            .columns = columns.items,
+            .types = types.items,
+        };
+
+        if (self.storage.writeTable(table)) |err| {
+            return .{ .err = err };
+        }
+        return .{
+            .val = .{ .fields = undefined, .rows = undefined, .empty = true },
+        };
+    }
+```
+
+For both `CREATE TABLE` and `INSERT INTO` there is more validation we
+could do. Exercise for the reader and whatnot. :)
+
+
+#### `execute`
+
+Finally we can switch on the `AST` and call the appropriate execution
+function.
+
+```zig
+    pub fn execute(self: Executor, ast: Parser.AST) QueryResponseResult {
+        return switch (ast) {
+            .select => |select| switch (self.executeSelect(select)) {
+                .val => |val| .{ .val = val },
+                .err => |err| .{ .err = err },
+            },
+            .insert => |insert| switch (self.executeInsert(insert)) {
+                .val => |val| .{ .val = val },
+                .err => |err| .{ .err = err },
+            },
+            .create_table => |createTable| switch (self.executeCreateTable(createTable)) {
+                .val => |val| .{ .val = val },
+                .err => |err| .{ .err = err },
+            },
+        };
+    }
+};
+```
+
+And now we're ready to put it all together in `main`!
+
+### `main` (`main.zig`, 144 LoC)
+
+First we set up our arena allocator.
+
+```zig
+const std = @import("std");
+
+const RocksDB = @import("rocksdb.zig").RocksDB;
+const lex = @import("lex.zig");
+const parse = @import("parse.zig");
+const execute = @import("execute.zig");
+const Storage = @import("storage.zig").Storage;
+
+pub fn main() !void {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+```
+
+Then we parse CLI arguments. Importantly we need to grab a location on
+disk for RocksDB to store data. And we need a query to execute.
+
+```zig
+    var debugTokens = false;
+    var debugAST = false;
+    var args = std.process.args();
+    var scriptArg: usize = 0;
+    var databaseArg: usize = 0;
+    var i: usize = 0;
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--debug-tokens")) {
+            debugTokens = true;
+        }
+
+        if (std.mem.eql(u8, arg, "--debug-ast")) {
+            debugAST = true;
+        }
+
+        if (std.mem.eql(u8, arg, "--database")) {
+            databaseArg = i + 1;
+            i += 1;
+            _ = args.next();
+        }
+
+        if (std.mem.eql(u8, arg, "--script")) {
+            scriptArg = i + 1;
+            i += 1;
+            _ = args.next();
+        }
+
+        i += 1;
+    }
+
+    if (databaseArg == 0) {
+        std.debug.print("--database is a required flag. Should be a directory for data.\n", .{});
+        return;
+    }
+
+    if (scriptArg == 0) {
+        std.debug.print("--script is a required flag. Should be a file containing SQL.\n", .{});
+        return;
+    }
+```
+
+Next we read the file passed for the query.
+
+```zig
+    const file = try std.fs.cwd().openFileZ(std.os.argv[scriptArg], .{});
+    defer file.close();
+
+    const file_size = try file.getEndPos();
+    var prog = try allocator.alloc(u8, file_size);
+
+    _ = try file.read(prog);
+```
+
+And pass the query to the lexer.
+
+```zig
+    var tokens = std.ArrayList(lex.Token).init(allocator);
+    const lexErr = lex.lex(prog, &tokens);
+    if (lexErr) |err| {
+        std.debug.print("Failed to lex: {s}", .{err});
+        return;
+    }
+
+    if (debugTokens) {
+        for (tokens.items) |token| {
+            std.debug.print("Token: {s}\n", .{token.string()});
+        }
+    }
+
+    if (tokens.items.len == 0) {
+        std.debug.print("Program is empty", .{});
+        return;
+    }
+```
+
+Pass the tokens to the parser.
+
+```zig
+    const parser = parse.Parser.init(allocator);
+    var ast: parse.Parser.AST = undefined;
+    switch (parser.parse(tokens.items)) {
+        .err => |err| {
+            std.debug.print("Failed to parse: {s}", .{err});
+            return;
+        },
+        .val => |val| ast = val,
+    }
+
+    if (debugAST) {
+        ast.print();
+    }
+```
+
+Initialize storage.
+
+```zig
+    var db: RocksDB = undefined;
+    var dataDirectory = std.mem.span(std.os.argv[databaseArg]);
+    switch (RocksDB.open(allocator, dataDirectory)) {
+        .err => |err| {
+            std.debug.print("Failed to open database: {s}", .{err});
+            return;
+        },
+        .val => |val| db = val,
+    }
+    defer db.close();
+
+    const storage = Storage.init(allocator, db);
+```
+
+And execute and print results. :)
+
+```zig
+    const executor = execute.Executor.init(allocator, storage);
+    switch (executor.execute(ast)) {
+        .err => |err| {
+            std.debug.print("Failed to execute: {s}", .{err});
+            return;
+        },
+        .val => |val| {
+            if (val.rows.len == 0) {
+                std.debug.print("ok\n", .{});
+                return;
+            }
+
+            std.debug.print("| ", .{});
+            for (val.fields) |field| {
+                std.debug.print("{s}\t\t|", .{field});
+            }
+            std.debug.print("\n", .{});
+            std.debug.print("+ ", .{});
+            for (val.fields) |field| {
+                var fieldLen = field.len;
+                while (fieldLen > 0) {
+                    std.debug.print("=", .{});
+                    fieldLen -= 1;
+                }
+                std.debug.print("\t\t+", .{});
+            }
+            std.debug.print("\n", .{});
+
+            for (val.rows) |row| {
+                std.debug.print("| ", .{});
+                for (row) |cell| {
+                    std.debug.print("{s}\t\t|", .{cell});
+                }
+                std.debug.print("\n", .{});
+            }
+        },
+    }
+}
+```
+
+### build.zig
+
+Finally, finally, tie it all together with `build.zig`.
+
+```zig
+const version = @import("builtin").zig_version;
+const std = @import("std");
+
+pub fn build(b: *std.build.Builder) void {
+    const exe = b.addExecutable("main", "main.zig");
+    exe.linkLibC();
+    exe.linkSystemLibraryName("rocksdb");
+
+    if (@hasDecl(@TypeOf(exe.*), "addLibraryPath")) {
+        exe.addLibraryPath("./rocksdb");
+        exe.addIncludePath("./rocksdb/include");
+    } else {
+        exe.addLibPath("./rocksdb");
+        exe.addIncludeDir("./rocksdb/include");
+    }
+
+    exe.setOutputDir(".");
+
+    if (exe.target.isDarwin()) {
+        b.installFile("./rocksdb/librocksdb.7.8.dylib", "../librocksdb.7.8.dylib");
+        exe.addRPath(".");
+    }
+
+    exe.install();
+}
+```
+
+Grab RocksDB, build it, and build our CLI.
+
+```bash
+$ git clone https://github.com/facebook/rocksdb
+$ ( cd rocksdb && make shared_lib -j8 )
+$ zig build
+```
+
+And give it a go. :)
+
+```bash
+$ ./main --database data --script <(echo "CREATE TABLE y (year int, age int, name text)")
+echo "CREATE TABLE y (year int, age int, name text)"
+ok
+$ ./main --database data --script <(echo "INSERT INTO y VALUES (2010, 38, 'Gary')")
+echo "INSERT INTO y VALUES (2010, 38, 'Gary')"
+ok
+$ ./main --database data --script <(echo "INSERT INTO y VALUES (2021, 92, 'Teej')")
+echo "INSERT INTO y VALUES (2021, 92, 'Teej')"
+ok
+$ ./main --database data --script <(echo "INSERT INTO y VALUES (1994, 18, 'Mel')")
+echo "INSERT INTO y VALUES (1994, 18, 'Mel')"
+ok
+
+# Basic query
+$ ./main --database data --script <(echo "SELECT name, age, year FROM y")
+echo "SELECT name, age, year FROM y"
+| name          |age            |year           |
++ ====          +===            +====           +
+| Mel           |18             |1994           |
+| Gary          |38             |2010           |
+| Teej          |92             |2021           |
+
+# With WHERE
+$ ./main --database data --script <(echo "SELECT name, year, age FROM y WHERE age < 40")
+echo "SELECT name, year, age FROM y WHERE age < 40"
+| name          |year           |age            |
++ ====          +====           +===            +
+| Mel           |1994           |18             |
+| Gary          |2010           |38             |
+
+# With operations
+$ ./main --database data --script <(echo "SELECT 'Name: ' || name, year + 30, age FROM y WHERE age < 40")
+echo "SELECT 'Name: ' || name, year + 30, age FROM y WHERE age < 40"
+| unknown               |unknown                |age            |
++ =======               +=======                +===            +
+| Name: Mel             |2024           |18             |
+| Name: Gary            |2040           |38             |
+```
+
+### From Here
+
+If you liked this, here are some other things you might want to check
+out!
+
+* Designing Database Intensive Applications
+* Database Internals: A Deep Dive Into How Distributed Data Systems Work
+* [r/databasedevelopment](https://reddit.com/r/databasedevelopment)
+* [The #dbs channel on a software internals/hacking Discord I run](https//discord.multiprocess.io)
+* [gosql](https://github.com/gosql)
+
+And of course, other posts on this blog. :)
