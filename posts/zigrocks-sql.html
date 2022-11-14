@@ -605,7 +605,7 @@ They can be:
 
 Let's define these in Zig:
 
-```    
+```zig
     pub const BinaryOperationAST = struct {
         operator: Token,
         left: *ExpressionAST,
@@ -728,14 +728,14 @@ with another expression for the where.
     };
 ```
 
-To parse it we look for: 
+To parse it we look for:
 
 * `SELECT`
 * Then a comma separated list of `ExpressionAST`s
 * Then a `FROM`
 * Then optionally a `WHERE`
   * And then another `ExpressionAST`
-  
+
 With the help of `expectTokenKind` and `parseExpression` it is not too
 difficult, but a little verbose, to write.
 
@@ -2036,6 +2036,10 @@ echo "SELECT 'Name: ' || name, year + 30, age FROM y WHERE age < 40"
 ```
 
 ### From Here
+
+As mentioned, this project is a vast simplification and there are
+plenty of bugs and subpar design choices. But hopefully it helps to
+make database development feel a little less intimidating!
 
 If you liked this, here are some other things you might want to check
 out!

@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 14 Nov 2022 01:18:42 +0000</lastBuildDate><item><title>Writing a SQL database, take two: Zig and RocksDB</title><link>http://notes.eatonphil.com/zigrocks-sql.html</link><description>&lt;p&gt;In this post, in ~1700 lines of code (yes, I'm sorry it's bigger than
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Mon, 14 Nov 2022 01:21:32 +0000</lastBuildDate><item><title>Writing a SQL database, take two: Zig and RocksDB</title><link>http://notes.eatonphil.com/zigrocks-sql.html</link><description>&lt;p&gt;In this post, in ~1700 lines of code (yes, I'm sorry it's bigger than
 my usual), we'll create a basic embedded SQL database in Zig on top of
 RocksDB. Other than the RocksDB layer it will not use third-party
 libraries.&lt;/p&gt;
@@ -508,14 +508,14 @@ pub const Parser = struct {
 &lt;li&gt;Or binary operations&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;Let's define these in Zig:&lt;/p&gt;
-&lt;pre&gt;&lt;code&gt;    pub const BinaryOperationAST = struct {
+&lt;pre&gt;&lt;code class="hljs zig"&gt;    pub const BinaryOperationAST = struct {
         operator: Token,
         left: *ExpressionAST,
         right: *ExpressionAST,
 
         fn print(self: BinaryOperationAST) void {
             self.left.print();
-            std.debug.print(" {s} ", .{self.operator.string()});
+            std.debug.print(&amp;quot; {s} &amp;quot;, .{self.operator.string()});
             self.right.print();
         }
     };
@@ -527,8 +527,8 @@ pub const Parser = struct {
         fn print(self: ExpressionAST) void {
             switch (self) {
                 .literal =&amp;gt; |literal| switch (literal.kind) {
-                    .string =&amp;gt; std.debug.print("'{s}'", .{literal.string()}),
-                    else =&amp;gt; std.debug.print("{s}", .{literal.string()}),
+                    .string =&amp;gt; std.debug.print(&amp;quot;&amp;#39;{s}&amp;#39;&amp;quot;, .{literal.string()}),
+                    else =&amp;gt; std.debug.print(&amp;quot;{s}&amp;quot;, .{literal.string()}),
                 },
                 .binary_operation =&amp;gt; self.binary_operation.print(),
             }
@@ -1755,7 +1755,10 @@ echo &amp;quot;SELECT &amp;#39;Name: &amp;#39; || name, year + 30, age FROM y WH
 | Name: Mel             |2024           |18             |
 | Name: Gary            |2040           |38             |
 &lt;/code&gt;&lt;/pre&gt;
-&lt;h3 id="from-here"&gt;From Here&lt;/h3&gt;&lt;p&gt;If you liked this, here are some other things you might want to check
+&lt;h3 id="from-here"&gt;From Here&lt;/h3&gt;&lt;p&gt;As mentioned, this project is a vast simplification and there are
+plenty of bugs and subpar design choices. But hopefully it helps to
+make database development feel a little less intimidating!&lt;/p&gt;
+&lt;p&gt;If you liked this, here are some other things you might want to check
 out!&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Designing Database Intensive Applications&lt;/li&gt;

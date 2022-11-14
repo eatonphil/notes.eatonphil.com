@@ -563,14 +563,14 @@ pub const Parser = struct {
 <li>Or binary operations</li>
 </ul>
 <p>Let's define these in Zig:</p>
-<pre><code>    pub const BinaryOperationAST = struct {
+<pre><code class="hljs zig">    pub const BinaryOperationAST = struct {
         operator: Token,
         left: *ExpressionAST,
         right: *ExpressionAST,
 
         fn print(self: BinaryOperationAST) void {
             self.left.print();
-            std.debug.print(" {s} ", .{self.operator.string()});
+            std.debug.print(&quot; {s} &quot;, .{self.operator.string()});
             self.right.print();
         }
     };
@@ -582,8 +582,8 @@ pub const Parser = struct {
         fn print(self: ExpressionAST) void {
             switch (self) {
                 .literal =&gt; |literal| switch (literal.kind) {
-                    .string =&gt; std.debug.print("'{s}'", .{literal.string()}),
-                    else =&gt; std.debug.print("{s}", .{literal.string()}),
+                    .string =&gt; std.debug.print(&quot;&#39;{s}&#39;&quot;, .{literal.string()}),
+                    else =&gt; std.debug.print(&quot;{s}&quot;, .{literal.string()}),
                 },
                 .binary_operation =&gt; self.binary_operation.print(),
             }
@@ -1810,7 +1810,10 @@ echo &quot;SELECT &#39;Name: &#39; || name, year + 30, age FROM y WHERE age &lt;
 | Name: Mel             |2024           |18             |
 | Name: Gary            |2040           |38             |
 </code></pre>
-<h3 id="from-here">From Here</h3><p>If you liked this, here are some other things you might want to check
+<h3 id="from-here">From Here</h3><p>As mentioned, this project is a vast simplification and there are
+plenty of bugs and subpar design choices. But hopefully it helps to
+make database development feel a little less intimidating!</p>
+<p>If you liked this, here are some other things you might want to check
 out!</p>
 <ul>
 <li>Designing Database Intensive Applications</li>
