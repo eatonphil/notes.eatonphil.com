@@ -134,15 +134,15 @@ syntax tree (AST).</p>
 that can be easily stored on disk. And it handles recovering
 high-level tables and rows from bytes on disk.</p>
 <p>Invisible to users of the <em>Storage</em> component is <em>RocksDB</em>, which is how
-the bytes are actually stored on disk. RocksDB is a persistant store
+the bytes are actually stored on disk. <a href="http://rocksdb.org/">RocksDB</a> is a persistant store
 that maps arbitary byte keys to arbitrary byte values. We'll use it
 for storing and recovering both table metadata and actual row data.</p>
 <p><em>Execution</em> takes a query AST and executes it against <em>Storage</em>.</p>
 <p>These terms are a vast simplification of real-world database
-design. But they are already extremely helpful to have in a project
+design. But they are helpful structure to have even in a project
 this small.</p>
 <h3 id="memory-management">Memory Management</h3><p>Zig doesn't have a garbage collector. Mitchell Hashimoto <a href="https://github.com/mitchellh/zig-libgc">wrote
-bindings to Boehm GC</a>, but Zig
+bindings to Boehm GC</a>. But Zig
 also has a <a href="https://ziglang.org/documentation/master/#toc-Choosing-an-Allocator">builtin Arena
 allocator</a>
 which is perfect for this simple project.</p>
@@ -354,9 +354,9 @@ comparison function in Zig. So let's write that first.</p>
 }
 </code></pre>
 <p>Unfortunately it only supports ASCII for now.</p>
-<p>Now we can write a simple longest matching substring function. It will
-be simple because the keyword mapping we set up above is ordered by
-length descending.</p>
+<p>Now we can write a simple longest-matching-substring function. It is
+simple because the keyword mapping we set up above is already ordered
+by length descending.</p>
 <pre><code class="hljs zig">fn lexKeyword(source: String, index: usize) struct { nextPosition: usize, token: ?Token } {
     var longestLen: usize = 0;
     var kind = Token.Kind.select_keyword;
@@ -646,7 +646,7 @@ pub const Parser = struct {
 <p>Basically, we assume it's a literal expression unless we see an
 operator after it. If there's an operator after it we call
 <code>parseExpression</code> recursively and return a binary expression.</p>
-<p>Important to note, this skips both implicit operator precedence and
+<p>Important to note: this skips both implicit operator precedence and
 explicit precedence via parenthesis.</p>
 <h4 id="<code>select</code>"><code>SELECT</code></h4><p>A <code>SELECT</code> query's structure has a <code>FROM</code> table name, a
 comma-separated list of expressions, and an optional <code>WHERE</code> section
@@ -1000,7 +1000,7 @@ the above three query types.</p>
     }
 };
 </code></pre>
-<p>Perfect. (For today. :) )</p>
+<p>Perfect. For today. :)</p>
 <h3 id="storage-(<code>storage.zig</code>,-338-loc)">Storage (<code>storage.zig</code>, 338 LoC)</h3><p>Next we're going to switch contexts completely and think about how
 tables and rows will get serialized into bytes that can be stored on
 disk.</p>
@@ -1138,7 +1138,7 @@ either a boolean, an integer, a string, or null.</p>
         }
     };
 </code></pre>
-<p>We use a simple, space inefficient scheme for encoding/decoding to
+<p>We use a simple, space-inefficient scheme for encoding/decoding to
 bytes that can be written to disk.</p>
 <h4 id="rows">Rows</h4><p>Now that we've got values, we can define rows in terms of values. And
 we can provide a few helper functions for getting cells by field name.</p>
@@ -1290,7 +1290,7 @@ iterating over all rows with that prefix.</p>
         };
     }
 </code></pre>
-<h4 id="tables">Tables</h4><p>Finally we've got tables. We must store table metadata. Its name,
+<h4 id="tables">Tables</h4><p>Finally we've got tables. We must store table metadata: its name,
 columns and column types.</p>
 <pre><code class="hljs zig">    pub const Table = struct {
         name: String,
@@ -1500,7 +1500,7 @@ requested fields.</p>
 if there is no <code>WHERE</code> condition or if we evaluate the <code>WHERE</code>
 condition successfully.</p>
 <p>When we add rows to the response, we need to actually evaluate the
-expression from each column in the <code>SELECT</code> AST.</p>
+expression for each column in the <code>SELECT</code> AST.</p>
 <pre><code class="hljs zig">        while (iter.next()) |row| {
             var add = false;
             if (s.where) |where| {
@@ -1550,7 +1550,7 @@ write them to storage.</p>
         };
     }
 </code></pre>
-<h4 id="<code>create-table</code>"><code>CREATE TABLE</code></h4><p>Similarly to <code>INSERT INTO</code> but without any expression evaluation we
+<h4 id="<code>create-table</code>"><code>CREATE TABLE</code></h4><p>Similarly to <code>INSERT INTO</code>, but without any expression evaluation, we
 map the <code>CreateTableAST</code> to <code>Storage</code> entities and write them to
 storage.</p>
 <pre><code class="hljs zig">    fn executeCreateTable(self: Executor, c: Parser.CreateTableAST) QueryResponseResult {
@@ -1837,8 +1837,8 @@ make database development feel a little less intimidating!</p>
 <p>If you liked this, here are some other things you might want to check
 out!</p>
 <ul>
-<li>Designing Database Intensive Applications</li>
-<li>Database Internals: A Deep Dive Into How Distributed Data Systems Work</li>
+<li><a href="https://www.goodreads.com/book/show/23463279-designing-data-intensive-applications">Designing Database Intensive Applications</a></li>
+<li><a href="https://www.goodreads.com/en/book/show/44647144-database-internals">Database Internals: A Deep Dive Into How Distributed Data Systems Work</a></li>
 <li><a href="https://reddit.com/r/databasedevelopment">r/databasedevelopment</a></li>
 <li><a href="https//discord.multiprocess.io">The #dbs channel on a software internals/hacking Discord I run</a></li>
 <li><a href="https://github.com/gosql">gosql</a></li>

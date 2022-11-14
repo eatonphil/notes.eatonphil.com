@@ -94,20 +94,20 @@ that can be easily stored on disk. And it handles recovering
 high-level tables and rows from bytes on disk.
 
 Invisible to users of the *Storage* component is *RocksDB*, which is how
-the bytes are actually stored on disk. RocksDB is a persistant store
+the bytes are actually stored on disk. [RocksDB](http://rocksdb.org/) is a persistant store
 that maps arbitary byte keys to arbitrary byte values. We'll use it
 for storing and recovering both table metadata and actual row data.
 
 *Execution* takes a query AST and executes it against *Storage*.
 
 These terms are a vast simplification of real-world database
-design. But they are already extremely helpful to have in a project
+design. But they are helpful structure to have even in a project
 this small.
 
 ### Memory Management
 
 Zig doesn't have a garbage collector. Mitchell Hashimoto [wrote
-bindings to Boehm GC](https://github.com/mitchellh/zig-libgc), but Zig
+bindings to Boehm GC](https://github.com/mitchellh/zig-libgc). But Zig
 also has a [builtin Arena
 allocator](https://ziglang.org/documentation/master/#toc-Choosing-an-Allocator)
 which is perfect for this simple project.
@@ -361,9 +361,9 @@ fn asciiCaseInsensitiveEqual(left: String, right: String) bool {
 
 Unfortunately it only supports ASCII for now.
 
-Now we can write a simple longest matching substring function. It will
-be simple because the keyword mapping we set up above is ordered by
-length descending.
+Now we can write a simple longest-matching-substring function. It is
+simple because the keyword mapping we set up above is already ordered
+by length descending.
 
 ```zig
 fn lexKeyword(source: String, index: usize) struct { nextPosition: usize, token: ?Token } {
@@ -696,7 +696,7 @@ Basically, we assume it's a literal expression unless we see an
 operator after it. If there's an operator after it we call
 `parseExpression` recursively and return a binary expression.
 
-Important to note, this skips both implicit operator precedence and
+Important to note: this skips both implicit operator precedence and
 explicit precedence via parenthesis.
 
 #### `SELECT`
@@ -1080,7 +1080,7 @@ And we can implement `parse` by switching on the current token.
 };
 ```
 
-Perfect. (For today. :) )
+Perfect. For today. :)
 
 ### Storage (`storage.zig`, 338 LoC)
 
@@ -1252,7 +1252,7 @@ And deserialization.
     };
 ```
 
-We use a simple, space inefficient scheme for encoding/decoding to
+We use a simple, space-inefficient scheme for encoding/decoding to
 bytes that can be written to disk.
 
 #### Rows
@@ -1426,7 +1426,7 @@ iterating over all rows with that prefix.
 
 #### Tables
 
-Finally we've got tables. We must store table metadata. Its name,
+Finally we've got tables. We must store table metadata: its name,
 columns and column types.
 
 ```zig
@@ -1673,7 +1673,7 @@ if there is no `WHERE` condition or if we evaluate the `WHERE`
 condition successfully.
 
 When we add rows to the response, we need to actually evaluate the
-expression from each column in the `SELECT` AST.
+expression for each column in the `SELECT` AST.
 
 ```zig
         while (iter.next()) |row| {
@@ -1733,7 +1733,7 @@ write them to storage.
 
 #### `CREATE TABLE`
 
-Similarly to `INSERT INTO` but without any expression evaluation we
+Similarly to `INSERT INTO`, but without any expression evaluation, we
 map the `CreateTableAST` to `Storage` entities and write them to
 storage.
 
@@ -2068,8 +2068,8 @@ make database development feel a little less intimidating!
 If you liked this, here are some other things you might want to check
 out!
 
-* Designing Database Intensive Applications
-* Database Internals: A Deep Dive Into How Distributed Data Systems Work
+* [Designing Database Intensive Applications](https://www.goodreads.com/book/show/23463279-designing-data-intensive-applications)
+* [Database Internals: A Deep Dive Into How Distributed Data Systems Work](https://www.goodreads.com/en/book/show/44647144-database-internals)
 * [r/databasedevelopment](https://reddit.com/r/databasedevelopment)
 * [The #dbs channel on a software internals/hacking Discord I run](https//discord.multiprocess.io)
 * [gosql](https://github.com/gosql)
