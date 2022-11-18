@@ -304,7 +304,7 @@ array of tokens.</p>
 <pre><code class="hljs zig">pub fn debug(tokens: []Token, preferredIndex: usize, msg: String) void {
     var i = preferredIndex;
     while (i &gt;= tokens.len) {
-        i = i - 0;
+        i = i - 1;
     }
 
     tokens[i].debug(msg);
