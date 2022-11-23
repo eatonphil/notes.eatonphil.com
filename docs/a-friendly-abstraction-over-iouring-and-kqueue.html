@@ -3,8 +3,8 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     
-    <title>Administering Kubernetes is hard | notes.eatonphil.com</title>
-    <meta name="description" content="Administering Kubernetes is hard" />
+    <title>A Programmer-Friendly I/O Abstraction Over io_uring and kqueue | notes.eatonphil.com</title>
+    <meta name="description" content="A Programmer-Friendly I/O Abstraction Over io_uring and kqueue" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css" />
@@ -73,10 +73,10 @@
 	    </div>
 	  </div>
 
-          <h2>September 30, 2019</h2>
-          <h1>Administering Kubernetes is hard</h1>
+          <h2>November 23, 2022</h2>
+          <h1>A Programmer-Friendly I/O Abstraction Over io_uring and kqueue</h1>
           <div class="row" style="padding-bottom: 5px">
-            <div class="tags"><a href="/tags/orchestration.html" class="tag">orchestration</a><a href="/tags/aws.html" class="tag">aws</a><a href="/tags/docker.html" class="tag">docker</a><a href="/tags/kubernetes.html" class="tag">kubernetes</a></div>
+            <div class="tags"><a href="/tags/databases.html" class="tag">databases</a><a href="/tags/zig.html" class="tag">zig</a><a href="/tags/io_uring.html" class="tag">io_uring</a><a href="/tags/kqueue.html" class="tag">kqueue</a><a href="/tags/linux.html" class="tag">linux</a><a href="/tags/freebsd.html" class="tag">freebsd</a><a href="/tags/darwin.html" class="tag">darwin</a></div>
           </div>
 	</div>
       </div>
@@ -84,34 +84,11 @@
 
     <div class="container">
       <div class="col-6">
-        <p>Kubernetes is easy to use after some exposure; it's pretty convenient
-too. But it is super hard to set up.</p>
-<p><a href="https://eksctl.io">eksctl</a> is a good tool for folks who don't want to
-spend hours/days/weeks debugging VPC configuration in 1000s of lines
-of CloudFormation. None of the other tools seem to be that much easier
-to use (kops, kubeadm, etc.).</p>
-<p>But even with EKS and eksctl you are constrained to Amazon Linux
-worker nodes. AMIs are practically impossible to discover.</p>
-<p>I haven't spent much time with GKE.</p>
-<p>And while eksctl operates on the right level for developers needing to
-administrate small/medium-sized systems, it... doesn't exist outside
-EKS.</p>
-<p>It is unfortunate the only major container orchestration system is
-this complex to administer. The user-facing APIs are pretty solid and
-guide toward sustainable system design. It is <em>really</em> hard to see the
-value for most companies with medium-sized deployments tasked with
-administration. Among serious proprietary alternatives, sure, there's
-ECS and Google App Engine. But there's little advantage in existing
-Kubernetes user knowledge. The OSS alternatives don't have the
-adoption to seem like a good investment.</p>
-<p>OpenStack's <a href="https://wiki.openstack.org/wiki/Magnum">magnum</a> or
-OpenShift seem like possible high-level providers for a generic
-environment. But neither are particularly known for stability.</p>
-<p>In all, the ecosystem has gotten friendlier. There will probably be a
-time in the future (3-5 years from now?) when Kubernetes is fairly
-easy to administer.</p>
-<p>I'd love to hear your thoughts and experiences administering
-Kubernetes.</p>
+        <head>
+    <meta http-equiv="refresh" content="4;URL='https://tigerbeetle.com/blog/a-friendly-abstraction-over-iouring-and-kqueue/'" />
+</head><p>This is an external post of mine. Click
+<a href="https://tigerbeetle.com/blog/a-friendly-abstraction-over-iouring-and-kqueue/">here</a>
+if you are not redirected.</p>
 <style>.feedback{display:initial;}</style>
 	<div class="feedback">
 	  <h4>Feedback</h4>
