@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 01 Dec 2022 22:13:11 +0000</lastBuildDate><item><title>Is it worth writing about?</title><link>http://notes.eatonphil.com/is-it-worth-writing-about.html</link><description>&lt;p&gt;You acquire a skill or experience through time and effort,
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 01 Dec 2022 22:14:31 +0000</lastBuildDate><item><title>Is it worth writing about?</title><link>http://notes.eatonphil.com/is-it-worth-writing-about.html</link><description>&lt;p&gt;You acquire a skill or experience through time and effort,
 then downplay the impact of writing and sharing the learning
 process.&lt;/p&gt;
 &lt;p&gt;Professionals seem naturally to imagine a high bar for what
@@ -86,6 +86,8 @@ internet.&lt;/p&gt;
 &lt;h3 id="community"&gt;Community&lt;/h3&gt;&lt;p&gt;If you want a community of folks where you can find encouragement to
 write and eyes to review drafts, check out the #writing-and-drafts
 channel on &lt;a href="discord.multiprocess.io"&gt;discord.multiprocess.io&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id="is-it-worth-writing-about?"&gt;Is it worth writing about?&lt;/h3&gt;&lt;p&gt;Well if you come to me I'm almost surely going to say yes. Poor
+Betteridge.&lt;/p&gt;
 </description><guid isPermaLink="false">http://notes.eatonphil.com/is-it-worth-writing-about.html</guid><pubDate>Thu, 01 Dec 2022 00:00:00 +0000</pubDate></item><item><title>A Programmer-Friendly I/O Abstraction Over io_uring and kqueue</title><link>http://notes.eatonphil.com/a-friendly-abstraction-over-iouring-and-kqueue.html</link><description>&lt;head&gt;
     &lt;meta http-equiv="refresh" content="4;URL='https://tigerbeetle.com/blog/a-friendly-abstraction-over-iouring-and-kqueue/'" /&gt;
 &lt;/head&gt;&lt;p&gt;This is an external post of mine. Click
