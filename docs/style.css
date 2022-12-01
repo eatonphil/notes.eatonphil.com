@@ -7,7 +7,7 @@ body {
     padding: 0;
     color: black;
     font-size: 1.1rem;
-    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -66,6 +66,13 @@ p:last-child, li:last-child {
 
 a {
     color: rgb(0 95 255);
+    text-decoration: none;
+}
+
+blockquote {
+    background: #efefef;
+    padding: 1px 15px 15px 15px;
+    font-size: .9rem;
 }
 
 .code-caption {
