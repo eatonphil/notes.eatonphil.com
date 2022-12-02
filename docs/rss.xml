@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Fri, 02 Dec 2022 03:50:52 +0000</lastBuildDate><item><title>Is it worth writing about?</title><link>http://notes.eatonphil.com/is-it-worth-writing-about.html</link><description>&lt;p&gt;You acquire a skill or experience through time and effort,
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Fri, 02 Dec 2022 13:41:40 +0000</lastBuildDate><item><title>Is it worth writing about?</title><link>http://notes.eatonphil.com/is-it-worth-writing-about.html</link><description>&lt;p&gt;You acquire a skill or experience through time and effort,
 then downplay the impact of writing and sharing the learning
 process.&lt;/p&gt;
 &lt;p&gt;Professionals seem naturally to imagine a high bar for what
@@ -8,12 +8,12 @@ is worth writing about.&lt;/p&gt;
 these beliefs, but rather encouragement for folks looking for a reason
 to write.&lt;/p&gt;
 &lt;p&gt;There are (at least) a few concrete reasons to write about what you've
-learned, even when it's not novel.&lt;/p&gt;
+learned, even when you don't think it's novel.&lt;/p&gt;
 &lt;h3 id="to-practice-writing"&gt;To practice writing&lt;/h3&gt;&lt;p&gt;This is the easiest reason. While practice does not imply improvement,
 you cannot improve without practice.&lt;/p&gt;
 &lt;p&gt;Every time you learn something is a chance to write down both what
 you've learned and also how you learned it.&lt;/p&gt;
-&lt;p&gt;For professional developers this happens all the time. Daily,
+&lt;p&gt;For professional developers this chance happens all the time. Daily,
 really. But most developers, even those who want to write more, let
 the opportunity slip.&lt;/p&gt;
 &lt;h3 id="providing-variety"&gt;Providing variety&lt;/h3&gt;&lt;p&gt;When I learn a topic I normally go through dozens of posts, papers,
@@ -38,8 +38,10 @@ software include:&lt;/p&gt;
 &lt;li&gt;&lt;a href="https://nullprogram.com/blog/2015/03/19/"&gt;Chris Wellons&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;And &lt;a href="https://zserge.com/"&gt;Serge Zaitsev&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
-&lt;p&gt;But experience need not be a prerequisite. A beginner's experience is
-valuable for everyone who is not a beginner.&lt;/p&gt;
+&lt;p&gt;But experience need not be a prerequisite. Experts (who don't practice
+explaining) easily forget how they came to their current
+understanding. A beginner's experience is valuable for everyone who is
+not a beginner, sometimes also to beginners.&lt;/p&gt;
 &lt;h3 id="to-cement-understanding"&gt;To cement understanding&lt;/h3&gt;&lt;p&gt;Finally, honest writing &lt;em&gt;forces&lt;/em&gt; you to either understand the dark
 corners of what you've learned or to ask for help in these dark
 corners.&lt;/p&gt;
