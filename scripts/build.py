@@ -1,9 +1,15 @@
 import glob
 import os
+import shutil
 from datetime import datetime, timezone
 
 import mistune
 from feedgen.feed import FeedGenerator
+
+STATIC = [
+    'style.css',
+    'favicon.ico',
+]
 
 POST_SUMMARY = """
 <div class="summary">
@@ -158,9 +164,8 @@ def main():
         meta = '<meta name="google-site-verification" content="s-Odt0Dj7WZzEk6hLV28wLyR5LeGQFoopUV3IDNO6bM" />\n    '
         f.write(TEMPLATE.format(post=home_page, title="", tag=TAG, subtitle="", tags="", meta=meta, frequent_tags=""))
 
-    with open('docs/style.css', 'w') as fw:
-        with open('style.css') as fr:
-            fw.write(fr.read())
+    for f in STATIC:
+        shutil.copy(f, os.path.join('docs', f))
 
     fg = FeedGenerator()
     for url, title, date, post, content, _ in reversed(post_data):
