@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 01 Dec 2022 22:21:15 +0000</lastBuildDate><item><title>Is it worth writing about?</title><link>http://notes.eatonphil.com/is-it-worth-writing-about.html</link><description>&lt;p&gt;You acquire a skill or experience through time and effort,
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Notes on software development</title><link>http://notes.eatonphil.com/</link><description>Notes on software development</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><language>en</language><lastBuildDate>Thu, 29 Dec 2022 22:48:58 +0000</lastBuildDate><item><title>Is it worth writing about?</title><link>http://notes.eatonphil.com/is-it-worth-writing-about.html</link><description>&lt;p&gt;You acquire a skill or experience through time and effort,
 then downplay the impact of writing and sharing the learning
 process.&lt;/p&gt;
 &lt;p&gt;Professionals seem naturally to imagine a high bar for what
@@ -8,20 +8,21 @@ is worth writing about.&lt;/p&gt;
 these beliefs, but rather encouragement for folks looking for a reason
 to write.&lt;/p&gt;
 &lt;p&gt;There are (at least) a few concrete reasons to write about what you've
-learned, even when it's not novel.&lt;/p&gt;
+learned, even when you don't think it's novel.&lt;/p&gt;
 &lt;h3 id="to-practice-writing"&gt;To practice writing&lt;/h3&gt;&lt;p&gt;This is the easiest reason. While practice does not imply improvement,
 you cannot improve without practice.&lt;/p&gt;
 &lt;p&gt;Every time you learn something is a chance to write down both what
 you've learned and also how you learned it.&lt;/p&gt;
-&lt;p&gt;For professional developers this happens all the time. Daily,
+&lt;p&gt;For professional developers this chance happens all the time. Daily,
 really. But most developers, even those who want to write more, let
 the opportunity slip.&lt;/p&gt;
 &lt;h3 id="providing-variety"&gt;Providing variety&lt;/h3&gt;&lt;p&gt;When I learn a topic I normally go through dozens of posts, papers,
-videos or books to find a version that clicks. If I can. I prefer to
-start with blog posts and often there are not blog posts on the
-subject. Books, videos, and academic papers aren't often as accessible.&lt;/p&gt;
+docs, videos or books to find a version that clicks. If I can. I
+prefer to start with blog posts and often there are not blog posts on
+the subject. Books, docs, videos, and academic papers aren't often as
+accessible.&lt;/p&gt;
 &lt;p&gt;Even if you're writing about a popular topic, there's still a chance
-your post gets through to someone where other posts do not.&lt;/p&gt;
+your post gets through to someone in a way other posts do not.&lt;/p&gt;
 &lt;p class="note"&gt;
   For programmers there are notorious topics you can avoid if
   you'd like ("What is a monad", "Why is lisp interesting", "Kubernetes
@@ -29,7 +30,7 @@ your post gets through to someone where other posts do not.&lt;/p&gt;
 &lt;/p&gt;&lt;p&gt;Additionally, as you gain experience as a programmer (or product
 manager, or whatever), your perspective and approach becomes both more
 interesting and more valuable.&lt;/p&gt;
-&lt;p&gt;I don't think I've ever thought: "I wish they'd write less". But I'm
+&lt;p&gt;I don't recall ever thinking: "I wish they'd write less". But I'm
 always wishing some folks wrote more, or at all.&lt;/p&gt;
 &lt;p&gt;Some folks with experience, writing about widely varied topics in
 software include:&lt;/p&gt;
@@ -38,8 +39,10 @@ software include:&lt;/p&gt;
 &lt;li&gt;&lt;a href="https://nullprogram.com/blog/2015/03/19/"&gt;Chris Wellons&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;And &lt;a href="https://zserge.com/"&gt;Serge Zaitsev&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
-&lt;p&gt;But experience need not be a prerequisite. A beginner's experience is
-valuable for everyone who is not a beginner.&lt;/p&gt;
+&lt;p&gt;But experience need not be a prerequisite. Experts (who don't practice
+explaining) easily forget how they came to their current
+understanding. A beginner's experience is valuable for everyone who is
+not a beginner, sometimes also for beginners.&lt;/p&gt;
 &lt;h3 id="to-cement-understanding"&gt;To cement understanding&lt;/h3&gt;&lt;p&gt;Finally, honest writing &lt;em&gt;forces&lt;/em&gt; you to either understand the dark
 corners of what you've learned or to ask for help in these dark
 corners.&lt;/p&gt;
@@ -85,7 +88,7 @@ a bit of rigor.&lt;/p&gt;
 internet.&lt;/p&gt;
 &lt;h3 id="community"&gt;Community&lt;/h3&gt;&lt;p&gt;If you want a community of folks where you can find encouragement to
 write and eyes to review drafts, check out the #writing-and-drafts
-channel on &lt;a href="discord.multiprocess.io"&gt;discord.multiprocess.io&lt;/a&gt;.&lt;/p&gt;
+channel on &lt;a href="https://discord.multiprocess.io"&gt;discord.multiprocess.io&lt;/a&gt;.&lt;/p&gt;
 &lt;h3 id="is-it-worth-writing-about?"&gt;Is it worth writing about?&lt;/h3&gt;&lt;p&gt;Well if you come to me I'm almost surely going to say yes. Poor
 Betteridge.&lt;/p&gt;
 &lt;p&gt;&lt;blockquote class="twitter-tweet"&gt;&lt;p lang="en" dir="ltr"&gt;Wrote a short post as a bit of encouragement to folks who want to write more but imagine a high bar for what&amp;#39;s worthwhile.&lt;br&gt;&lt;br&gt;tldr; if you ask me it&amp;#39;s almost always going to be a yes. And I think there&amp;#39;s a path toward a higher-quality internet.&lt;a href="https://t.co/Nn6BvXhNdZ"&gt;https://t.co/Nn6BvXhNdZ&lt;/a&gt; &lt;a href="https://t.co/KELvsxnr2w"&gt;pic.twitter.com/KELvsxnr2w&lt;/a&gt;&lt;/p&gt;&amp;mdash; Phil Eaton (@phil_eaton) &lt;a href="https://twitter.com/phil_eaton/status/1598441836284203011?ref_src=twsrc%5Etfw"&gt;December 1, 2022&lt;/a&gt;&lt;/blockquote&gt; &lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8"&gt;&lt;/script&gt;&lt;/p&gt;
