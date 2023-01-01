@@ -1,1 +1,1 @@
-https://notes.eatonphil.com
+Now at https://github.com/eatonphil/eatonphil.com.
